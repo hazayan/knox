@@ -1,5 +1,5 @@
 # Knox -- the high level overview
-Knox is a service for storing and rotation of secrets, keys, and passwords used by other services. 
+Knox is a service for storing and rotation of secrets, keys, and passwords used by other services.
 
 ## The Problem Knox is Meant to Solve
 Pinterest has a plethora of keys or secrets doing things like signing cookies, encrypting data, protecting our network via TLS, accessing our AWS machines, communicating with our third parties, and many more. If these keys become compromised, rotating (or changing our keys) used to be a difficult process generally involving a deploy and likely a code change. Keys/secrets within Pinterest were stored in git repositories. This means they were copied all over our company's infrastructure and present on many of our employees laptops. There was no way to audit who accessed or who has access to the keys. Knox was built to solve these problems.
@@ -46,9 +46,6 @@ To see all available commands run:
 $GOPATH/bin/dev_client help
 ```
 
-For production usage, I reccommend making your own client,renaming it `knox`, and moving it into you $PATH for ease of use.
+For production usage, I recommend making your own client, renaming it `knox`, and moving it into you $PATH for ease of use.
 
 For more information on interacting with knox, use `knox help` or go to https://github.com/pinterest/knox/wiki/Knox-Client
-
-
-
