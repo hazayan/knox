@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"syscall"
 	"time"
 
 	"gopkg.in/fsnotify.v1"
@@ -268,72 +267,22 @@ type Keys interface {
 // KeysFile is an implementation of Keys based on the file system for the register file.
 type KeysFile struct {
 	fn string
-	fd int
+	*flock
 }
 
 // NewKeysFile takes in a filename and outputs an implementation of the Keys interface
 func NewKeysFile(fn string) Keys {
-	return &KeysFile{fn, -1}
+	return &KeysFile{fn, newFlock()}
 }
 
 // Lock performs the nonblocking syscall lock and retries until the global timeout is met.
 func (k *KeysFile) Lock() error {
-	fd, err := k.getFD()
-	if err != nil {
-		return err
-	}
-	err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
-	if err == nil {
-		return nil
-	}
-	overallTimeout := time.After(lockTimeout)
-	for {
-		select {
-		case <-overallTimeout:
-			return err
-		case <-time.After(lockRetryTime):
-			err := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
-			if err == nil {
-				return nil
-			}
-		}
-	}
+	return k.lock(k, defaultFilePermission, true, lockTimeout)
 }
 
 // Unlock performs the nonblocking syscall unlock and retries until the global timeout is met.
 func (k *KeysFile) Unlock() error {
-	fd, err := k.getFD()
-	if err != nil {
-		return err
-	}
-	err = syscall.Flock(fd, syscall.LOCK_UN|syscall.LOCK_NB)
-	if err == nil {
-		return nil
-	}
-	overallTimeout := time.After(lockTimeout)
-	for {
-		select {
-		case <-overallTimeout:
-			return err
-		case <-time.After(lockRetryTime):
-			err = syscall.Flock(fd, syscall.LOCK_UN|syscall.LOCK_NB)
-			if err == nil {
-				return nil
-			}
-		}
-	}
-}
-
-func (k *KeysFile) getFD() (int, error) {
-	if k.fd != -1 {
-		return k.fd, nil
-	}
-	fd, err := syscall.Open(k.fn, syscall.O_RDWR, 0)
-	if err != nil {
-		return -1, err
-	}
-	k.fd = fd
-	return k.fd, nil
+	return k.unlock(k)
 }
 
 // Get will get the list of key ids. It expects Lock to have been called.
