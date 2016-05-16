@@ -62,8 +62,8 @@ func generateTestDBWithKeys(crypt keydb.Cryptor) keydb.DB {
 }
 
 func main() {
-	crypt1 := keydb.NewLegacyAESCryptor(0, make([]byte, 16))
-	crypt2 := keydb.NewLegacyAESCryptor(1, make([]byte, 16))
+	crypt1 := keydb.NewAESGCMCryptor(0, make([]byte, 16))
+	crypt2 := keydb.NewAESGCMCryptor(1, make([]byte, 16))
 
 	source := generateTestDBWithKeys(crypt1)
 
