@@ -1,0 +1,18 @@
+language: go
+go:
+  - 1.5
+  - 1.6
+
+branches:
+  only:
+    - master
+
+notifications:
+  email:
+    recipients:
+    - devinlundberg@pinterest.com
+    on_success: never
+    on_failure: change
+env:
+  global:
+    - GO15VENDOREXPERIMENT=1
