@@ -7,6 +7,10 @@ branches:
   only:
     - master
 
+# Don't test vendor directory (go test ./... will test these by default and fsnotify causes problems)
+script:
+  - go test . ./server ./client ./server/auth ./server/keydb ./log
+
 notifications:
   email:
     recipients:
