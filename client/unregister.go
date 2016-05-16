@@ -22,10 +22,15 @@ func runUnregister(cmd *Command, args []string) {
 		fatalf("You must include a key ID to deregister. See 'knox help unregister'")
 	}
 	k := NewKeysFile(daemonFolder + daemonToRegister)
-	err := k.Remove([]string{args[0]})
-
+	err := k.Lock()
 	if err != nil {
-		fatalf(err.Error())
+		fatalf("Error locking the register file: %s", err.Error())
+	}
+	defer k.Unlock()
+
+	err = k.Remove([]string{args[0]})
+	if err != nil {
+		fatalf("Error removing the key: %s", err.Error())
 	}
 	fmt.Println("Unregistered key successfully")
 }
