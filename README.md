@@ -13,7 +13,7 @@ The goals of Knox are:
 Read more at https://github.com/pinterest/knox/wiki
 
 ## Getting knox set up
-The first step is to install Go. We require Go >1.6 or Go 1.5 with the vendor flag enabled (`GO15VENDOREXPERIMENT=1`). For instructions on setting up Go, please visit https://golang.org/doc/install
+The first step is to install Go (or use Docker, see below). We require Go >= 1.6 or Go 1.5 with the vendor flag enabled (`GO15VENDOREXPERIMENT=1`). For instructions on setting up Go, please visit https://golang.org/doc/install
 
 After Go is set up (including a `$GOPATH` directory that will store your workspace), please run `go get -d github.com/pinterest/knox` to get the latest version of the knox code.
 
@@ -49,3 +49,17 @@ $GOPATH/bin/dev_client help
 For production usage, I recommend making your own client, renaming it `knox`, and moving it into you $PATH for ease of use.
 
 For more information on interacting with knox, use `knox help` or go to https://github.com/pinterest/knox/wiki/Knox-Client
+
+## Knox with Docker
+
+You can run a Docker container to get knox set up, instead of installing Go on your host.
+
+```sh
+git clone https://github.com/pinterest/knox.git
+cd knox
+docker run --name knox --rm -v "$PWD":/go/src/github.com/pinterest/knox -it golang /bin/bash
+```
+
+This will run a bash shell into the container, mounting a local copy of knox in the go source path.
+
+You can refer back to the section "Getting knox set up" to set up knox.
