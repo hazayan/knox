@@ -241,7 +241,6 @@ func deleteKeyHandler(m KeyManager, principal knox.Principal, parameters map[str
 
 // getAccessHandler gets the ACL for a specific Key.
 // The route for this handler is GET /v0/keys/<key_id>/access/
-// The principal needs Read access.
 func getAccessHandler(m KeyManager, principal knox.Principal, parameters map[string]string) (interface{}, *httpError) {
 
 	keyID := parameters["keyID"]
@@ -255,10 +254,9 @@ func getAccessHandler(m KeyManager, principal knox.Principal, parameters map[str
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
 
-	// Authorize
-	if !principal.CanAccess(key.ACL, knox.Read) {
-		return nil, errF(knox.UnauthorizedCode, "")
-	}
+	// NO authorization on purpose
+	// this allows, e.g., to see who has admin access to ask for grants
+
 	return key.ACL, nil
 }
 
