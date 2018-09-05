@@ -87,8 +87,10 @@ func (s VersionStatus) MarshalJSON() ([]byte, error) {
 type PrincipalType int
 
 const (
+	// Unknown represents a bad PrincipalType that cannot be marshaled
+	Unknown PrincipalType = -1
 	// User represents a single LDAP User.
-	User PrincipalType = iota
+	User = iota
 	// UserGroup represents an LDAP security group.
 	UserGroup
 	// Machine represents the host of a machine.
@@ -113,7 +115,10 @@ func (s *PrincipalType) UnmarshalJSON(b []byte) error {
 	case `"Service"`:
 		*s = Service
 	default:
-		return invalidTypeError{"PrincipalType"}
+		// To ensure compatibilty in the event of new PrincipalTypes, don't
+		// throw an error. Instead just create a bogus Type. When displaying
+		// the ACL to the user, fail on the single entry. GetKey & GetACL will work.
+		*s = Unknown
 	}
 	return nil
 }
@@ -131,6 +136,9 @@ func (s PrincipalType) MarshalJSON() ([]byte, error) {
 		return json.Marshal("MachinePrefix")
 	case Service:
 		return json.Marshal("Service")
+	case Unknown:
+		// Explicitly prevent unrecognized PrincipalTypes from being marshaled
+		return nil, invalidTypeError{"PrincipalType"}
 	default:
 		return nil, invalidTypeError{"PrincipalType"}
 	}
