@@ -242,9 +242,24 @@ func (d daemon) processKey(keyID string) error {
 	if err != nil {
 		return fmt.Errorf("Error marshalling key %s: %s", keyID, err.Error())
 	}
-	err = ioutil.WriteFile(d.keyFilename(keyID), b, defaultFilePermission)
+	// Write to tmpfile, mv to normal location. Close + rm on failures
+	tmpFile, err := ioutil.TempFile(d.dir, fmt.Sprintf(".*.%s.tmp", keyID))
 	if err != nil {
+		return fmt.Errorf("Error opening tmp file for key %s: %s", keyID, err.Error())
+	}
+	_, err = tmpFile.Write(b)
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
 		return fmt.Errorf("Error writing key %s to file: %s", keyID, err.Error())
+	}
+	// Done writing
+	tmpFile.Close()
+
+	err = os.Rename(tmpFile.Name(), d.keyFilename(keyID))
+	if err != nil {
+		os.Remove(tmpFile.Name())
+		return fmt.Errorf("Error renaming key %s temporary file: %s", keyID, err.Error())
 	}
 
 	err = os.Chmod(d.keyFilename(keyID), defaultFilePermission)
