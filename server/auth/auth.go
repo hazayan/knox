@@ -135,6 +135,34 @@ func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (knox.Princ
 	return NewService(splits[0], splits[1]), nil
 }
 
+// SpiffeFallbackProvider is a SpiffeProvider that uses the same Type byte as the
+// MTLSAuthProvider. The use case for this is to allow a client that specifies
+// MTLSAuth to also transparently be given Spiffe based access as well. For
+// more predictable results, ensure that the MTLSAuthProvider is registered before
+// the SpiffeFallbackProvider so that MTLSAuthProvider is always used if it succeeds.
+// Note that this is only possible with the SpiffeProvider because there is no use
+// of the token from the AuthorizationHeader in this Provider.
+type SpiffeFallbackProvider struct {
+	SpiffeProvider
+}
+
+// NewSpiffeAuthFallbackProvider initializes a chain of trust with given CA certificates,
+// identical to the SpiffeProvider except the Type is defined as the MTLSAuthProvider
+// Type().
+func NewSpiffeAuthFallbackProvider(CAs *x509.CertPool) *SpiffeFallbackProvider {
+	return &SpiffeFallbackProvider{
+		SpiffeProvider: SpiffeProvider{
+			CAs:  CAs,
+			time: time.Now,
+		},
+	}
+}
+
+// Type is set to be identical to the Type of the MTLSAuthProvider
+func (s *SpiffeFallbackProvider) Type() byte {
+	return (&MTLSAuthProvider{}).Type()
+}
+
 // GitHubProvider implements user authentication through github.com
 type GitHubProvider struct {
 	client httpClient
