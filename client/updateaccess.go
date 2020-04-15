@@ -25,7 +25,8 @@ Access will add or change the acl on a key by adding a specific access control r
 -U: A specific user. The principal should be set to the ldap username of the user.
 -G: A specific user group. The principal should be set to the group name. This takes the format of ou=Security,ou=Prod,ou=groups,dc=pinterest,dc=com in LDAP.
 -P: A machine hostname prefix. Prefix matching will be used to determine access. For example, if the principal is set to 'auth' then 'auth004' would match (and so would any hostname beginning with auth).
--S: A specific service. The principal should be set to the exact Spiffe ID. For example, spiffe://example.com/service
+-S: A specific service. The principal should be set to the exact SPIFFE ID. For example, 'spiffe://example.com/service'.
+-N: A service prefix (namespace). The principal should be set to a SPIFFE ID ending with a slash, such as 'spiffe://example.com/namespace/'. This will match all services under that prefix, so for example 'spiffe://example.com/namespace/service' would be allowed.
 
 This command requires admin access to the key.
 
@@ -45,6 +46,7 @@ var updateAccessUser = cmdUpdateAccess.Flag.Bool("U", false, "")
 var updateAccessGroup = cmdUpdateAccess.Flag.Bool("G", false, "")
 var updateAccessPrefix = cmdUpdateAccess.Flag.Bool("P", false, "")
 var updateAccessService = cmdUpdateAccess.Flag.Bool("S", false, "")
+var updateAccessServicePrefix = cmdUpdateAccess.Flag.Bool("N", false, "")
 
 func runUpdateAccess(cmd *Command, args []string) {
 	if len(args) != 2 {
@@ -77,8 +79,10 @@ func runUpdateAccess(cmd *Command, args []string) {
 		access.Type = knox.MachinePrefix
 	case *updateAccessService:
 		access.Type = knox.Service
+	case *updateAccessServicePrefix:
+		access.Type = knox.ServicePrefix
 	default:
-		fatalf("access requires {-M|-U|-G|-P|-S}. See 'knox help access'")
+		fatalf("access requires {-M|-U|-G|-P|-S|-N}. See 'knox help access'")
 	}
 	err := cli.PutAccess(keyID, &access)
 	if err != nil {

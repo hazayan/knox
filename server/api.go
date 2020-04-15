@@ -45,6 +45,7 @@ var HTTPErrMap = map[int]*httpErrResp{
 	knox.NoKeyDataCode:                 &httpErrResp{http.StatusBadRequest, "Missing Key Data"},
 	knox.BadRequestDataCode:            &httpErrResp{http.StatusBadRequest, "Bad request format"},
 	knox.BadKeyFormatCode:              &httpErrResp{http.StatusBadRequest, "Key ID contains unsupported characters"},
+	knox.BadPrincipalIdentifier:        &httpErrResp{http.StatusBadRequest, "Invalid principal identifier"},
 }
 
 func combine(f, g func(http.HandlerFunc) http.HandlerFunc) func(http.HandlerFunc) http.HandlerFunc {
@@ -206,6 +207,16 @@ var defaultAccess []knox.Access
 // AddDefaultAccess adds an access to every created key.
 func AddDefaultAccess(a *knox.Access) {
 	defaultAccess = append(defaultAccess, *a)
+}
+
+// Extra validators to apply on principals submitted to Knox.
+var extraPrincipalValidators []knox.PrincipalValidator
+
+// AddPrincipalValidator applies additional, custom validation on principals
+// submitted to Knox for adding into ACLs. Can be used to set custom business
+// logic for e.g. what kind of machine or service prefixes are acceptable.
+func AddPrincipalValidator(validator knox.PrincipalValidator) {
+	extraPrincipalValidators = append(extraPrincipalValidators, validator)
 }
 
 // newKeyVersion creates a new KeyVersion with correctly set defaults.

@@ -135,7 +135,7 @@ func TestAccessTypeMarshaling(t *testing.T) {
 	}
 }
 func TestPrincipalTypeMarshaling(t *testing.T) {
-	for _, in := range []PrincipalType{User, UserGroup, Machine, MachinePrefix, Service} {
+	for _, in := range []PrincipalType{User, UserGroup, Machine, MachinePrefix, Service, ServicePrefix} {
 		var out PrincipalType
 		marshalUnmarshal(t, &in, &out)
 		if in != out {
@@ -207,7 +207,8 @@ func TestACLValidate(t *testing.T) {
 	a2 := Access{ID: "testuser", AccessType: Write, Type: User}
 	a3 := Access{ID: "testmachine", AccessType: Read, Type: MachinePrefix}
 	a6 := Access{ID: "spiffe://example.com/serviceA", AccessType: Read, Type: Service}
-	validACL := ACL([]Access{a1, a2, a3, a6})
+	a7 := Access{ID: "spiffe://example.com/serviceA/", AccessType: Read, Type: ServicePrefix}
+	validACL := ACL([]Access{a1, a2, a3, a6, a7})
 	if validACL.Validate() != nil {
 		t.Error("ValidACL should be valid")
 	}
@@ -385,4 +386,83 @@ func TestKVLGetPrimary(t *testing.T) {
 	if keyVersion.ID != v1.ID {
 		t.Error("Incorrect version returned from getPrimary")
 	}
+}
+
+func TestMinComponentsValidator(t *testing.T) {
+	validate := func(id string, min int, valid bool) {
+		err := ServicePrefixPathComponentsValidator(min)(ServicePrefix, id)
+		if valid && err != nil {
+			t.Fatal("Should be valid, but was not:", id)
+		}
+		if !valid && err == nil {
+			t.Fatal("Should not be valid, but was:", id)
+		}
+	}
+
+	// Never valid w/o domain
+	validate("spiffe://", 0, false)
+	validate("spiffe://", 1, false)
+
+	// Valid with domain only if min len is zero
+	validate("spiffe://domain", 0, true)
+	validate("spiffe://domain", 1, false)
+
+	// If min len is 1, must have one path component
+	validate("spiffe://domain/a", 0, true)
+	validate("spiffe://domain/a", 1, true)
+	validate("spiffe://domain/a", 2, false)
+
+	// If min len is 2, must have two path components
+	validate("spiffe://domain/a/b", 0, true)
+	validate("spiffe://domain/a/b", 1, true)
+	validate("spiffe://domain/a/b", 2, true)
+	validate("spiffe://domain/a/b", 3, false)
+}
+
+func TestPrincipalValidation(t *testing.T) {
+	validatePrincipal := func(principalType PrincipalType, id string, expected bool) {
+		extraValidators := []PrincipalValidator{
+			ServicePrefixPathComponentsValidator(1),
+		}
+
+		err := principalType.IsValidPrincipal(id, extraValidators)
+		if err == nil && !expected {
+			t.Errorf("Should not be valid, but is: '%s'", id)
+		}
+		if err != nil && expected {
+			t.Errorf("Should be valid, but isn't: '%s' (error: %s)", id, err.Error())
+		}
+	}
+
+	// -- Invalid examples --
+	// Empty strings
+	validatePrincipal(User, "", false)
+	validatePrincipal(UserGroup, "", false)
+	validatePrincipal(Machine, "", false)
+	validatePrincipal(MachinePrefix, "", false)
+	validatePrincipal(Service, "", false)
+	validatePrincipal(ServicePrefix, "", false)
+
+	// Not valid URLs
+	validatePrincipal(Service, "not-a-url", false)
+	validatePrincipal(ServicePrefix, "not-a-url", false)
+
+	// Wrong URL scheme
+	validatePrincipal(Service, "https://example.com", false)
+	validatePrincipal(ServicePrefix, "https://example.com", false)
+
+	// Not enough components
+	validatePrincipal(ServicePrefix, "spiffe://example.com", false)
+	validatePrincipal(ServicePrefix, "spiffe://example.com/", false)
+
+	// No trailing slash
+	validatePrincipal(ServicePrefix, "spiffe://example.com/foo", false)
+
+	// -- Valid examples --
+	validatePrincipal(User, "test", true)
+	validatePrincipal(UserGroup, "test", true)
+	validatePrincipal(Machine, "test", true)
+	validatePrincipal(MachinePrefix, "test", true)
+	validatePrincipal(Service, "spiffe://example.com/service", true)
+	validatePrincipal(ServicePrefix, "spiffe://example.com/prefix/", true)
 }
