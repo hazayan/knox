@@ -352,6 +352,10 @@ func (s service) CanAccess(acl knox.ACL, t knox.AccessType) bool {
 			if a.ID == string(s.GetID()) && a.AccessType.CanAccess(t) {
 				return true
 			}
+		case knox.ServicePrefix:
+			if strings.HasPrefix(s.GetID(), a.ID) && a.AccessType.CanAccess(t) {
+				return true
+			}
 		}
 	}
 	return false

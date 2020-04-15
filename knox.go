@@ -7,14 +7,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 var (
-	ErrACLDuplicateEntries   = fmt.Errorf("Duplicate entries in ACL")
-	ErrACLContainsNone       = fmt.Errorf("ACL contains None access")
-	ErrACLEmptyMachinePrefix = fmt.Errorf("MachinePrefix cannot be empty while adding Read, Write, or Admin access.")
+	ErrACLDuplicateEntries = fmt.Errorf("Duplicate entries in ACL")
+	ErrACLContainsNone     = fmt.Errorf("ACL contains None access")
+	ErrACLEmptyPrincipal   = fmt.Errorf("Principals of type user, user group, machine, or machine prefix may not be empty.")
+
+	ErrACLInvalidService               = fmt.Errorf("Service is invalid, must conform to 'spiffe://<domain>/<path>' format.")
+	ErrACLInvalidServicePrefixURL      = fmt.Errorf("Service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format.")
+	ErrACLInvalidServicePrefixNoSlash  = fmt.Errorf("Service prefix had no trailing slash, must conform to 'spiffe://<domain>/<path>/' format.")
+	ErrACLInvalidServicePrefixTooShort = fmt.Errorf("Service prefix too short, path of namespace for prefix needs to be longer.")
 
 	ErrInvalidKeyID       = fmt.Errorf("KeyID can only contain alphanumeric characters, colons, and underscores.")
 	ErrInvalidVersionHash = fmt.Errorf("Hash does not match")
@@ -32,6 +39,10 @@ var (
 	ErrKeyExists          = fmt.Errorf("Key Exists")
 )
 
+const (
+	spiffeScheme = "spiffe"
+)
+
 // InvalidTypeError is an error for to throw when in the json conversion.
 type invalidTypeError struct {
 	badType string
@@ -44,6 +55,10 @@ func (e invalidTypeError) Error() string {
 // VersionStatus is an enum to determine that state of a single Key Version.
 // This is related to key rotation.
 type VersionStatus int
+
+// A PrincipalValidator is a function that applies to a principal type and string,
+// and validates that the string is a valid principal for the given type.
+type PrincipalValidator func(pt PrincipalType, id string) error
 
 const (
 	// Primary is the main key version. There is exactly one in a given KeyVersionList.
@@ -96,10 +111,12 @@ const (
 	UserGroup
 	// Machine represents the host of a machine.
 	Machine
-	// MachinePrefix represents a prefix to match multiple Machines.
+	// MachinePrefix represents a prefix to match multiple machines.
 	MachinePrefix
-	// Service represents a service via Spiffe ID
+	// Service represents a service via SPIFFE ID.
 	Service
+	// ServicePrefix represents a prefix to match multiple SPIFFE IDs.
+	ServicePrefix
 )
 
 // UnmarshalJSON parses JSON input to set an PrincipalType.
@@ -115,6 +132,8 @@ func (s *PrincipalType) UnmarshalJSON(b []byte) error {
 		*s = MachinePrefix
 	case `"Service"`:
 		*s = Service
+	case `"ServicePrefix"`:
+		*s = ServicePrefix
 	default:
 		// To ensure compatibilty in the event of new PrincipalTypes, don't
 		// throw an error. Instead just create a bogus Type. When displaying
@@ -137,11 +156,86 @@ func (s PrincipalType) MarshalJSON() ([]byte, error) {
 		return json.Marshal("MachinePrefix")
 	case Service:
 		return json.Marshal("Service")
+	case ServicePrefix:
+		return json.Marshal("ServicePrefix")
 	case Unknown:
 		// Explicitly prevent unrecognized PrincipalTypes from being marshaled
 		return nil, invalidTypeError{"PrincipalType"}
 	default:
 		return nil, invalidTypeError{"PrincipalType"}
+	}
+}
+
+// IsValidPrincipal verifies that the given id string matches our expectations
+// for what a principal should look like given the principal type. For example,
+// a service principal should be a valid SPIFFE ID.
+func (s PrincipalType) IsValidPrincipal(id string, extraValidators []PrincipalValidator) error {
+	// Empty principals are invalid. Note we must deny addition of ACLs with
+	// empty MachinePrefix to prevent abuse. An empty prefix would grant *every*
+	// client access, which we don't support in Knox (if it's not a secret it
+	// doesn't belong in Knox). For other types of principals, an empty string is
+	// also invalid (though would not broadly open up access).
+	if id == "" {
+		return ErrACLEmptyPrincipal
+	}
+
+	// Apply additional validation for service and service prefix principals.
+	switch s {
+	case Service, ServicePrefix:
+		// For Service principals and prefixes, verify that id looks like a valid SPIFFE ID.
+		parsed, err := url.Parse(id)
+		if err != nil || parsed.Scheme != spiffeScheme || parsed.Host == "" {
+			return ErrACLInvalidServicePrefixURL
+		}
+
+		// Prefixes must also end in "/" as we don't allow prefixes to match inside
+		// of a path component, to avoid perfixes like "foo/bar" also matching
+		// things like "foo/barbaz" even though it should only match "foo/bar/baz".
+		endsWithSlash := strings.HasSuffix(id, "/")
+		if s == ServicePrefix && !endsWithSlash {
+			return ErrACLInvalidServicePrefixNoSlash
+		}
+	}
+
+	for _, extraValidator := range extraValidators {
+		err := extraValidator(s, id)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ServicePrefixPathComponentsValidator is an extra validator that can be applied
+// to ensure that service prefixes have a certain minimum length, e.g. to prevent
+// allow the prefix to be a full domain.
+func ServicePrefixPathComponentsValidator(minPathComponents int) PrincipalValidator {
+	return func(pt PrincipalType, id string) error {
+		if pt != ServicePrefix {
+			return nil
+		}
+
+		parsed, err := url.Parse(id)
+		if err != nil || parsed.Scheme != spiffeScheme || parsed.Host == "" {
+			return ErrACLInvalidServicePrefixURL
+		}
+
+		// Trim leading and trailing slashes, and count remaining slashes to determine
+		// the number of components in the namespace path.
+		trimmed := strings.Trim(parsed.Path, "/")
+
+		// If result is empty, it was zero components (e.g. prefix was "/").
+		components := 0
+		if trimmed != "" {
+			components = strings.Count(trimmed, "/") + 1
+		}
+
+		if components < minPathComponents {
+			return ErrACLInvalidServicePrefixTooShort
+		}
+
+		return nil
 	}
 }
 
@@ -429,6 +523,7 @@ const (
 	NoKeyDataCode
 	BadRequestDataCode
 	BadKeyFormatCode
+	BadPrincipalIdentifier
 )
 
 // Response is the format for responses from the api server.
