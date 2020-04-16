@@ -5,12 +5,15 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/pinterest/knox"
@@ -146,7 +149,28 @@ func putAccess(t *testing.T, id string, a *knox.Access) {
 		t.Fatal(err.Error())
 	}
 	if message != "" {
-		t.Fatal("Code not ok for "+path, message)
+		t.Fatalf("Code not ok for PUT of %s on %s: %s", urlData, path, message)
+	}
+	return
+}
+
+func putAccessExpectedFailure(t *testing.T, id string, a *knox.Access, expectedMessage string) {
+	path := "/v0/keys/" + id + "/access/"
+	urlData := url.Values{}
+	s, jsonErr := json.Marshal(a)
+	if jsonErr != nil {
+		t.Fatal(jsonErr.Error())
+	}
+	urlData.Set("access", string(s))
+	message, err := getHTTPData("PUT", path, urlData, nil)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if message == "" {
+		t.Fatal("Access update should fail, but did not")
+	}
+	if !strings.Contains(message, expectedMessage) {
+		t.Fatal("Access update failed, but with unexpected message:", message)
 	}
 	return
 }
@@ -399,7 +423,7 @@ func TestKeyAccessUpdates(t *testing.T) {
 		t.Fatal("Incorrect initial ACL")
 	}
 
-	accessService := knox.Access{ID: "testservice", Type: knox.Service, AccessType: knox.Read}
+	accessService := knox.Access{ID: "spiffe://testservice", Type: knox.Service, AccessType: knox.Read}
 	putAccess(t, keyID, &accessService)
 	acl4 := getAccess(t, keyID)
 	if len(acl4) != 2 {
@@ -408,10 +432,51 @@ func TestKeyAccessUpdates(t *testing.T) {
 	for _, a := range acl {
 		switch a.ID {
 		case "testuser":
-		case "testservice":
+		case "spiffe://testservice":
 			if a.AccessType != accessService.AccessType || a.Type != accessService.Type {
 				t.Fatal("Incorrect updated ACL")
 			}
 		}
 	}
+}
+
+func TestKeyAccessUpdatesWithPrincipalValidation(t *testing.T) {
+	// Create a test user principal that we always reject
+	invalidPrincipalID := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	customValidator := func(pt knox.PrincipalType, id string) error {
+		if pt == knox.User && id == invalidPrincipalID {
+			return fmt.Errorf("Invalid user: %s", id)
+		}
+		return nil
+	}
+
+	AddPrincipalValidator(customValidator)
+
+	// Set up testing key
+	keyID := "testkeyaccessprincipalvalidation"
+	data := []byte("The Magic Words are Squeamish Ossifrage")
+	keyVersionID := addKey(t, keyID, data)
+	if keyVersionID == 0 {
+		t.Fatal("Expected keyID back")
+	}
+
+	// Should be *valid* for user with good id
+	// Note this also makes 'testuser' admin, which is required for the below
+	// as testuser is the auth'd principal for all internal test calls in unit tests.
+	access := knox.Access{ID: "testuser", Type: knox.User, AccessType: knox.Admin}
+	putAccess(t, keyID, &access)
+
+	// Should be *valid* for machine with bad id
+	access = knox.Access{ID: invalidPrincipalID, Type: knox.Machine, AccessType: knox.Read}
+	putAccess(t, keyID, &access)
+
+	// Should be *not valid* for user with bad id
+	access = knox.Access{ID: invalidPrincipalID, Type: knox.User, AccessType: knox.Read}
+	putAccessExpectedFailure(t, keyID, &access, "Invalid principal identifier")
+
+	// Should be *not valid* for user service with bad SPIFFE ID, even though
+	// we don't have a special extra validator for it (validation is built-in)
+	access = knox.Access{ID: "https://ahoy", Type: knox.Service, AccessType: knox.Read}
+	putAccessExpectedFailure(t, keyID, &access, "Invalid principal identifier")
 }

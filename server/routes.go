@@ -302,10 +302,15 @@ func putAccessHandler(m KeyManager, principal knox.Principal, parameters map[str
 		return nil, errF(knox.UnauthorizedCode, "")
 	}
 
-	//Deny addition of ACLS with empty MachinePrefix for Read,Write,and Admin AccessType
-	//Empty MachinePrefix is allowed with None AccessType for revoking existing ACLS
-	if access.Type == knox.MachinePrefix && access.ID == "" && access.AccessType != knox.None {
-		return nil, errF(knox.BadRequestDataCode, knox.ErrACLEmptyMachinePrefix.Error())
+	// If access type change is not "None" (i.e. we're adding, not deleting, an ACL entry) then
+	// we apply validation on the ID string to make sure it conforms to the expectations of the
+	// particular principal type. We do this to block empty machines prefixes and other invalid
+	// or bad entries.
+	if access.AccessType != knox.None {
+		principalErr := access.Type.IsValidPrincipal(access.ID, extraPrincipalValidators)
+		if principalErr != nil {
+			return nil, errF(knox.BadPrincipalIdentifier, principalErr.Error())
+		}
 	}
 
 	// Update Access
