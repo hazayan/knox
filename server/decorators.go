@@ -193,20 +193,27 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.HandlerFunc {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			var principal knox.Principal
-			err := fmt.Errorf("No matching authentication providers found")
+			principals := []knox.Principal{}
+			errReturned := fmt.Errorf("No matching authentication providers found")
 
 			for _, p := range providers {
 				if token, match := providerMatch(p, r.Header.Get("Authorization")); match {
-					principal, err = p.Authenticate(token, r)
-					if err == nil {
-						setPrincipal(r, principal)
-						f(w, r)
-						return
+					principal, errAuthenticate := p.Authenticate(token, r)
+					if errAuthenticate != nil {
+						errReturned = errAuthenticate
+						continue
 					}
+					principals = append(principals, principal)
 				}
 			}
-			writeErr(errF(knox.UnauthenticatedCode, err.Error()))(w, r)
+			if len(principals) == 0 {
+				writeErr(errF(knox.UnauthenticatedCode, errReturned.Error()))(w, r)
+				return
+			}
+
+			setPrincipal(r, knox.NewPrincipalMux(principals))
+			f(w, r)
+			return
 		}
 	}
 }

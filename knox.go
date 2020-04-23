@@ -508,6 +508,45 @@ type Principal interface {
 	GetID() string
 }
 
+// PrincipalMux provides a Principal Interface over multiple Principals.
+type PrincipalMux struct {
+	principals []Principal
+}
+
+// CanAccess will check the principals in order of adding, and the first
+// Principal that provides at least the AccessType requested will be used.
+func (p PrincipalMux) CanAccess(acl ACL, accessType AccessType) bool {
+	for _, p := range p.principals {
+		if p.CanAccess(acl, accessType) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetID returns the first registered ID.
+func (p PrincipalMux) GetID() string {
+	if len(p.principals) == 0 {
+		return "No Principal Found"
+	}
+	return p.principals[0].GetID()
+}
+
+// Default returns the first registered Principal.
+func (p PrincipalMux) Default() Principal {
+	if len(p.principals) == 0 {
+		return nil
+	}
+	return p.principals[0]
+}
+
+// NewPrincipalMux returns a Principal that represents many principals.
+func NewPrincipalMux(p []Principal) Principal {
+	return PrincipalMux{
+		principals: p,
+	}
+}
+
 // These are the error codes for use in server responses.
 const (
 	OKCode = iota

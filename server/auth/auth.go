@@ -234,12 +234,18 @@ type httpClient interface {
 
 // IsUser returns true if the principal is a user.
 func IsUser(p knox.Principal) bool {
+	if mux, ok := p.(knox.PrincipalMux); ok {
+		p = mux.Default()
+	}
 	_, ok := p.(user)
 	return ok
 }
 
 // IsService returns true if the principal is a service.
 func IsService(p knox.Principal) bool {
+	if mux, ok := p.(knox.PrincipalMux); ok {
+		p = mux.Default()
+	}
 	_, ok := p.(service)
 	return ok
 }
