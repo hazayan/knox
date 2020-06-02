@@ -19,7 +19,7 @@ var (
 
 	// ErrTimeout is returned when we cannot obtain an exclusive lock
 	// on the key file.
-	ErrTimeout = errors.New("timeout")
+	ErrTimeout = errors.New("timeout waiting on lock to become available")
 )
 
 const (

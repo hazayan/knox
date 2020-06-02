@@ -6,8 +6,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"path"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/pinterest/knox"
 )
@@ -550,4 +555,58 @@ func TestBackwardsCompat(t *testing.T) {
 			t.Fatalf("%s does not equal 1, 2, or 3", key)
 		}
 	}
+}
+
+func TestLockTimeout(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Test must run on Linux")
+		return
+	}
+
+	tmp, err := ioutil.TempDir("", "test-lock-timeout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmp)
+
+	lockFile := path.Join(tmp, "lock")
+	ioutil.WriteFile(lockFile, []byte{}, 0600)
+
+	// Lock file in sub-process to create locking conflict
+	lockingSubprocess := lockFileInSeparateProcess(t, lockFile, "300")
+	defer func() {
+		if lockingSubprocess.Process != nil {
+			lockingSubprocess.Process.Kill()
+		}
+	}()
+
+	// Wait for subprocess to spin up
+	time.Sleep(5 * time.Second)
+
+	// Dump lock holder pre-timeout (useful to identify test failures)
+	t.Log(identifyLockHolders(lockFile))
+
+	// Try to acquire lock in this process and make sure we hit a timeout
+	kf := NewKeysFile(lockFile)
+	err = kf.Lock()
+	if err == nil {
+		t.Fatal("was able to acquire lock, but should not have been")
+	}
+	if !strings.Contains(err.Error(), "timeout") {
+		t.Fatal("got lock error, but error was not a timeout")
+	}
+
+	// Dump lock holder post-timeout (useful to identify test failures)
+	t.Log(identifyLockHolders(lockFile))
+}
+
+func lockFileInSeparateProcess(t *testing.T, filename, seconds string) *exec.Cmd {
+	// Spawn "flock" subprocess that will acquire and hold lock for us (up to N seconds)
+	cmd := exec.Command("flock", "-F", filename, "sleep", seconds)
+	err := cmd.Start()
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+	return cmd
 }
