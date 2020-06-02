@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -562,6 +564,14 @@ func TestLockTimeout(t *testing.T) {
 		t.Skip("Test must run on Linux")
 		return
 	}
+	_, err := exec.LookPath("lsof")
+	if err != nil {
+		t.Fatal("lsof is not installed in path")
+	}
+	_, err = exec.LookPath("flock")
+	if err != nil {
+		t.Fatal("flock is not installed in path")
+	}
 
 	tmp, err := ioutil.TempDir("", "test-lock-timeout")
 	if err != nil {
@@ -573,10 +583,18 @@ func TestLockTimeout(t *testing.T) {
 	ioutil.WriteFile(lockFile, []byte{}, 0600)
 
 	// Lock file in sub-process to create locking conflict
-	lockingSubprocess := lockFileInSeparateProcess(t, lockFile, "300")
+	locker, stdout, stderr := lockFileInSeparateProcess(t, lockFile, "300")
 	defer func() {
-		if lockingSubprocess.Process != nil {
-			lockingSubprocess.Process.Kill()
+		if locker.Process != nil {
+			t.Log("Terminating locking subprocess...")
+
+			syscall.Kill(-locker.Process.Pid, syscall.SIGKILL)
+
+			// Print stdout/stderr from locking process for debugging
+			allStdout, err := ioutil.ReadAll(stdout)
+			allStderr, err := ioutil.ReadAll(stderr)
+			t.Log(string(allStdout), err)
+			t.Log(string(allStderr), err)
 		}
 	}()
 
@@ -600,13 +618,25 @@ func TestLockTimeout(t *testing.T) {
 	t.Log(identifyLockHolders(lockFile))
 }
 
-func lockFileInSeparateProcess(t *testing.T, filename, seconds string) *exec.Cmd {
+func lockFileInSeparateProcess(t *testing.T, filename, seconds string) (*exec.Cmd, io.ReadCloser, io.ReadCloser) {
 	// Spawn "flock" subprocess that will acquire and hold lock for us (up to N seconds)
-	cmd := exec.Command("flock", "-F", filename, "sleep", seconds)
-	err := cmd.Start()
+	cmd := exec.Command("flock", filename, "sleep", seconds)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
-		return nil
 	}
-	return cmd
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return cmd, stdout, stderr
 }

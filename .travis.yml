@@ -1,14 +1,13 @@
 language: go
 go:
-  - 1.5.x
-  - 1.6.x
-  - 1.7.x
-  - 1.8.x
-  - 1.9.x
+  - 1.14.x
 
 branches:
   only:
     - master
+
+before_install:
+  - sudo apt-get install --yes lsof util-linux
 
 # Don't test vendor directory (go test ./... will test these by default and fsnotify causes problems)
 script:

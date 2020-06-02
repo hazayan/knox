@@ -420,10 +420,10 @@ func identifyLockHolders(filename string) (string, error) {
 	}
 
 	cmd := exec.Command("lsof", filename)
-	stdout, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("error identifying lock holder: %w", err)
+		return string(out), fmt.Errorf("error identifying lock holder: %s", err.Error())
 	}
 
-	return string(stdout), nil
+	return string(out), nil
 }
