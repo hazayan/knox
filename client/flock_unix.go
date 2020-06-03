@@ -14,7 +14,7 @@ import (
 
 // ErrTimeout is returned when we cannot obtain an exclusive lock
 // on the key file.
-var ErrTimeout = errors.New("timeout")
+var ErrTimeout = errors.New("timeout waiting on lock to become available")
 
 type flock struct {
 	fd int

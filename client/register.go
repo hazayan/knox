@@ -61,7 +61,7 @@ func runRegister(cmd *Command, args []string) {
 
 	err = k.Lock()
 	if err != nil {
-		fatalf("There was an error getting file lock %s", err.Error())
+		fatalf("There was an error obtaining file lock: %s", err.Error())
 	}
 	if *registerRemove {
 		err = k.Overwrite(ks)
