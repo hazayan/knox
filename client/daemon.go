@@ -3,11 +3,14 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path"
+	"runtime"
 	"strings"
 	"time"
 
@@ -292,12 +295,33 @@ func NewKeysFile(fn string) Keys {
 
 // Lock performs the nonblocking syscall lock and retries until the global timeout is met.
 func (k *KeysFile) Lock() error {
-	return k.lock(k, defaultFilePermission, true, lockTimeout)
+	err := k.lock(k, defaultFilePermission, true, lockTimeout)
+
+	// Timeout means someone else is using our lock, which is unusual.
+	// Let's collect some extra debugging information to find out why.
+	if err == ErrTimeout && runtime.GOOS == "linux" {
+		lockHolders, err := identifyLockHolders(k.fn)
+		if err != nil {
+			logf("hit timeout, found lock holder information:\n%s", lockHolders)
+		}
+	}
+
+	// Annotate error with path to file to make debugging easier
+	if err != nil {
+		return fmt.Errorf("unable to obtain lock on file '%s': %w", k.fn, err)
+	}
+	return nil
 }
 
 // Unlock performs the nonblocking syscall unlock and retries until the global timeout is met.
 func (k *KeysFile) Unlock() error {
-	return k.unlock(k)
+	err := k.unlock(k)
+
+	// Annotate error with path to file to make debugging easier
+	if err != nil {
+		return fmt.Errorf("unable to release lock on file '%s': %w", k.fn, err)
+	}
+	return nil
 }
 
 // Get will get the list of key ids. It expects Lock to have been called.
@@ -388,4 +412,18 @@ func (k *KeysFile) Overwrite(ks []string) error {
 		buffer.WriteByte('\n')
 	}
 	return ioutil.WriteFile(k.fn, buffer.Bytes(), 0666)
+}
+
+func identifyLockHolders(filename string) (string, error) {
+	if runtime.GOOS != "linux" {
+		return "", errors.New("error identifying lock holder: works only on linux")
+	}
+
+	cmd := exec.Command("lsof", filename)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("error identifying lock holder: %s", err.Error())
+	}
+
+	return string(out), nil
 }
