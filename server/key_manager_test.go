@@ -415,3 +415,59 @@ func TestAddUpdateVersion(t *testing.T) {
 		t.Fatalf("%d does equal %d", kv1.CreationTime, kv.CreationTime)
 	}
 }
+
+func TestGetInactiveKeyVersions(t *testing.T) {
+	m, u, acl := GetMocks()
+
+	keyOrig := newKey("id1", acl, []byte("data"), u)
+	kv := newKeyVersion([]byte("data2"), knox.Active)
+
+	// Create key and add version so we have two versions
+	err := m.AddNewKey(&keyOrig)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+
+	err = m.AddVersion(keyOrig.ID, &kv)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+
+	// Get active versions and deactivate one of them
+	key, err := m.GetKey(keyOrig.ID, knox.Active)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+
+	kvID0 := key.VersionList[0].ID
+	kvID1 := key.VersionList[1].ID
+
+	// Deactivate one of these versions
+	err = m.UpdateVersion(keyOrig.ID, kvID1, knox.Inactive)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+
+	// Reading active key versions should now list only one version
+	key, err = m.GetKey(keyOrig.ID, knox.Active)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+
+	if len(key.VersionList) != 1 {
+		t.Fatalf("Wanted one key version, got: %d", len(key.VersionList))
+	}
+	if key.VersionList[0].ID != kvID0 {
+		t.Fatalf("Inactive key id was listed as ctive")
+	}
+
+	// Reading active/inactive key versions should now list both
+	key, err = m.GetKey(keyOrig.ID, knox.Inactive)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+
+	if len(key.VersionList) != 2 {
+		t.Fatalf("Wanted two key versions, got: %d", len(key.VersionList))
+	}
+}
