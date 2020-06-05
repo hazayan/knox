@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,12 +13,13 @@ func init() {
 }
 
 var cmdGetVersions = &Command{
-	UsageLine: "versions [-s state] <key_identifier>",
+	UsageLine: "versions [-s state] [-v] <key_identifier>",
 	Short:     "gets the versions for a key",
 	Long: `
 versions get all of the version ids for a key.
 
 -s specifies the minimum state of key to return. By default this is set to active which means active and primary keys are returned. Accepted values include inactive, active, and primary.
+-v enables verbose output, which shows the state of each version alongside the version number.
 
 This requires read access to the key and can use user or machine authentication.
 
@@ -27,6 +29,7 @@ See also: knox keys, knox get
 	`,
 }
 var getVersionsState = cmdGetVersions.Flag.String("s", "active", "")
+var verboseOutput = cmdGetVersions.Flag.Bool("v", false, "verbose")
 
 func runGetVersions(cmd *Command, args []string) {
 	if len(args) != 1 {
@@ -50,6 +53,14 @@ func runGetVersions(cmd *Command, args []string) {
 	}
 	kvl := key.VersionList
 	for _, v := range kvl {
-		fmt.Printf("%d\n", v.ID)
+		status, err := json.Marshal(v.Status)
+		if err != nil {
+			status = []byte("(unknown)")
+		}
+		if *verboseOutput {
+			fmt.Printf("%d %s\n", v.ID, string(status))
+		} else {
+			fmt.Printf("%d\n", v.ID)
+		}
 	}
 }
