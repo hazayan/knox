@@ -165,6 +165,9 @@ type APIClient interface {
 	UpdateVersion(keyID, versionID string, status VersionStatus) error
 	CacheGetKey(keyID string) (*Key, error)
 	NetworkGetKey(keyID string) (*Key, error)
+	GetKeyWithStatus(keyID string, status VersionStatus) (*Key, error)
+	CacheGetKeyWithStatus(keyID string, status VersionStatus) (*Key, error)
+	NetworkGetKeyWithStatus(keyID string, status VersionStatus) (*Key, error)
 }
 
 type HTTP interface {
@@ -223,6 +226,52 @@ func (c *HTTPClient) GetKey(keyID string) (*Key, error) {
 	key, err := c.CacheGetKey(keyID)
 	if err != nil {
 		return c.NetworkGetKey(keyID)
+	}
+	return key, err
+}
+
+// CacheGetKeyWithStatus gets the key with status from file system cache.
+func (c *HTTPClient) CacheGetKeyWithStatus(keyID string, status VersionStatus) (*Key, error) {
+	if c.KeyFolder == "" {
+		return nil, fmt.Errorf("No folder set for cached key.")
+	}
+	st, err := status.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	path := c.KeyFolder + keyID + "?status=" + string(st)
+	b, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	k := Key{Path: path}
+	err = json.Unmarshal(b, &k)
+	if err != nil {
+		return nil, err
+	}
+	return &k, nil
+}
+
+// GetKeyWithStatus gets a knox key by keyID and given version status (always calls network).
+func (c *HTTPClient) NetworkGetKeyWithStatus(keyID string, status VersionStatus) (*Key, error) {
+	// If clients need to know
+	d := url.Values{}
+	s, err := status.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	d.Set("status", string(s))
+
+	key := &Key{}
+	err = c.getHTTPData("GET", "/v0/keys/"+keyID+"/?status="+string(s), nil, key)
+	return key, err
+}
+
+// GetKeyWithStatus gets a knox key by keyID and status (leverages cache).
+func (c *HTTPClient) GetKeyWithStatus(keyID string, status VersionStatus) (*Key, error) {
+	key, err := c.CacheGetKeyWithStatus(keyID, status)
+	if err != nil {
+		return c.NetworkGetKeyWithStatus(keyID, status)
 	}
 	return key, err
 }
