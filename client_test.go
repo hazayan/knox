@@ -398,3 +398,58 @@ func TestConcurrentDeletes(t *testing.T) {
 		t.Fatalf("%d total client attempts is not 4", ops)
 	}
 }
+
+func TestGetKeyWithStatus(t *testing.T) {
+	expected := Key{
+		ID:          "testkey",
+		ACL:         ACL([]Access{}),
+		VersionList: KeyVersionList{},
+		VersionHash: "VersionHash",
+	}
+	resp, err := buildGoodResponse(expected)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+	srv := buildServer(200, resp, func(r *http.Request) {
+		if r.Method != "GET" {
+			t.Fatalf("%s is not GET", r.Method)
+		}
+		if r.URL.Path != "/v0/keys/testkey/" {
+			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/")
+		}
+
+		statusParams, ok := r.URL.Query()["status"]
+		if !ok {
+			t.Fatal("query param for status is missing")
+		}
+
+		var status VersionStatus
+		err := json.Unmarshal([]byte(statusParams[0]), &status)
+		if err != nil || status != Inactive {
+			t.Fatal("query param for status is incorrect:", err)
+		}
+	})
+	defer srv.Close()
+
+	cli := MockClient(srv.Listener.Addr().String())
+
+	k, err := cli.GetKeyWithStatus("testkey", Inactive)
+	if err != nil {
+		t.Fatalf("%s is not nil", err)
+	}
+	if k.ID != expected.ID {
+		t.Fatalf("%s does not equal %s", k.ID, expected.ID)
+	}
+	if len(k.ACL) != len(expected.ACL) {
+		t.Fatalf("%d does not equal %d", len(k.ACL), len(expected.ACL))
+	}
+	if len(k.VersionList) != len(expected.VersionList) {
+		t.Fatalf("%d does not equal %d", len(k.VersionList), len(expected.VersionList))
+	}
+	if k.VersionHash != expected.VersionHash {
+		t.Fatalf("%s does not equal %s", k.VersionHash, expected.VersionHash)
+	}
+	if k.Path != "" {
+		t.Fatalf("path '%v' is not empty", k.Path)
+	}
+}
