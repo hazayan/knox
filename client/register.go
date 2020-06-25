@@ -19,6 +19,7 @@ Register will cache the key in the file system and keep it up to date using the 
 -r removes all existing registered keys.
 -k specifies a specific key identifier to register
 -f specifies a file containing a new line separated list of key identifiers
+-t specifies a timeout for getting the key from the daemon in seconds
 -g gets the key as well
 
 For a machine to access a certain key, it needs permissions on that key.
@@ -37,9 +38,9 @@ var registerRemove = cmdRegister.Flag.Bool("r", false, "")
 var registerKey = cmdRegister.Flag.String("k", "", "")
 var registerKeyFile = cmdRegister.Flag.String("f", "", "")
 var registerAndGet = cmdRegister.Flag.Bool("g", false, "")
+var registerTimeout = cmdRegister.Flag.Int("t", 5, "")
 
 const registerRecheckTime = 10 * time.Millisecond
-const registerTimeout = 1 * time.Second
 
 func runRegister(cmd *Command, args []string) {
 	if *registerKey == "" && *registerKeyFile == "" {
@@ -79,11 +80,13 @@ func runRegister(cmd *Command, args []string) {
 	}
 	if *registerAndGet {
 		key, err := cli.CacheGetKey(*registerKey)
-		c := time.After(registerTimeout)
+		c := time.After(time.Duration(*registerTimeout) * time.Second)
 		for err != nil {
 			select {
 			case <-c:
-				fatalf("Error getting key from daemon; check knox logs for details")
+				fatalf(
+					"Error getting key from daemon (hit timeout after %d seconds); check knox logs for details (most recent error: %v)",
+					*registerTimeout, err)
 			case <-time.After(registerRecheckTime):
 				key, err = cli.CacheGetKey(*registerKey)
 			}
@@ -98,5 +101,4 @@ func runRegister(cmd *Command, args []string) {
 	} else {
 		logf("Successfully registered keys %v", ks)
 	}
-
 }
