@@ -38,7 +38,7 @@ var registerRemove = cmdRegister.Flag.Bool("r", false, "")
 var registerKey = cmdRegister.Flag.String("k", "", "")
 var registerKeyFile = cmdRegister.Flag.String("f", "", "")
 var registerAndGet = cmdRegister.Flag.Bool("g", false, "")
-var registerTimeout = cmdRegister.Flag.Int("t", 10, "")
+var registerTimeout = cmdRegister.Flag.Int("t", 5, "")
 
 const registerRecheckTime = 10 * time.Millisecond
 
@@ -85,7 +85,7 @@ func runRegister(cmd *Command, args []string) {
 			select {
 			case <-c:
 				fatalf(
-					"Error getting key from daemon (hit timeout after %s seconds); check knox logs for details (most recent error: %v)",
+					"Error getting key from daemon (hit timeout after %d seconds); check knox logs for details (most recent error: %v)",
 					*registerTimeout, err)
 			case <-time.After(registerRecheckTime):
 				key, err = cli.CacheGetKey(*registerKey)
