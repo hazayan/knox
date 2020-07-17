@@ -211,7 +211,7 @@ func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 				return
 			}
 
-			setPrincipal(r, knox.NewPrincipalMux(principals))
+			setPrincipal(r, knox.NewPrincipalMux(...principals))
 			f(w, r)
 			return
 		}
