@@ -95,6 +95,26 @@ func TestServiceCanAccess(t *testing.T) {
 	}
 }
 
+func TestPrincipalMuxUserOrService(t *testing.T) {
+	u := NewUser("test", []string{"returntrue"})
+	s := NewService("example.com", "serviceA")
+	userMux := knox.NewPrincipalMux(u, s)
+	serviceMux := knox.NewPrincipalMux(s, u)
+
+	if !IsUser(userMux) {
+		t.Error("IsUser failed to identify that mux is user first.")
+	}
+	if IsService(userMux) {
+		t.Error("IsService failed to identify that mux is user first, and thus not a service.")
+	}
+	if IsUser(serviceMux) {
+		t.Error("IsUser failed to identify that mux is service first, and thus not a user.")
+	}
+	if !IsService(serviceMux) {
+		t.Error("IsService failed to identify that mux is service first.")
+	}
+}
+
 const caCert = `-----BEGIN CERTIFICATE-----
 MIICOjCCAeCgAwIBAgIUIKkBZQbtx8rVaWIOhpabkqZSqecwCgYIKoZIzj0EAwIw
 aTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh
