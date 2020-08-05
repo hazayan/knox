@@ -541,7 +541,7 @@ func (p PrincipalMux) Default() Principal {
 }
 
 // NewPrincipalMux returns a Principal that represents many principals.
-func NewPrincipalMux(p Principal...) Principal {
+func NewPrincipalMux(p ...Principal) Principal {
 	return PrincipalMux{
 		principals: p,
 	}

@@ -98,15 +98,15 @@ func Logger(logger *log.Logger) func(http.HandlerFunc) http.HandlerFunc {
 			p := GetPrincipal(r)
 			params := GetParams(r)
 			apiError := GetAPIError(r)
-			version := r.Header.Get("User-Agent")
-			if version == "" {
-				version = "unknown"
+			agent := r.Header.Get("User-Agent")
+			if agent == "" {
+				agent = "unknown"
 			}
 			e := &reqLog{
 				Type:       "access",
 				StatusCode: 200,
 				Request:    buildRequest(r, p, params),
-				Version: 	version,
+				UserAgent:  agent,
 			}
 			if apiError != nil {
 				e.Code = apiError.Subcode
@@ -124,7 +124,7 @@ type reqLog struct {
 	StatusCode int     `json:"status_code"`
 	Request    request `json:"request"`
 	Msg        string  `json:"msg"`
-	Version    string `json:"version"`
+	UserAgent  string  `json:"userAgent"`
 }
 
 type request struct {
@@ -217,7 +217,7 @@ func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 				return
 			}
 
-			setPrincipal(r, knox.NewPrincipalMux(...principals))
+			setPrincipal(r, knox.NewPrincipalMux(principals...))
 			f(w, r)
 			return
 		}
