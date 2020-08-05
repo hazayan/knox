@@ -184,15 +184,18 @@ type HTTPClient struct {
 	KeyFolder string
 	// Client is the http client for making network calls
 	Client HTTP
+	// Version is the current client version, useful for debugging and sent as a header
+	Version string
 }
 
 // NewClient creates a new client to connect to talk to Knox.
-func NewClient(host string, client HTTP, authHandler func() string, keyFolder string) APIClient {
+func NewClient(host string, client HTTP, authHandler func() string, keyFolder, version string) APIClient {
 	return &HTTPClient{
 		Host:        host,
 		Client:      client,
 		AuthHandler: authHandler,
 		KeyFolder:   keyFolder,
+		Version:     version,
 	}
 }
 
@@ -371,6 +374,7 @@ func (c *HTTPClient) getHTTPData(method string, path string, body url.Values, da
 	}
 	// Get user from env variable and machine hostname from elsewhere.
 	r.Header.Set("Authorization", auth)
+	r.Header.Set("User-Agent", fmt.Sprintf("Knox_Client/%s", c.Version))
 
 	if body != nil {
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -416,5 +420,6 @@ func MockClient(host string) *HTTPClient {
 		},
 		KeyFolder: "",
 		Client:    &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}},
+		Version:   "mock",
 	}
 }
