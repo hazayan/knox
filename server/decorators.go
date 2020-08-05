@@ -98,10 +98,15 @@ func Logger(logger *log.Logger) func(http.HandlerFunc) http.HandlerFunc {
 			p := GetPrincipal(r)
 			params := GetParams(r)
 			apiError := GetAPIError(r)
+			version := r.Header.Get("User-Agent")
+			if version == "" {
+				version = "unknown"
+			}
 			e := &reqLog{
 				Type:       "access",
 				StatusCode: 200,
 				Request:    buildRequest(r, p, params),
+				Version: 	version,
 			}
 			if apiError != nil {
 				e.Code = apiError.Subcode
@@ -119,6 +124,7 @@ type reqLog struct {
 	StatusCode int     `json:"status_code"`
 	Request    request `json:"request"`
 	Msg        string  `json:"msg"`
+	Version    string `json:"version"`
 }
 
 type request struct {
