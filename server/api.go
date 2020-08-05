@@ -156,7 +156,7 @@ func writeErr(apiErr *httpError) http.HandlerFunc {
 		resp.Timestamp = time.Now().UnixNano()
 		resp.Status = "error"
 		resp.Code = apiErr.Subcode
-		resp.Message = HTTPErrMap[apiErr.Subcode].Message
+		resp.Message = apiErr.Message
 		code := HTTPErrMap[apiErr.Subcode].Code
 		w.WriteHeader(code)
 		setAPIError(r, apiErr)
