@@ -16,6 +16,11 @@ Prints the current version of the Knox client.
 `,
 }
 
+// GetVersion exposes the current client version
+func GetVersion() string {
+	return Version
+}
+
 func runVersion(cmd *Command, args []string) {
 	fmt.Printf("Knox CLI version %s\n", Version)
 }
