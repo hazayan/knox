@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
 
@@ -140,16 +141,16 @@ func postKeysHandler(m KeyManager, principal knox.Principal, parameters map[stri
 
 	// Authorize
 	if !auth.IsUser(principal) {
-		return nil, errF(knox.UnauthorizedCode, "")
+		return nil, errF(knox.UnauthorizedCode, fmt.Sprintf("Must be a user to create keys, principal is %s", principal.GetID()))
 	}
 
 	keyID, keyIDOK := parameters["id"]
 	if !keyIDOK {
-		return nil, errF(knox.NoKeyIDCode, "")
+		return nil, errF(knox.NoKeyIDCode, "Missing parameter 'id'")
 	}
 	data, dataOK := parameters["data"]
 	if !dataOK {
-		return nil, errF(knox.NoKeyDataCode, "")
+		return nil, errF(knox.NoKeyDataCode, "Missing parameter 'data'")
 	}
 	aclStr, aclOK := parameters["acl"]
 
@@ -171,10 +172,10 @@ func postKeysHandler(m KeyManager, principal knox.Principal, parameters map[stri
 	err := m.AddNewKey(&key)
 	if err != nil {
 		if err == knox.ErrKeyExists {
-			return nil, errF(knox.KeyIdentifierExistsCode, "")
+			return nil, errF(knox.KeyIdentifierExistsCode, fmt.Sprintf("Key %s already exists", keyID))
 		}
 		if err == knox.ErrInvalidKeyID {
-			return nil, errF(knox.BadKeyFormatCode, "")
+			return nil, errF(knox.BadKeyFormatCode, fmt.Sprintf("KeyID includes unsupported characters %s", keyID))
 		}
 
 		return nil, errF(knox.InternalServerErrorCode, err.Error())
@@ -201,14 +202,14 @@ func getKeyHandler(m KeyManager, principal knox.Principal, parameters map[string
 	key, getErr := m.GetKey(keyID, status)
 	if getErr != nil {
 		if getErr == knox.ErrKeyIDNotFound {
-			return nil, errF(knox.KeyIdentifierDoesNotExistCode, "")
+			return nil, errF(knox.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
 
 	// Authorize access to data
 	if !principal.CanAccess(key.ACL, knox.Read) {
-		return nil, errF(knox.UnauthorizedCode, "")
+		return nil, errF(knox.UnauthorizedCode, fmt.Sprintf("Principal %s not authorized to read %s", principal.GetID(), keyID))
 	}
 	// Zero ACL for key response, in order to avoid caching unnecessarily
 	key.ACL = knox.ACL{}
@@ -224,14 +225,14 @@ func deleteKeyHandler(m KeyManager, principal knox.Principal, parameters map[str
 	key, getErr := m.GetKey(keyID, knox.Primary)
 	if getErr != nil {
 		if getErr == knox.ErrKeyIDNotFound {
-			return nil, errF(knox.KeyIdentifierDoesNotExistCode, "")
+			return nil, errF(knox.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
 
 	// Authorize
 	if !principal.CanAccess(key.ACL, knox.Admin) {
-		return nil, errF(knox.UnauthorizedCode, "")
+		return nil, errF(knox.UnauthorizedCode, fmt.Sprintf("Principal %s not authorized to delete %s", principal.GetID(), keyID))
 	}
 
 	// Delete the key
@@ -252,7 +253,7 @@ func getAccessHandler(m KeyManager, principal knox.Principal, parameters map[str
 	key, getErr := m.GetKey(keyID, knox.Primary)
 	if getErr != nil {
 		if getErr == knox.ErrKeyIDNotFound {
-			return nil, errF(knox.KeyIdentifierDoesNotExistCode, "")
+			return nil, errF(knox.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
@@ -273,7 +274,14 @@ func putAccessHandler(m KeyManager, principal knox.Principal, parameters map[str
 	keyID := parameters["keyID"]
 
 	accessStr, accessOK := parameters["access"]
+<<<<<<< HEAD
 	aclStr, aclOK := parameters["acl"]
+=======
+	if !accessOK {
+		return nil, errF(knox.BadRequestDataCode, "Missing parameter 'access'")
+	}
+	access := knox.Access{}
+>>>>>>> 8625655... add better error messages
 
 	acl := []knox.Access{}
 	if accessOK {
@@ -304,14 +312,14 @@ func putAccessHandler(m KeyManager, principal knox.Principal, parameters map[str
 	key, getErr := m.GetKey(keyID, knox.Primary)
 	if getErr != nil {
 		if getErr == knox.ErrKeyIDNotFound {
-			return nil, errF(knox.KeyIdentifierDoesNotExistCode, "")
+			return nil, errF(knox.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
 
 	// Authorize
 	if !principal.CanAccess(key.ACL, knox.Admin) {
-		return nil, errF(knox.UnauthorizedCode, "")
+		return nil, errF(knox.UnauthorizedCode, fmt.Sprintf("Principal %s not authorized to update access for %s", principal.GetID(), keyID))
 	}
 
 	for _, access := range acl {
@@ -344,7 +352,7 @@ func postVersionHandler(m KeyManager, principal knox.Principal, parameters map[s
 	keyID := parameters["keyID"]
 	dataStr, dataOK := parameters["data"]
 	if !dataOK {
-		return nil, errF(knox.BadRequestDataCode, "")
+		return nil, errF(knox.BadRequestDataCode, "Missing parameter 'data'")
 	}
 	decodedData, decodeErr := base64.StdEncoding.DecodeString(dataStr)
 	if decodeErr != nil {
@@ -355,14 +363,14 @@ func postVersionHandler(m KeyManager, principal knox.Principal, parameters map[s
 	key, getErr := m.GetKey(keyID, knox.Inactive)
 	if getErr != nil {
 		if getErr == knox.ErrKeyIDNotFound {
-			return nil, errF(knox.KeyIdentifierDoesNotExistCode, "")
+			return nil, errF(knox.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
 
 	// Authorize
 	if !principal.CanAccess(key.ACL, knox.Write) {
-		return nil, errF(knox.UnauthorizedCode, "")
+		return nil, errF(knox.UnauthorizedCode, fmt.Sprintf("Principal %s not authorized to write %s", principal.GetID(), keyID))
 	}
 
 	// Create and add the new version
@@ -392,7 +400,7 @@ func putVersionsHandler(m KeyManager, principal knox.Principal, parameters map[s
 
 	statusStr, statusOK := parameters["status"]
 	if !statusOK {
-		return nil, errF(knox.BadRequestDataCode, "")
+		return nil, errF(knox.BadRequestDataCode, "Missing parameter 'status'")
 	}
 	status := knox.Active
 	statusErr := status.UnmarshalJSON([]byte(statusStr))
@@ -408,14 +416,14 @@ func putVersionsHandler(m KeyManager, principal knox.Principal, parameters map[s
 	key, getErr := m.GetKey(keyID, knox.Inactive)
 	if getErr != nil {
 		if getErr == knox.ErrKeyIDNotFound {
-			return nil, errF(knox.KeyIdentifierDoesNotExistCode, "")
+			return nil, errF(knox.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(knox.InternalServerErrorCode, getErr.Error())
 	}
 
 	// Authorize
 	if !principal.CanAccess(key.ACL, knox.Write) {
-		return nil, errF(knox.UnauthorizedCode, "")
+		return nil, errF(knox.UnauthorizedCode, fmt.Sprintf("Principal %s not authorized to write %s", principal.GetID(), keyID))
 	}
 
 	err := m.UpdateVersion(keyID, id, status)
