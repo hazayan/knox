@@ -274,14 +274,7 @@ func putAccessHandler(m KeyManager, principal knox.Principal, parameters map[str
 	keyID := parameters["keyID"]
 
 	accessStr, accessOK := parameters["access"]
-<<<<<<< HEAD
 	aclStr, aclOK := parameters["acl"]
-=======
-	if !accessOK {
-		return nil, errF(knox.BadRequestDataCode, "Missing parameter 'access'")
-	}
-	access := knox.Access{}
->>>>>>> 8625655... add better error messages
 
 	acl := []knox.Access{}
 	if accessOK {
