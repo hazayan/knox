@@ -128,19 +128,20 @@ type reqLog struct {
 }
 
 type request struct {
-	Method      string            `json:"method"`
-	Path        string            `json:"path"`
-	Parameters  map[string]string `json:"parameters"`
-	ParsedQuery map[string]string `json:"parsed_query_string"`
-	Principal   string            `json:"principal"`
-	AuthType    string            `json:"auth_type"`
-	RequestURI  string            `json:"request_uri"`
-	RemoteAddr  string            `json:"remote_addr"`
-	TLSServer   string            `json:"tls_server"`
-	TLSCipher   uint16            `json:"tls_cipher"`
-	TLSVersion  uint16            `json:"tls_version"`
-	TLSResumed  bool              `json:"tls_resumed"`
-	TLSUnique   []byte            `json:"tls_session_id"`
+	Method             string            `json:"method"`
+	Path               string            `json:"path"`
+	Parameters         map[string]string `json:"parameters"`
+	ParsedQuery        map[string]string `json:"parsed_query_string"`
+	Principal          string            `json:"principal"`
+	FallbackPrincipals []string          `json:"fallback_principals"`
+	AuthType           string            `json:"auth_type"`
+	RequestURI         string            `json:"request_uri"`
+	RemoteAddr         string            `json:"remote_addr"`
+	TLSServer          string            `json:"tls_server"`
+	TLSCipher          uint16            `json:"tls_cipher"`
+	TLSVersion         uint16            `json:"tls_version"`
+	TLSResumed         bool              `json:"tls_resumed"`
+	TLSUnique          []byte            `json:"tls_session_id"`
 }
 
 func scrub(params map[string]string) map[string]string {
@@ -175,6 +176,9 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 	if p != nil {
 		r.Principal = p.GetID()
 		r.AuthType = p.Type()
+		if mux, ok := p.(knox.PrincipalMux); ok {
+			r.FallbackPrincipals = mux.GetIDs()
+		}
 	} else {
 		r.Principal = ""
 		r.AuthType = ""
