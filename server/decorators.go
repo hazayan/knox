@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 
 	"github.com/gorilla/context"
 	"github.com/pinterest/knox"
@@ -174,13 +175,7 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 	}
 	if p != nil {
 		r.Principal = p.GetID()
-		if auth.IsUser(p) {
-			r.AuthType = "user"
-		} else if auth.IsService(p) {
-			r.AuthType = "service"
-		} else {
-			r.AuthType = "machine"
-		}
+		r.AuthType = p.Type()
 	} else {
 		r.Principal = ""
 		r.AuthType = ""
@@ -199,7 +194,8 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.HandlerFunc {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			principals := []knox.Principal{}
+			var defaultPrincipal knox.Principal
+			allPrincipals := map[string]knox.Principal{}
 			errReturned := fmt.Errorf("No matching authentication providers found")
 
 			for _, p := range providers {
@@ -209,15 +205,23 @@ func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 						errReturned = errAuthenticate
 						continue
 					}
-					principals = append(principals, principal)
+					if defaultPrincipal == nil {
+						// First match is considered the default principal to use.
+						defaultPrincipal = principal
+					}
+
+					// We record the name of the provider to be used in logging, so we can record
+					// information about which provider authenticated which principal later on.
+					providerName := reflect.TypeOf(p).Name()
+					allPrincipals[providerName] = principal
 				}
 			}
-			if len(principals) == 0 {
+			if defaultPrincipal == nil {
 				writeErr(errF(knox.UnauthenticatedCode, errReturned.Error()))(w, r)
 				return
 			}
 
-			setPrincipal(r, knox.NewPrincipalMux(principals...))
+			setPrincipal(r, knox.NewPrincipalMux(defaultPrincipal, allPrincipals))
 			f(w, r)
 			return
 		}
