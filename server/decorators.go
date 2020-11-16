@@ -212,7 +212,7 @@ func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 
 					// We record the name of the provider to be used in logging, so we can record
 					// information about which provider authenticated which principal later on.
-					providerName := reflect.TypeOf(p).Name()
+					providerName := reflect.TypeOf(p).String()
 					allPrincipals[providerName] = principal
 				}
 			}
