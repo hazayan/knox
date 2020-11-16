@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"reflect"
 
 	"github.com/gorilla/context"
 	"github.com/pinterest/knox"
@@ -212,8 +211,7 @@ func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 
 					// We record the name of the provider to be used in logging, so we can record
 					// information about which provider authenticated which principal later on.
-					providerName := reflect.TypeOf(p).String()
-					allPrincipals[providerName] = principal
+					allPrincipals[p.Name()] = principal
 				}
 			}
 			if defaultPrincipal == nil {
