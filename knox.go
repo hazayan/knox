@@ -534,6 +534,15 @@ func (p PrincipalMux) GetID() string {
 	return p.defaultPrincipal.GetID()
 }
 
+// GetIDs returns all registered IDs from the principals that are muxed.
+func (p PrincipalMux) GetIDs() []string {
+	ids := []string{}
+	for _, principal := range p.allPrincipals {
+		ids = append(ids, principal.GetID())
+	}
+	return ids
+}
+
 // Type returns the underlying type of a principal, for logging/debugging purposes.
 func (p PrincipalMux) Type() string {
 	if len(p.allPrincipals) == 1 {
