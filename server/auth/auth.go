@@ -294,6 +294,11 @@ func (u user) GetID() string {
 	return u.ID
 }
 
+// Type returns the underlying type of a principal, for logging/debugging purposes.
+func (u user) Type() string {
+	return "user"
+}
+
 // CanAccess determines if a User can access an object represented by the ACL
 // with a certain AccessType. It compares LDAP username and LDAP group.
 func (u user) CanAccess(acl knox.ACL, t knox.AccessType) bool {
@@ -317,6 +322,11 @@ type machine string
 
 func (m machine) GetID() string {
 	return string(m)
+}
+
+// Type returns the underlying type of a principal, for logging/debugging purposes.
+func (m machine) Type() string {
+	return "machine"
 }
 
 // CanAccess determines if a Machine can access an object represented by the ACL
@@ -347,6 +357,11 @@ type service struct {
 // GetID converts the internal representation into a SPIFFE id
 func (s service) GetID() string {
 	return "spiffe://" + s.domain + "/" + s.id
+}
+
+// Type returns the underlying type of a principal, for logging/debugging purposes.
+func (s service) Type() string {
+	return "service"
 }
 
 // CanAccess determines if a Service can access an object represented by the ACL
