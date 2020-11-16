@@ -529,7 +529,7 @@ func (p PrincipalMux) CanAccess(acl ACL, accessType AccessType) bool {
 	return false
 }
 
-// GetID returns the first registered ID.
+// GetID returns the ID of the default principal.
 func (p PrincipalMux) GetID() string {
 	return p.defaultPrincipal.GetID()
 }
