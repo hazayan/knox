@@ -506,17 +506,22 @@ func (kvl KeyVersionList) Update(versionID uint64, s VersionStatus) (KeyVersionL
 type Principal interface {
 	CanAccess(ACL, AccessType) bool
 	GetID() string
+	Type() string
 }
 
 // PrincipalMux provides a Principal Interface over multiple Principals.
 type PrincipalMux struct {
-	principals []Principal
+	// The default principal to use in the mux.
+	defaultPrincipal Principal
+
+	// All principals being muxed, including the default, indexed by provider.
+	allPrincipals map[string]Principal
 }
 
 // CanAccess will check the principals in order of adding, and the first
 // Principal that provides at least the AccessType requested will be used.
 func (p PrincipalMux) CanAccess(acl ACL, accessType AccessType) bool {
-	for _, p := range p.principals {
+	for _, p := range p.allPrincipals {
 		if p.CanAccess(acl, accessType) {
 			return true
 		}
@@ -524,26 +529,45 @@ func (p PrincipalMux) CanAccess(acl ACL, accessType AccessType) bool {
 	return false
 }
 
-// GetID returns the first registered ID.
+// GetID returns the ID of the default principal.
 func (p PrincipalMux) GetID() string {
-	if len(p.principals) == 0 {
-		return "No Principal Found"
+	return p.defaultPrincipal.GetID()
+}
+
+// GetIDs returns all registered IDs from the principals that are muxed.
+func (p PrincipalMux) GetIDs() []string {
+	ids := []string{}
+	for _, principal := range p.allPrincipals {
+		ids = append(ids, principal.GetID())
 	}
-	return p.principals[0].GetID()
+	return ids
+}
+
+// Type returns the underlying type of a principal, for logging/debugging purposes.
+func (p PrincipalMux) Type() string {
+	if len(p.allPrincipals) == 1 {
+		return p.defaultPrincipal.Type()
+	}
+
+	types := []string{}
+	for provider, principal := range p.allPrincipals {
+		types = append(types, fmt.Sprintf("%s=>%s", provider, principal.Type()))
+	}
+
+	// Outputs a string like 'mux[foo=>user, bar=>service]'.
+	return fmt.Sprintf("mux[%s]", strings.Join(types, ","))
 }
 
 // Default returns the first registered Principal.
 func (p PrincipalMux) Default() Principal {
-	if len(p.principals) == 0 {
-		return nil
-	}
-	return p.principals[0]
+	return p.defaultPrincipal
 }
 
 // NewPrincipalMux returns a Principal that represents many principals.
-func NewPrincipalMux(p ...Principal) Principal {
+func NewPrincipalMux(defaultPrincipal Principal, allPrincipals map[string]Principal) Principal {
 	return PrincipalMux{
-		principals: p,
+		defaultPrincipal: defaultPrincipal,
+		allPrincipals:    allPrincipals,
 	}
 }
 
