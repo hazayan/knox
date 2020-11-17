@@ -128,19 +128,20 @@ type reqLog struct {
 }
 
 type request struct {
-	Method      string            `json:"method"`
-	Path        string            `json:"path"`
-	Parameters  map[string]string `json:"parameters"`
-	ParsedQuery map[string]string `json:"parsed_query_string"`
-	Principal   string            `json:"principal"`
-	AuthType    string            `json:"auth_type"`
-	RequestURI  string            `json:"request_uri"`
-	RemoteAddr  string            `json:"remote_addr"`
-	TLSServer   string            `json:"tls_server"`
-	TLSCipher   uint16            `json:"tls_cipher"`
-	TLSVersion  uint16            `json:"tls_version"`
-	TLSResumed  bool              `json:"tls_resumed"`
-	TLSUnique   []byte            `json:"tls_session_id"`
+	Method             string            `json:"method"`
+	Path               string            `json:"path"`
+	Parameters         map[string]string `json:"parameters"`
+	ParsedQuery        map[string]string `json:"parsed_query_string"`
+	Principal          string            `json:"principal"`
+	FallbackPrincipals []string          `json:"fallback_principals"`
+	AuthType           string            `json:"auth_type"`
+	RequestURI         string            `json:"request_uri"`
+	RemoteAddr         string            `json:"remote_addr"`
+	TLSServer          string            `json:"tls_server"`
+	TLSCipher          uint16            `json:"tls_cipher"`
+	TLSVersion         uint16            `json:"tls_version"`
+	TLSResumed         bool              `json:"tls_resumed"`
+	TLSUnique          []byte            `json:"tls_session_id"`
 }
 
 func scrub(params map[string]string) map[string]string {
@@ -174,12 +175,9 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 	}
 	if p != nil {
 		r.Principal = p.GetID()
-		if auth.IsUser(p) {
-			r.AuthType = "user"
-		} else if auth.IsService(p) {
-			r.AuthType = "service"
-		} else {
-			r.AuthType = "machine"
+		r.AuthType = p.Type()
+		if mux, ok := p.(knox.PrincipalMux); ok {
+			r.FallbackPrincipals = mux.GetIDs()
 		}
 	} else {
 		r.Principal = ""
@@ -199,7 +197,8 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.HandlerFunc {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			principals := []knox.Principal{}
+			var defaultPrincipal knox.Principal
+			allPrincipals := map[string]knox.Principal{}
 			errReturned := fmt.Errorf("No matching authentication providers found")
 
 			for _, p := range providers {
@@ -209,15 +208,22 @@ func Authentication(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 						errReturned = errAuthenticate
 						continue
 					}
-					principals = append(principals, principal)
+					if defaultPrincipal == nil {
+						// First match is considered the default principal to use.
+						defaultPrincipal = principal
+					}
+
+					// We record the name of the provider to be used in logging, so we can record
+					// information about which provider authenticated which principal later on.
+					allPrincipals[p.Name()] = principal
 				}
 			}
-			if len(principals) == 0 {
+			if defaultPrincipal == nil {
 				writeErr(errF(knox.UnauthenticatedCode, errReturned.Error()))(w, r)
 				return
 			}
 
-			setPrincipal(r, knox.NewPrincipalMux(principals...))
+			setPrincipal(r, knox.NewPrincipalMux(defaultPrincipal, allPrincipals))
 			f(w, r)
 			return
 		}

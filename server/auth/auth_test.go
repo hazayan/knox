@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"net/http"
+	"strings"
 	"time"
 
 	"testing"
@@ -95,11 +96,30 @@ func TestServiceCanAccess(t *testing.T) {
 	}
 }
 
+func TestPrincipalMuxType(t *testing.T) {
+	u := NewUser("test", []string{"returntrue"})
+	s := NewService("example.com", "serviceA")
+
+	user := knox.NewPrincipalMux(u, map[string]knox.Principal{"foo": u})
+	service := knox.NewPrincipalMux(s, map[string]knox.Principal{"foo": s})
+	both := knox.NewPrincipalMux(u, map[string]knox.Principal{"foo": u, "bar": s})
+
+	if user.Type() != "user" {
+		t.Error("Type of user-only mux should be 'user'")
+	}
+	if service.Type() != "service" {
+		t.Error("Type of service-only mux should be 'service'")
+	}
+	if !strings.Contains(both.Type(), "mux") || !strings.Contains(both.Type(), "user") || !strings.Contains(both.Type(), "service") {
+		t.Error("Type of mux with both should contain both user and service in the type string")
+	}
+}
+
 func TestPrincipalMuxUserOrService(t *testing.T) {
 	u := NewUser("test", []string{"returntrue"})
 	s := NewService("example.com", "serviceA")
-	userMux := knox.NewPrincipalMux(u, s)
-	serviceMux := knox.NewPrincipalMux(s, u)
+	userMux := knox.NewPrincipalMux(u, map[string]knox.Principal{"foo": u, "bar": s})
+	serviceMux := knox.NewPrincipalMux(s, map[string]knox.Principal{"foo": u, "bar": s})
 
 	if !IsUser(userMux) {
 		t.Error("IsUser failed to identify that mux is user first.")
