@@ -136,13 +136,27 @@ func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (knox.Princ
 	if err != nil {
 		return nil, err
 	}
+
+	return spiffeToPrincipal(spiffeURIs)
+}
+
+func spiffeToPrincipal(spiffeURIs []string) (knox.Principal, error) {
+	if len(spiffeURIs) == 0 {
+		return nil, fmt.Errorf("auth: no spiffe identity in certificate")
+	}
 	if len(spiffeURIs) > 1 {
 		return nil, fmt.Errorf("auth: more than one service identity specified in certificate")
 	}
-	splits := strings.SplitN(spiffeURIs[0][9:], "/", 2)
-	if len(splits) != 2 {
-		return nil, fmt.Errorf("auth: invalid service ID format")
+
+	uri := spiffeURIs[0]
+	if !strings.HasPrefix(uri, "spiffe://") {
+		return nil, fmt.Errorf("auth: service identity was not a valid SPIFFE ID (bad prefix)")
 	}
+	splits := strings.SplitN(uri[9:], "/", 2)
+	if len(splits) != 2 {
+		return nil, fmt.Errorf("auth: service identity was not a valid SPIFFE ID (bad format)")
+	}
+
 	return NewService(splits[0], splits[1]), nil
 }
 

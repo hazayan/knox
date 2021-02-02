@@ -346,6 +346,25 @@ func TestSpiffeSuccess(t *testing.T) {
 	testSpiffeAuthFlow(t, "0sANYTHING", &a)
 }
 
+func TestSpiffeToPrincipalBadInput(t *testing.T) {
+	inputs := [][]string{
+		nil,
+		{},
+		{""},
+		{"!"},
+		{"foo"},
+		{"spiffe:/asdf"},
+		{"a", "b"},
+	}
+
+	for _, input := range inputs {
+		_, err := spiffeToPrincipal(input)
+		if err == nil {
+			t.Errorf("Input %s should return err, but did not", input)
+		}
+	}
+}
+
 func testSpiffeAuthFlow(t *testing.T, authHeader string, provider Provider) {
 	expected := "spiffe://example.com/service"
 	req, err := http.NewRequest("GET", "http://localhost/", nil)
@@ -369,7 +388,7 @@ func testSpiffeAuthFlow(t *testing.T, authHeader string, provider Provider) {
 		t.Fatal("Authenticated principal is not a service")
 	}
 	if p.GetID() != expected {
-		t.Fatal("Service ID differs from expected result")
+		t.Fatalf("Service ID differs from expected result (result was %s)", p.GetID())
 	}
 }
 
