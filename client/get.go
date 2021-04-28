@@ -18,7 +18,7 @@ var cmdGet = &Command{
 	Long: `
 Get gets the key data for a key.
 
--v specifies the key_version to get. If it is not provided, this returns the most recent version.
+-v specifies the key_version to get. If it is not provided, this returns the primary version.
 -j returns the json version of the key as specified in the knox API.
 -n forces a network call. This will avoid cache issues where the ACL is out of date.
 -a returns all key versions (including inactive ones). Only works when -j is specified.
