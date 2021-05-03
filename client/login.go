@@ -21,7 +21,7 @@ var cmdLogin = &Command{
 	UsageLine: "login [username]",
 	Short:     "login as user and save authentication data",
 	Long: `
-Will authenticate user via OAuth2 password grant flow if available. Requires user to enter username and password. The authentication data is saved in "~/.knox_user_auth".
+Will authenticate user via OAuth2 password grant flow if available. Requires user to enter username and password. By default, the authentication data is saved in "~/.knox_user_auth".
 
 The optional username argument can specify the user that to log in as otherwise it uses the current os user.
 
@@ -79,7 +79,7 @@ func runLogin(cmd *Command, args []string) {
 	if authResp.Error != "" {
 		fatalf("Fail to authenticate: %q", authResp.Error)
 	}
-	authFile := path.Join(u.HomeDir, "/.knox_user_auth")
+	authFile := path.Join(u.HomeDir, knoxTokenFileLocation)
 	err = ioutil.WriteFile(authFile, data, 0600)
 	if err != nil {
 		fatalf("Failed to write auth data to file" + err.Error())
