@@ -45,6 +45,8 @@ import (
 	"github.com/pinterest/knox"
 )
 
+const defaultTokenFileLocation = ".knox_user_auth"
+
 var cli knox.APIClient
 
 // VisibilityParams exposes functions for the knox client to provide information
@@ -59,9 +61,10 @@ var errorf = func(string, ...interface{}) {}
 var daemonReportMetrics = func(map[string]uint64) {}
 var knoxAuthClientID = ""
 var knoxOAuthTokenEndpoint = ""
+var knoxTokenFileLocation = ""
 
 // Run is how to execute commands. It uses global variables and isn't safe to call in parallel.
-func Run(client knox.APIClient, p *VisibilityParams, tokenEndpoint, clientID string) {
+func Run(client knox.APIClient, p *VisibilityParams, tokenEndpoint, clientID string, homeRelativeTokenFileLocation string) {
 	cli = client
 	if p != nil {
 		if p.Logf != nil {
@@ -76,6 +79,11 @@ func Run(client knox.APIClient, p *VisibilityParams, tokenEndpoint, clientID str
 	}
 	knoxAuthClientID = clientID
 	knoxOAuthTokenEndpoint = tokenEndpoint
+	knoxTokenFileLocation = homeRelativeTokenFileLocation
+
+	if homeRelativeTokenFileLocation == "" {
+		knoxTokenFileLocation = defaultTokenFileLocation
+	}
 
 	flag.Usage = usage
 	flag.Parse()

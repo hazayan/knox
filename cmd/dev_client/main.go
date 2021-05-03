@@ -120,8 +120,15 @@ func main() {
 		AuthHandler: authHandler,
 		KeyFolder:   keyFolder,
 		Client:      &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}},
-		Version:     client.GetVersion(),
 	}
 
-	client.Run(cli, &client.VisibilityParams{Logf: log.Printf, Errorf: log.Printf, Metrics: func(map[string]uint64) {}}, tokenEndpoint, clientID)
+	client.Run(
+		cli,
+		&client.VisibilityParams{
+			Logf:    log.Printf,
+			Errorf:  log.Printf,
+			Metrics: func(map[string]uint64) {}},
+		tokenEndpoint,
+		clientID,
+		"")
 }
