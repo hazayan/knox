@@ -36,6 +36,86 @@ You can retrieve the secret using:
 $GOPATH/bin/dev_client get test_service:first_secret
 ```
 
+---
+
+# Knox Extension: First Iteration Plan & Architecture Blueprint
+
+## Goals
+
+- Deliver robust client and server implementations for secret management.
+- Harden security: authentication, authorization, audit logging, input validation.
+- Modularize code for future extensibility (e.g., protocol support).
+- Document APIs, configuration, and security features.
+
+## Project Structure
+
+```
+knox/
+  client/         # Knox client implementation
+  server/         # Knox server implementation
+  api/            # Shared API types/interfaces
+  storage/        # Secret storage backend abstraction
+  auth/           # Authentication & authorization logic
+  config/         # Configuration management
+  main.go         # Entry point for server binary
+  README.md       # Documentation
+  tests/          # Integration and unit tests
+```
+
+## Client API (Go)
+
+```go
+type Client struct {
+    // Transport, auth, config
+}
+
+func (c *Client) GetSecret(name string) (string, error)
+func (c *Client) SetSecret(name, value string) error
+func (c *Client) DeleteSecret(name string) error
+func (c *Client) ListSecrets() ([]string, error)
+```
+
+- Transport: Support HTTP (REST/gRPC) with TLS.
+- Auth: API key, mTLS, or token-based.
+
+## Server API (Go)
+
+```go
+type Server struct {
+    // Config, storage, auth
+}
+
+func (s *Server) Start() error
+func (s *Server) Stop() error
+// Internal handlers for CRUD, auth, etc.
+```
+
+- Endpoints: `/secrets/{name}` for CRUD, `/secrets` for listing.
+- Security: TLS, authentication, authorization, audit logging.
+- Storage: Pluggable backend (file, DB, etc.).
+
+## Security Hardening
+
+- Authentication: API keys, mTLS, or JWT.
+- Authorization: Per-secret or per-user access control.
+- Audit Logging: Log all access and mutation events.
+- Input Validation: Strict checks on all incoming data.
+- Rate Limiting: Prevent abuse.
+
+## Testing & Documentation
+
+- Unit Tests: For client, server, and storage logic.
+- Integration Tests: End-to-end flows.
+- Documentation: API usage, configuration, security features.
+
+## Iteration Goals
+
+- Deliver a working client and server with secure, robust secret management.
+- Harden against common security threats and edge cases.
+- Document everything for easy onboarding and review.
+
+---
+
 You can see all key IDs using:
 ```sh
 $GOPATH/bin/dev_client keys

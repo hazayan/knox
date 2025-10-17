@@ -1,0 +1,23 @@
+[Unit]
+Description=Knox D-Bus Secret Service Bridge
+Documentation=https://github.com/pinterest/knox
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/knox-dbus --config=%h/.config/knox/dbus.yaml
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.config/knox %h/.knox
+
+# Environment
+Environment="KNOX_USER_AUTH_FILE=%h/.knox/token"
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,31 @@
+# Knox D-Bus Bridge Configuration Example
+
+dbus:
+  # Bus type: "session" for user session, "system" for system-wide
+  bus_type: "session"
+
+  # D-Bus service name (standard Secret Service name)
+  service_name: "org.freedesktop.secrets"
+
+knox:
+  # Knox server address
+  server: "localhost:9000"
+
+  # TLS configuration
+  tls:
+    ca_cert: ""  # Path to CA certificate (optional)
+    client_cert: ""  # Path to client certificate for mTLS (optional)
+    client_key: ""  # Path to client key for mTLS (optional)
+
+  # Namespace prefix for D-Bus keys in Knox
+  # All D-Bus secrets will be stored as: prefix:collection:item
+  # Example: "dbus:default:firefox_password"
+  namespace_prefix: "dbus"
+
+encryption:
+  # Supported encryption algorithms
+  # "plain" = no encryption (secrets encrypted by Knox)
+  # "dh-ietf1024-sha256-aes128-cbc-pkcs7" = D-Bus standard encryption
+  algorithms:
+    - "plain"
+    - "dh-ietf1024-sha256-aes128-cbc-pkcs7"
