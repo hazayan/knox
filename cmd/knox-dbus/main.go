@@ -1,0 +1,212 @@
+// Package main provides the Knox D-Bus Secret Service bridge daemon.
+package main
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+
+	"github.com/spf13/cobra"
+
+	"github.com/pinterest/knox"
+	"github.com/pinterest/knox/pkg/config"
+	"github.com/pinterest/knox/pkg/dbus"
+	"github.com/pinterest/knox/pkg/observability/logging"
+)
+
+var (
+	cfgFile string
+	version = "2.0.0-dev"
+)
+
+func main() {
+	rootCmd := &cobra.Command{
+		Use:   "knox-dbus",
+		Short: "Knox D-Bus Secret Service bridge",
+		Long: `Knox D-Bus bridge provides FreeDesktop Secret Service API compatibility,
+allowing desktop applications (Firefox, Chrome, SSH, etc.) to store secrets in Knox.`,
+		Version: version,
+		RunE:    runDaemon,
+	}
+
+	homeDir, _ := os.UserHomeDir()
+	defaultCfgFile := filepath.Join(homeDir, ".config", "knox", "dbus.yaml")
+
+	rootCmd.Flags().StringVarP(&cfgFile, "config", "c", defaultCfgFile, "Path to configuration file")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runDaemon(cmd *cobra.Command, args []string) error {
+	// Load configuration
+	cfg, err := config.LoadDBusConfig(cfgFile)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Initialize logging
+	logging.Initialize(logging.Config{
+		Level:  "info",
+		Format: "text",
+	})
+
+	logging.Infof("Knox D-Bus bridge %s starting...", version)
+	logging.Infof("Configuration: %s", cfgFile)
+
+	// Create Knox API client
+	knoxClient, err := createKnoxClient(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create Knox client: %w", err)
+	}
+
+	// Test Knox connectivity
+	logging.Info("Testing Knox connectivity...")
+	if _, err := knoxClient.GetKeys(map[string]string{}); err != nil {
+		logging.Warnf("Knox connectivity test failed: %v", err)
+		logging.Warn("Bridge will continue but may not function properly")
+	} else {
+		logging.Info("Knox connectivity OK")
+	}
+
+	// Create and start D-Bus bridge
+	logging.Infof("Starting D-Bus service: %s", cfg.DBus.ServiceName)
+	logging.Infof("Bus type: %s", cfg.DBus.BusType)
+
+	bridge, err := dbus.NewBridge(cfg, knoxClient)
+	if err != nil {
+		return fmt.Errorf("failed to create bridge: %w", err)
+	}
+
+	if err := bridge.Start(); err != nil {
+		return fmt.Errorf("failed to start bridge: %w", err)
+	}
+	defer bridge.Stop()
+
+	logging.Info("D-Bus bridge started successfully")
+	logging.Infof("Namespace prefix: %s", cfg.Knox.NamespacePrefix)
+	logging.Info("Ready to serve requests")
+
+	// Wait for interrupt signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	sig := <-sigChan
+	logging.Infof("Received signal: %v, shutting down...", sig)
+
+	return nil
+}
+
+func createKnoxClient(cfg *config.DBusConfig) (knox.APIClient, error) {
+	// Create HTTP client with TLS
+	httpClient, err := createHTTPClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
+	// Create auth handlers
+	authHandlers := createAuthHandlers(cfg)
+
+	// Create Knox client
+	client := knox.NewClient(
+		cfg.Knox.Server,
+		httpClient,
+		authHandlers,
+		"", // No cache for D-Bus bridge
+		version,
+	)
+
+	return client, nil
+}
+
+func createHTTPClient(cfg *config.DBusConfig) (*http.Client, error) {
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+
+	// Load CA certificate if specified
+	if cfg.Knox.TLS.CACert != "" {
+		caCert, err := os.ReadFile(cfg.Knox.TLS.CACert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate")
+		}
+
+		tlsConfig.RootCAs = caCertPool
+	}
+
+	// Load client certificate if specified
+	if cfg.Knox.TLS.ClientCert != "" && cfg.Knox.TLS.ClientKey != "" {
+		cert, err := tls.LoadX509KeyPair(cfg.Knox.TLS.ClientCert, cfg.Knox.TLS.ClientKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate: %w", err)
+		}
+
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	return &http.Client{
+		Transport: transport,
+	}, nil
+}
+
+func createAuthHandlers(cfg *config.DBusConfig) []knox.AuthHandler {
+	var handlers []knox.AuthHandler
+
+	// mTLS auth handler (if client cert is configured)
+	if cfg.Knox.TLS.ClientCert != "" {
+		handlers = append(handlers, func() (string, string, knox.HTTP) {
+			return "0m", "mtls", nil
+		})
+	}
+
+	// Environment variable auth handler
+	handlers = append(handlers, func() (string, string, knox.HTTP) {
+		// Check for user auth token in environment
+		if token := os.Getenv("KNOX_USER_AUTH"); token != "" {
+			return "0u" + token, "user_token", nil
+		}
+
+		// Check for machine auth token in environment
+		if token := os.Getenv("KNOX_MACHINE_AUTH"); token != "" {
+			return "0m" + token, "machine_token", nil
+		}
+
+		return "", "", nil
+	})
+
+	// File-based auth handler
+	handlers = append(handlers, func() (string, string, knox.HTTP) {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", "", nil
+		}
+
+		tokenFile := filepath.Join(homeDir, ".knox", "token")
+		token, err := os.ReadFile(tokenFile)
+		if err != nil {
+			return "", "", nil
+		}
+
+		tokenStr := strings.TrimSpace(string(token))
+		return "0u" + tokenStr, "user_token_file", nil
+	})
+
+	return handlers
+}
