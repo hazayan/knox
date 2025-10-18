@@ -1,5 +1,5 @@
-// Package knox is a package to provide the basic types to be used across client and server.
-package knox
+// Package types is a package to provide the basic types to be used across client and server.
+package types
 
 import (
 	"crypto/sha256"

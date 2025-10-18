@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/pinterest/knox"
 	"path"
 	"strconv"
 	"time"
@@ -31,7 +30,7 @@ Note that knox register will only update the register file and will return succe
 even if the machine does not have access to the key. The daemon will actually retrieve
 the key.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/pinterest/types.
 
 See also: knox unregister, knox daemon
 	`,
@@ -58,7 +57,7 @@ func parseTimeout(val string) (time.Duration, error) {
 }
 
 func runRegister(cmd *Command, args []string) *ErrorStatus {
-	if _, ok := cli.(*knox.UncachedHTTPClient); ok {
+	if _, ok := cli.(*UncachedHTTPClient); ok {
 		fmt.Println("Cannot Register in No Cache mode")
 		return nil
 	}
