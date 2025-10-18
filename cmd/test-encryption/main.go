@@ -7,19 +7,19 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/storage/postgres"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/storage/postgres"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 func main() {
-	fmt.Println("=== Knox Encryption Verification Test ===\n")
+	fmt.Println("=== Knox Encryption Verification Test ===")
 
 	// Test 1: Verify DBKey structure contains encrypted data
 	fmt.Println("Test 1: Verify encrypted DBKey structure...")
 	testDBKey := &keydb.DBKey{
 		ID:  "test-key-1",
-		ACL: knox.ACL{},
+		ACL: types.ACL{},
 		VersionList: []keydb.EncKeyVersion{
 			{
 				ID:      1,
@@ -50,10 +50,10 @@ func main() {
 
 	// Test 2: Verify wrapper structure
 	fmt.Println("\nTest 2: Verify wrapper storage structure...")
-	wrapper := &knox.Key{
+	wrapper := &types.Key{
 		ID:  testDBKey.ID,
 		ACL: testDBKey.ACL,
-		VersionList: knox.KeyVersionList{
+		VersionList: types.KeyVersionList{
 			{ID: 1, Data: data}, // Encrypted DBKey in Data field
 		},
 	}
@@ -69,7 +69,7 @@ func main() {
 
 	// Test 3: Verify deserialization
 	fmt.Println("\nTest 3: Verify round-trip serialization...")
-	var reconstructedWrapper knox.Key
+	var reconstructedWrapper types.Key
 	if err := json.Unmarshal(wrapperData, &reconstructedWrapper); err != nil {
 		fmt.Printf("❌ FAILED: Could not deserialize wrapper: %v\n", err)
 		os.Exit(1)

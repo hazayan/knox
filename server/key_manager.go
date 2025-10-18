@@ -3,20 +3,20 @@ package server
 import (
 	"fmt"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 // KeyManager is the interface for logic related to managing keys.
 type KeyManager interface {
 	GetAllKeyIDs() ([]string, error)
 	GetUpdatedKeyIDs(map[string]string) ([]string, error)
-	GetKey(id string, status knox.VersionStatus) (*knox.Key, error)
-	AddNewKey(*knox.Key) error
+	GetKey(id string, status types.VersionStatus) (*types.Key, error)
+	AddNewKey(*types.Key) error
 	DeleteKey(id string) error
-	UpdateAccess(string, ...knox.Access) error
-	AddVersion(string, *knox.KeyVersion) error
-	UpdateVersion(keyID string, versionID uint64, s knox.VersionStatus) error
+	UpdateAccess(string, ...types.Access) error
+	AddVersion(string, *types.KeyVersion) error
+	UpdateVersion(keyID string, versionID uint64, s types.VersionStatus) error
 }
 
 // NewKeyManager builds a struct for interfacing with the keydb.
@@ -55,7 +55,7 @@ func (m *keyManager) GetUpdatedKeyIDs(versions map[string]string) ([]string, err
 	return output, nil
 }
 
-func (m *keyManager) GetKey(id string, status knox.VersionStatus) (*knox.Key, error) {
+func (m *keyManager) GetKey(id string, status types.VersionStatus) (*types.Key, error) {
 	encK, err := m.db.Get(id)
 	if err != nil {
 		return nil, err
@@ -65,20 +65,20 @@ func (m *keyManager) GetKey(id string, status knox.VersionStatus) (*knox.Key, er
 		return nil, fmt.Errorf("Error decrypting key: %s", err.Error())
 	}
 	switch status {
-	case knox.Inactive:
+	case types.Inactive:
 		return k, nil
-	case knox.Active:
+	case types.Active:
 		k.VersionList = k.VersionList.GetActive()
 		return k, nil
-	case knox.Primary:
-		k.VersionList = knox.KeyVersionList{*k.VersionList.GetPrimary()}
+	case types.Primary:
+		k.VersionList = types.KeyVersionList{*k.VersionList.GetPrimary()}
 		return k, nil
 	default:
-		return nil, knox.ErrInvalidStatus
+		return nil, types.ErrInvalidStatus
 	}
 }
 
-func (m *keyManager) AddNewKey(k *knox.Key) error {
+func (m *keyManager) AddNewKey(k *types.Key) error {
 	if err := k.Validate(); err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (m *keyManager) DeleteKey(id string) error {
 	return m.db.Remove(id)
 }
 
-func (m *keyManager) UpdateAccess(id string, acl ...knox.Access) error {
+func (m *keyManager) UpdateAccess(id string, acl ...types.Access) error {
 	encK, err := m.db.Get(id)
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (m *keyManager) UpdateAccess(id string, acl ...knox.Access) error {
 	return m.db.Update(newEncK)
 }
 
-func (m *keyManager) AddVersion(id string, v *knox.KeyVersion) error {
+func (m *keyManager) AddVersion(id string, v *types.KeyVersion) error {
 	encK, err := m.db.Get(id)
 	if err != nil {
 		return err
@@ -138,7 +138,7 @@ func (m *keyManager) AddVersion(id string, v *knox.KeyVersion) error {
 	return m.db.Update(newEncK)
 }
 
-func (m *keyManager) UpdateVersion(keyID string, versionID uint64, s knox.VersionStatus) error {
+func (m *keyManager) UpdateVersion(keyID string, versionID uint64, s types.VersionStatus) error {
 	encK, err := m.db.Get(keyID)
 	if err != nil {
 		return err

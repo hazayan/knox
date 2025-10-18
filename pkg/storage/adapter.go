@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 // DBAdapter adapts storage.Backend to keydb.DB interface.
 // It stores ENCRYPTED keydb.DBKey data in the backend by serializing it
-// into a wrapper knox.Key structure. The backend never sees plaintext secrets.
+// into a wrapper types.Key structure. The backend never sees plaintext secrets.
 //
 // SECURITY: All data stored in backend is encrypted. The serialized DBKey
 // contains encrypted EncData fields from the cryptor.
@@ -117,12 +117,12 @@ func (a *DBAdapter) Update(dbKey *keydb.DBKey) error {
 		return fmt.Errorf("failed to serialize DBKey: %w", err)
 	}
 
-	// Wrap in knox.Key for backend storage
+	// Wrap in types.Key for backend storage
 	// The encrypted DBKey bytes are stored in the Data field
-	wrapper := &knox.Key{
+	wrapper := &types.Key{
 		ID:  dbKey.ID,
 		ACL: dbKey.ACL,
-		VersionList: knox.KeyVersionList{
+		VersionList: types.KeyVersionList{
 			{ID: 1, Data: data}, // Encrypted DBKey serialized here
 		},
 	}
@@ -160,11 +160,11 @@ func (a *DBAdapter) Add(keys ...*keydb.DBKey) error {
 			return fmt.Errorf("failed to serialize DBKey: %w", err)
 		}
 
-		// Wrap in knox.Key for backend storage
-		wrapper := &knox.Key{
+		// Wrap in types.Key for backend storage
+		wrapper := &types.Key{
 			ID:  dbKey.ID,
 			ACL: dbKey.ACL,
-			VersionList: knox.KeyVersionList{
+			VersionList: types.KeyVersionList{
 				{ID: 1, Data: data}, // Encrypted DBKey serialized here
 			},
 		}

@@ -41,13 +41,11 @@ import (
 	"text/template"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/pinterest/knox"
 )
 
 const defaultTokenFileLocation = ".knox_user_auth"
 
-var cli knox.APIClient
+var cli APIClient
 
 // VisibilityParams exposes functions for the knox client to provide information
 type VisibilityParams struct {
@@ -66,7 +64,7 @@ var clientGetKeyMetrics = func(map[string]string) {}
 
 // Run is how to execute commands. It uses global variables and isn't safe to call in parallel.
 func Run(
-	client knox.APIClient,
+	client APIClient,
 	p *VisibilityParams,
 	loginCommand *Command,
 ) {

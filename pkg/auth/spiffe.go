@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/pinterest/knox"
-	knoxauth "github.com/pinterest/knox/server/auth"
+	"github.com/hazayan/knox/pkg/types"
+	knoxauth "github.com/hazayan/knox/server/auth"
 )
 
 // SPIFFEProvider authenticates clients using SPIFFE identities.
@@ -33,7 +33,7 @@ func (p *SPIFFEProvider) Name() string {
 }
 
 // Authenticate authenticates a request using SPIFFE identities.
-func (p *SPIFFEProvider) Authenticate(token string, r *http.Request) (knox.Principal, error) {
+func (p *SPIFFEProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	// Check if TLS is used
 	if r.TLS == nil {
 		return nil, fmt.Errorf("TLS not enabled")

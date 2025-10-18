@@ -5,16 +5,16 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/auth"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/auth"
+	"github.com/hazayan/knox/server/keydb"
 )
 
-func GetMocks() (KeyManager, knox.Principal, knox.ACL) {
+func GetMocks() (KeyManager, types.Principal, types.ACL) {
 	db := keydb.NewTempDB()
 	cryptor := keydb.NewAESGCMCryptor(10, []byte("testtesttesttest"))
 	m := NewKeyManager(cryptor, db)
-	acl := knox.ACL([]knox.Access{})
+	acl := types.ACL([]types.Access{})
 	u := auth.NewUser("test", []string{})
 	return m, u, acl
 }
@@ -23,7 +23,7 @@ type mockPrincipal struct {
 	ID string
 }
 
-func (p mockPrincipal) CanAccess(a knox.ACL, t knox.AccessType) bool {
+func (p mockPrincipal) CanAccess(a types.ACL, t types.AccessType) bool {
 	return true
 }
 
@@ -188,7 +188,7 @@ func TestAddNewKey(t *testing.T) {
 	m, u, acl := GetMocks()
 	key1 := newKey("id1", acl, []byte("data"), u)
 
-	key, err := m.GetKey(key1.ID, knox.Active)
+	key, err := m.GetKey(key1.ID, types.Active)
 	if err == nil {
 		t.Fatal("Should be an error")
 	}
@@ -198,7 +198,7 @@ func TestAddNewKey(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, knox.Active)
+	key, err = m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -206,12 +206,12 @@ func TestAddNewKey(t *testing.T) {
 		t.Fatal("keys are not equal")
 	}
 
-	pKey, err := m.GetKey(key1.ID, knox.Primary)
+	pKey, err := m.GetKey(key1.ID, types.Primary)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	aKey, err := m.GetKey(key1.ID, knox.Active)
+	aKey, err := m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -219,7 +219,7 @@ func TestAddNewKey(t *testing.T) {
 		t.Fatal("keys are not equal")
 	}
 
-	iKey, err := m.GetKey(key1.ID, knox.Inactive)
+	iKey, err := m.GetKey(key1.ID, types.Inactive)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -235,7 +235,7 @@ func TestAddNewKey(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, knox.Active)
+	key, err = m.GetKey(key1.ID, types.Active)
 	if err == nil {
 		t.Fatal("Should be an error")
 	}
@@ -244,9 +244,9 @@ func TestAddNewKey(t *testing.T) {
 func TestUpdateAccess(t *testing.T) {
 	m, u, acl := GetMocks()
 	key1 := newKey("id1", acl, []byte("data"), u)
-	access := knox.Access{Type: knox.User, ID: "grootan", AccessType: knox.Read}
-	access2 := knox.Access{Type: knox.UserGroup, ID: "group", AccessType: knox.Write}
-	access3 := knox.Access{Type: knox.Machine, ID: "machine", AccessType: knox.Read}
+	access := types.Access{Type: types.User, ID: "grootan", AccessType: types.Read}
+	access2 := types.Access{Type: types.UserGroup, ID: "group", AccessType: types.Write}
+	access3 := types.Access{Type: types.Machine, ID: "machine", AccessType: types.Read}
 	err := m.UpdateAccess(key1.ID, access)
 	if err == nil {
 		t.Fatal("Should be an error")
@@ -266,7 +266,7 @@ func TestUpdateAccess(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err := m.GetKey(key1.ID, knox.Active)
+	key, err := m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -306,10 +306,10 @@ func TestUpdateAccess(t *testing.T) {
 
 func TestAddUpdateVersion(t *testing.T) {
 	m, u, acl := GetMocks()
-	var key *knox.Key
+	var key *types.Key
 	key1 := newKey("id1", acl, []byte("data"), u)
-	kv := newKeyVersion([]byte("data2"), knox.Active)
-	access := knox.Access{Type: knox.User, ID: "grootan", AccessType: knox.Read}
+	kv := newKeyVersion([]byte("data2"), types.Active)
+	access := types.Access{Type: types.User, ID: "grootan", AccessType: types.Read}
 	err := m.UpdateAccess(key1.ID, access)
 	if err == nil {
 		t.Fatal("Should be an error")
@@ -320,7 +320,7 @@ func TestAddUpdateVersion(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, knox.Active)
+	key, err = m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -333,7 +333,7 @@ func TestAddUpdateVersion(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, knox.Active)
+	key, err = m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -349,27 +349,27 @@ func TestAddUpdateVersion(t *testing.T) {
 	sort.Sort(key.VersionList)
 	sort.Sort(key1.VersionList)
 	for _, kv1 := range key.VersionList {
-		if kv1.Status == knox.Primary {
+		if kv1.Status == types.Primary {
 			if !reflect.DeepEqual(kv1, key1.VersionList[0]) {
 				t.Fatal("primary versions are not equal")
 			}
 		}
-		if kv1.Status == knox.Active {
+		if kv1.Status == types.Active {
 			if !reflect.DeepEqual(kv1, kv) {
 				t.Fatal("active versions are not equal")
 			}
 		}
-		if kv1.Status == knox.Inactive {
+		if kv1.Status == types.Inactive {
 			t.Fatal("No key versions should be inactive")
 		}
 	}
 
-	err = m.UpdateVersion(key1.ID, kv.ID, knox.Primary)
+	err = m.UpdateVersion(key1.ID, kv.ID, types.Primary)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, knox.Active)
+	key, err = m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -384,8 +384,8 @@ func TestAddUpdateVersion(t *testing.T) {
 	}
 	sort.Sort(key.VersionList)
 	kv1 := key.VersionList[0]
-	if kv1.Status != knox.Primary {
-		t.Fatalf("%d does equal %d", kv1.Status, knox.Primary)
+	if kv1.Status != types.Primary {
+		t.Fatalf("%d does equal %d", kv1.Status, types.Primary)
 	}
 	if kv1.ID != kv.ID {
 		t.Fatalf("%d does equal %d", kv1.ID, kv.ID)
@@ -398,8 +398,8 @@ func TestAddUpdateVersion(t *testing.T) {
 	}
 
 	kv1 = key.VersionList[1]
-	if kv1.Status != knox.Active {
-		t.Fatalf("%d does equal %d", kv1.Status, knox.Primary)
+	if kv1.Status != types.Active {
+		t.Fatalf("%d does equal %d", kv1.Status, types.Primary)
 	}
 	if kv1.ID != key1.VersionList[0].ID {
 		t.Fatalf("%d does equal %d", kv1.ID, key1.VersionList[0].ID)
@@ -411,12 +411,12 @@ func TestAddUpdateVersion(t *testing.T) {
 		t.Fatalf("%d does equal %d", kv1.CreationTime, key1.VersionList[0].CreationTime)
 	}
 
-	err = m.UpdateVersion(key1.ID, key1.VersionList[0].ID, knox.Inactive)
+	err = m.UpdateVersion(key1.ID, key1.VersionList[0].ID, types.Inactive)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, knox.Active)
+	key, err = m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -430,8 +430,8 @@ func TestAddUpdateVersion(t *testing.T) {
 		t.Fatalf("%d does not equal %d", len(key.VersionList), 1)
 	}
 	kv1 = key.VersionList[0]
-	if kv1.Status != knox.Primary {
-		t.Fatalf("%d does equal %d", kv1.Status, knox.Primary)
+	if kv1.Status != types.Primary {
+		t.Fatalf("%d does equal %d", kv1.Status, types.Primary)
 	}
 	if kv1.ID != kv.ID {
 		t.Fatalf("%d does equal %d", kv1.ID, kv.ID)
@@ -448,7 +448,7 @@ func TestGetInactiveKeyVersions(t *testing.T) {
 	m, u, acl := GetMocks()
 
 	keyOrig := newKey("id1", acl, []byte("data"), u)
-	kv := newKeyVersion([]byte("data2"), knox.Active)
+	kv := newKeyVersion([]byte("data2"), types.Active)
 
 	// Create key and add version so we have two versions
 	err := m.AddNewKey(&keyOrig)
@@ -462,7 +462,7 @@ func TestGetInactiveKeyVersions(t *testing.T) {
 	}
 
 	// Get active versions and deactivate one of them
-	key, err := m.GetKey(keyOrig.ID, knox.Active)
+	key, err := m.GetKey(keyOrig.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -471,13 +471,13 @@ func TestGetInactiveKeyVersions(t *testing.T) {
 	kvID1 := key.VersionList[1].ID
 
 	// Deactivate one of these versions
-	err = m.UpdateVersion(keyOrig.ID, kvID1, knox.Inactive)
+	err = m.UpdateVersion(keyOrig.ID, kvID1, types.Inactive)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
 
 	// Reading active key versions should now list only one version
-	key, err = m.GetKey(keyOrig.ID, knox.Active)
+	key, err = m.GetKey(keyOrig.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -490,7 +490,7 @@ func TestGetInactiveKeyVersions(t *testing.T) {
 	}
 
 	// Reading active/inactive key versions should now list both
-	key, err = m.GetKey(keyOrig.ID, knox.Inactive)
+	key, err = m.GetKey(keyOrig.ID, types.Inactive)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}

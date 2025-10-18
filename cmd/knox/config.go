@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
-	"github.com/pinterest/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -351,7 +351,7 @@ Examples:
 				return json.NewEncoder(os.Stdout).Encode(localCfg.Profiles)
 			}
 
-			fmt.Println("Available profiles:\n")
+			fmt.Println("Available profiles:")
 
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "NAME\tSERVER\tCACHE")

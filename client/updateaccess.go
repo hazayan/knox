@@ -1,11 +1,11 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/pinterest/knox"
 )
 
 func init() {
@@ -34,7 +34,7 @@ Access will add or change the acl on a key by adding a specific access control r
 
 This command requires admin access to the key.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox create, knox get
 	`,
@@ -64,7 +64,7 @@ func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
 		if err != nil {
 			return &ErrorStatus{fmt.Errorf("Could not read acl file: %s", err.Error()), false}
 		}
-		acl := []knox.Access{}
+		acl := []types.Access{}
 		err = json.Unmarshal(b, &acl)
 		if err != nil {
 			return &ErrorStatus{fmt.Errorf("Could not decode access list properly: %s", err.Error()), false}
@@ -81,33 +81,33 @@ func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
 	}
 	keyID := args[0]
 	principal := args[1]
-	var access knox.Access
+	var access types.Access
 	access.ID = principal
 	switch {
 	case *updateAccessNone:
-		access.AccessType = knox.None
+		access.AccessType = types.None
 	case *updateAccessRead:
-		access.AccessType = knox.Read
+		access.AccessType = types.Read
 	case *updateAccessWrite:
-		access.AccessType = knox.Write
+		access.AccessType = types.Write
 	case *updateAccessAdmin:
-		access.AccessType = knox.Admin
+		access.AccessType = types.Admin
 	default:
 		return &ErrorStatus{fmt.Errorf("access requires {-n,-r,-w,-a}. See 'knox help access'"), false}
 	}
 	switch {
 	case *updateAccessMachine:
-		access.Type = knox.Machine
+		access.Type = types.Machine
 	case *updateAccessUser:
-		access.Type = knox.User
+		access.Type = types.User
 	case *updateAccessGroup:
-		access.Type = knox.UserGroup
+		access.Type = types.UserGroup
 	case *updateAccessPrefix:
-		access.Type = knox.MachinePrefix
+		access.Type = types.MachinePrefix
 	case *updateAccessService:
-		access.Type = knox.Service
+		access.Type = types.Service
 	case *updateAccessServicePrefix:
-		access.Type = knox.ServicePrefix
+		access.Type = types.ServicePrefix
 	default:
 		return &ErrorStatus{fmt.Errorf("access requires {-M|-U|-G|-P|-S|-N}. See 'knox help access'"), false}
 	}

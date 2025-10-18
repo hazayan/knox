@@ -1,11 +1,11 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/pinterest/knox"
 )
 
 func init() {
@@ -28,7 +28,7 @@ The original key version id will be print to stdout.
 
 To create a new key, user credentials are required. The default access list will include the creator of this key and a limited set of site reliablity and security engineers.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox add, knox get
 	`,
@@ -56,7 +56,7 @@ func runCreate(cmd *Command, args []string) *ErrorStatus {
 		return &ErrorStatus{err, false}
 	}
 	// TODO(devinlundberg): allow ACL to be entered as input
-	acl := knox.ACL{}
+	acl := types.ACL{}
 	versionID, err := cli.CreateKey(keyID, data, acl)
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("Error adding version: %s", err.Error()), true}

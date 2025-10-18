@@ -9,7 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 // Collection represents a collection of secret items.
@@ -247,11 +247,11 @@ func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secre
 
 	// Create default ACL (grant admin access to creator)
 	// TODO: Get actual user principal
-	acl := knox.ACL{
+	acl := types.ACL{
 		{
-			Type:       knox.User,
+			Type:       types.User,
 			ID:         "dbus-user",
-			AccessType: knox.Admin,
+			AccessType: types.Admin,
 		},
 	}
 

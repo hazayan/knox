@@ -1,9 +1,9 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"fmt"
 
-	"github.com/pinterest/knox"
 )
 
 var cmdPromote = &Command{
@@ -15,7 +15,7 @@ Promote will take an active key version and make it the primary key version. Thi
 
 To use this command, you must have write permissions on the key.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox reactivate, knox deactivate
 	`,
@@ -28,7 +28,7 @@ func runPromote(cmd *Command, args []string) *ErrorStatus {
 	keyID := args[0]
 	versionID := args[1]
 
-	err := cli.UpdateVersion(keyID, versionID, knox.Primary)
+	err := cli.UpdateVersion(keyID, versionID, types.Primary)
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("Error promoting version: %s", err.Error()), true}
 	}

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pinterest/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/config"
 	"github.com/spf13/cobra"
 )
 

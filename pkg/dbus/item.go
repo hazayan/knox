@@ -9,7 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 // Item represents a secret item in a collection.
@@ -244,7 +244,7 @@ func (i *Item) GetAttributes() map[string]string {
 }
 
 // createItemFromKnoxKey creates an item from a Knox key.
-func createItemFromKnoxKey(collection *Collection, key *knox.Key) (*Item, error) {
+func createItemFromKnoxKey(collection *Collection, key *types.Key) (*Item, error) {
 	// Extract item ID from key ID (remove collection prefix)
 	itemID := key.ID[len(collection.prefix):]
 
@@ -268,7 +268,7 @@ func createItemFromKnoxKey(collection *Collection, key *knox.Key) (*Item, error)
 }
 
 // saveItemToKnox saves an item to Knox as a new key.
-func saveItemToKnox(ctx context.Context, item *Item, data []byte, acl knox.ACL) error {
+func saveItemToKnox(ctx context.Context, item *Item, data []byte, acl types.ACL) error {
 	client := item.collection.bridge.knoxClient
 
 	// Create the key in Knox

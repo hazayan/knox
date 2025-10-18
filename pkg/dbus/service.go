@@ -7,15 +7,15 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/config"
+	"github.com/hazayan/knox/client"
+	"github.com/hazayan/knox/pkg/config"
 )
 
 // Bridge represents the D-Bus to Knox bridge.
 type Bridge struct {
 	conn        *dbus.Conn
 	config      *config.DBusConfig
-	knoxClient  knox.APIClient
+	knoxClient  client.APIClient
 	sessionMgr  *SessionManager
 	collections map[string]*Collection
 	mu          sync.RWMutex
@@ -23,7 +23,7 @@ type Bridge struct {
 }
 
 // NewBridge creates a new D-Bus to Knox bridge.
-func NewBridge(cfg *config.DBusConfig, knoxClient knox.APIClient) (*Bridge, error) {
+func NewBridge(cfg *config.DBusConfig, knoxClient client.APIClient) (*Bridge, error) {
 	return &Bridge{
 		config:      cfg,
 		knoxClient:  knoxClient,
