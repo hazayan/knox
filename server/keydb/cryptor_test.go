@@ -4,25 +4,25 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var testSecret = []byte("testtesttesttest")
 
-func makeTestKey() *knox.Key {
-	return &knox.Key{
+func makeTestKey() *types.Key {
+	return &types.Key{
 		ID:          "testID",
-		ACL:         knox.ACL([]knox.Access{{Type: knox.User, ID: "testUser", AccessType: knox.Read}}),
-		VersionList: knox.KeyVersionList([]knox.KeyVersion{makeTestVersion()}),
+		ACL:         types.ACL([]types.Access{{Type: types.User, ID: "testUser", AccessType: types.Read}}),
+		VersionList: types.KeyVersionList([]types.KeyVersion{makeTestVersion()}),
 		VersionHash: "testHash",
 	}
 }
 
-func makeTestVersion() knox.KeyVersion {
-	return knox.KeyVersion{
+func makeTestVersion() types.KeyVersion {
+	return types.KeyVersion{
 		ID:           12345,
 		Data:         []byte("data"),
-		Status:       knox.Primary,
+		Status:       types.Primary,
 		CreationTime: 1,
 	}
 }

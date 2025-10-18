@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var ErrDBVersion = fmt.Errorf("DB version does not match")
@@ -15,7 +15,7 @@ var ErrDBVersion = fmt.Errorf("DB version does not match")
 // DBKey is a struct for the json serialization of keys in the database.
 type DBKey struct {
 	ID          string          `json:"id"`
-	ACL         knox.ACL        `json:"acl"`
+	ACL         types.ACL       `json:"acl"`
 	VersionList []EncKeyVersion `json:"versions"`
 	VersionHash string          `json:"hash"`
 	// The version should be set by the db provider and is not part of the data.
@@ -26,7 +26,7 @@ type DBKey struct {
 func (k *DBKey) Copy() *DBKey {
 	versionList := make([]EncKeyVersion, len(k.VersionList))
 	copy(versionList, k.VersionList)
-	acl := make([]knox.Access, len(k.ACL))
+	acl := make([]types.Access, len(k.ACL))
 	copy(acl, k.ACL)
 	return &DBKey{
 		ID:          k.ID,
@@ -39,11 +39,11 @@ func (k *DBKey) Copy() *DBKey {
 
 // EncKeyVersion is a struct for encrypting key data
 type EncKeyVersion struct {
-	ID             uint64             `json:"id"`
-	EncData        []byte             `json:"data"`
-	Status         knox.VersionStatus `json:"status"`
-	CreationTime   int64              `json:"ts"`
-	CryptoMetadata []byte             `json:"crypt"`
+	ID             uint64              `json:"id"`
+	EncData        []byte              `json:"data"`
+	Status         types.VersionStatus `json:"status"`
+	CreationTime   int64               `json:"ts"`
+	CryptoMetadata []byte              `json:"crypt"`
 }
 
 // DB is the underlying database connection that KeyDB uses for all of its operations.
@@ -97,7 +97,7 @@ func (db *TempDB) Get(id string) (*DBKey, error) {
 			return &k, nil
 		}
 	}
-	return nil, knox.ErrKeyIDNotFound
+	return nil, types.ErrKeyIDNotFound
 }
 
 // GetAll gets all keys from TempDB.
@@ -128,7 +128,7 @@ func (db *TempDB) Update(key *DBKey) error {
 			return nil
 		}
 	}
-	return knox.ErrKeyIDNotFound
+	return types.ErrKeyIDNotFound
 }
 
 // Add adds the key(s) to the DB (it will fail if the key id exists).
@@ -141,7 +141,7 @@ func (db *TempDB) Add(keys ...*DBKey) error {
 	for _, key := range keys {
 		for _, oldK := range db.keys {
 			if oldK.ID == key.ID {
-				return knox.ErrKeyExists
+				return types.ErrKeyExists
 			}
 		}
 	}
@@ -168,7 +168,7 @@ func (db *TempDB) Remove(id string) error {
 			return nil
 		}
 	}
-	return knox.ErrKeyIDNotFound
+	return types.ErrKeyIDNotFound
 }
 
 // SQLDB provides a generic way to use SQL providers as Knox DBs.
@@ -257,7 +257,7 @@ func (db *SQLDB) Get(id string) (*DBKey, error) {
 	var acl, versions []byte
 	err := db.getStmt.QueryRow(id).Scan(&key.ID, &acl, &key.VersionHash, &versions, &key.DBVersion)
 	if err != nil {
-		return nil, knox.ErrKeyIDNotFound
+		return nil, types.ErrKeyIDNotFound
 	}
 	err = json.Unmarshal(acl, &key.ACL)
 	if err != nil {
@@ -329,7 +329,7 @@ func (db *SQLDB) Update(key *DBKey) error {
 			return err
 		}
 		if !rs.Next() {
-			return knox.ErrKeyIDNotFound
+			return types.ErrKeyIDNotFound
 		}
 		return ErrDBVersion
 	}
@@ -352,7 +352,7 @@ func (db *SQLDB) Add(keys ...*DBKey) error {
 		_, err = db.AddStmt.Exec(key.ID, acl, versions, key.VersionHash, updateTime)
 		if err != nil {
 			// Not sure how to properly differentiate here...
-			return knox.ErrKeyExists
+			return types.ErrKeyExists
 		}
 		// Not checking rows affected because I assume the db will return an error on primary key collision.
 	}
@@ -371,7 +371,7 @@ func (db *SQLDB) Remove(id string) error {
 		return err
 	}
 	if affected == 0 {
-		return knox.ErrKeyIDNotFound
+		return types.ErrKeyIDNotFound
 	}
 	return nil
 }

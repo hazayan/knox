@@ -3,10 +3,11 @@
 package etcd
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"context"
 	"errors"
 
-	"github.com/pinterest/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/storage"
 )
 
 func init() {
@@ -29,11 +30,11 @@ func New(endpoints []string, prefix string) (*Backend, error) {
 }
 
 // Placeholder methods to satisfy the interface
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*storage.Key, error) {
+func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (b *Backend) PutKey(ctx context.Context, key *storage.Key) error {
+func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 	return errors.New("not implemented")
 }
 
@@ -45,7 +46,7 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 	return nil, errors.New("not implemented")
 }
 
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*storage.Key) (*storage.Key, error)) error {
+func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	return errors.New("not implemented")
 }
 

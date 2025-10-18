@@ -10,9 +10,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/log"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/log"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 // HTTPError is the error type with knox err subcode and message for logging purposes
@@ -34,19 +34,19 @@ type httpErrResp struct {
 
 // HTTPErrMap is a mapping from err subcodes to the http err response that will be returned.
 var HTTPErrMap = map[int]*httpErrResp{
-	knox.NoKeyIDCode:                   {http.StatusBadRequest, "Missing Key ID"},
-	knox.InternalServerErrorCode:       {http.StatusInternalServerError, "Internal Server Error"},
-	knox.KeyIdentifierExistsCode:       {http.StatusBadRequest, "Key identifer exists"},
-	knox.KeyVersionDoesNotExistCode:    {http.StatusNotFound, "Key version does not exist"},
-	knox.KeyIdentifierDoesNotExistCode: {http.StatusNotFound, "Key identifer does not exist"},
-	knox.UnauthenticatedCode:           {http.StatusUnauthorized, "User or machine is not authenticated"},
-	knox.UnauthorizedCode:              {http.StatusForbidden, "User or machine not authorized"},
-	knox.NotYetImplementedCode:         {http.StatusNotImplemented, "Not yet implemented"},
-	knox.NotFoundCode:                  {http.StatusNotFound, "Route not found"},
-	knox.NoKeyDataCode:                 {http.StatusBadRequest, "Missing Key Data"},
-	knox.BadRequestDataCode:            {http.StatusBadRequest, "Bad request format"},
-	knox.BadKeyFormatCode:              {http.StatusBadRequest, "Key ID contains unsupported characters"},
-	knox.BadPrincipalIdentifier:        {http.StatusBadRequest, "Invalid principal identifier"},
+	types.NoKeyIDCode:                   {http.StatusBadRequest, "Missing Key ID"},
+	types.InternalServerErrorCode:       {http.StatusInternalServerError, "Internal Server Error"},
+	types.KeyIdentifierExistsCode:       {http.StatusBadRequest, "Key identifer exists"},
+	types.KeyVersionDoesNotExistCode:    {http.StatusNotFound, "Key version does not exist"},
+	types.KeyIdentifierDoesNotExistCode: {http.StatusNotFound, "Key identifer does not exist"},
+	types.UnauthenticatedCode:           {http.StatusUnauthorized, "User or machine is not authenticated"},
+	types.UnauthorizedCode:              {http.StatusForbidden, "User or machine not authorized"},
+	types.NotYetImplementedCode:         {http.StatusNotImplemented, "Not yet implemented"},
+	types.NotFoundCode:                  {http.StatusNotFound, "Route not found"},
+	types.NoKeyDataCode:                 {http.StatusBadRequest, "Missing Key Data"},
+	types.BadRequestDataCode:            {http.StatusBadRequest, "Bad request format"},
+	types.BadKeyFormatCode:              {http.StatusBadRequest, "Key ID contains unsupported characters"},
+	types.BadPrincipalIdentifier:        {http.StatusBadRequest, "Invalid principal identifier"},
 }
 
 func combine(f, g func(http.HandlerFunc) http.HandlerFunc) func(http.HandlerFunc) http.HandlerFunc {
@@ -99,7 +99,7 @@ func GetRouterFromKeyManager(
 		decorator = combine(decorators[j], decorator)
 	}
 
-	r.NotFoundHandler = setupRoute("404", keyManager)(decorator(WriteErr(errF(knox.NotFoundCode, ""))))
+	r.NotFoundHandler = setupRoute("404", keyManager)(decorator(WriteErr(errF(types.NotFoundCode, ""))))
 
 	for _, route := range allRoutes {
 		addRoute(r, route, decorator, keyManager)
@@ -215,7 +215,7 @@ func (p PostParameter) Name() string {
 type Route struct {
 	// Handler represents the handler function that is responsible for serving
 	// this route
-	Handler func(db KeyManager, principal knox.Principal, parameters map[string]string) (interface{}, *HTTPError)
+	Handler func(db KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError)
 
 	// Id represents A unique string identifier that represents this specific
 	// route
@@ -238,7 +238,7 @@ type Route struct {
 // HTTP error response code in the specified HTTP response writer
 func WriteErr(apiErr *HTTPError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resp := new(knox.Response)
+		resp := new(types.Response)
 		hostname, err := os.Hostname()
 		if err != nil {
 			panic("Hostname is required:" + err.Error())
@@ -262,9 +262,9 @@ func WriteErr(apiErr *HTTPError) http.HandlerFunc {
 // WriteData returns a function that can write arbitrary data to the specified
 // HTTP response writer
 func WriteData(w http.ResponseWriter, data interface{}) {
-	r := new(knox.Response)
+	r := new(types.Response)
 	r.Message = ""
-	r.Code = knox.OKCode
+	r.Code = types.OKCode
 	r.Status = "ok"
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -295,33 +295,33 @@ func (r Route) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // Users besides creator who have default access to all keys.
 // This is by default empty and should be expanded by the main function.
-var defaultAccess []knox.Access
+var defaultAccess []types.Access
 
 // AddDefaultAccess adds an access to every created key.
-func AddDefaultAccess(a *knox.Access) {
+func AddDefaultAccess(a *types.Access) {
 	defaultAccess = append(defaultAccess, *a)
 }
 
-var accessCallback func(knox.AccessCallbackInput) (bool, error)
+var accessCallback func(types.AccessCallbackInput) (bool, error)
 
 // SetAccessCallback adds a callback.
-func SetAccessCallback(callback func(knox.AccessCallbackInput) (bool, error)) {
+func SetAccessCallback(callback func(types.AccessCallbackInput) (bool, error)) {
 	accessCallback = callback
 }
 
 // Extra validators to apply on principals submitted to Knox.
-var extraPrincipalValidators []knox.PrincipalValidator
+var extraPrincipalValidators []types.PrincipalValidator
 
 // AddPrincipalValidator applies additional, custom validation on principals
 // submitted to Knox for adding into ACLs. Can be used to set custom business
 // logic for e.g. what kind of machine or service prefixes are acceptable.
-func AddPrincipalValidator(validator knox.PrincipalValidator) {
+func AddPrincipalValidator(validator types.PrincipalValidator) {
 	extraPrincipalValidators = append(extraPrincipalValidators, validator)
 }
 
 // newKeyVersion creates a new KeyVersion with correctly set defaults.
-func newKeyVersion(d []byte, s knox.VersionStatus) knox.KeyVersion {
-	version := knox.KeyVersion{}
+func newKeyVersion(d []byte, s types.VersionStatus) types.KeyVersion {
+	version := types.KeyVersion{}
 	version.Data = d
 	version.Status = s
 	version.CreationTime = time.Now().UnixNano()
@@ -331,17 +331,17 @@ func newKeyVersion(d []byte, s knox.VersionStatus) knox.KeyVersion {
 }
 
 // NewKey creates a new Key with correctly set defaults.
-func newKey(id string, acl knox.ACL, d []byte, u knox.Principal) knox.Key {
-	key := knox.Key{}
+func newKey(id string, acl types.ACL, d []byte, u types.Principal) types.Key {
+	key := types.Key{}
 	key.ID = id
 
-	creatorAccess := knox.Access{ID: u.GetID(), AccessType: knox.Admin, Type: knox.User}
+	creatorAccess := types.Access{ID: u.GetID(), AccessType: types.Admin, Type: types.User}
 	key.ACL = acl.Add(creatorAccess)
 	for _, a := range defaultAccess {
 		key.ACL = key.ACL.Add(a)
 	}
 
-	key.VersionList = []knox.KeyVersion{newKeyVersion(d, knox.Primary)}
+	key.VersionList = []types.KeyVersion{newKeyVersion(d, types.Primary)}
 	key.VersionHash = key.VersionList.Hash()
 	return key
 }

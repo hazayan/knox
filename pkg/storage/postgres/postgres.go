@@ -12,8 +12,8 @@ import (
 	"time"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/pkg/storage"
 )
 
 func init() {
@@ -107,7 +107,7 @@ func (b *Backend) initSchema(ctx context.Context) error {
 }
 
 // GetKey retrieves a key by ID.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
+func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
 	atomic.AddInt64(b.opCounts["get"], 1)
 
 	var keyData []byte
@@ -123,7 +123,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
 		return nil, fmt.Errorf("failed to query key: %w", err)
 	}
 
-	var key knox.Key
+	var key types.Key
 	if err := json.Unmarshal(keyData, &key); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal key: %w", err)
 	}
@@ -132,7 +132,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
 }
 
 // PutKey stores or updates a key.
-func (b *Backend) PutKey(ctx context.Context, key *knox.Key) error {
+func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 }
 
 // UpdateKey atomically updates a key using the provided update function.
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*knox.Key) (*knox.Key, error)) error {
+func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	atomic.AddInt64(b.opCounts["update"], 1)
 
 	// Start a transaction
@@ -244,9 +244,9 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*kn
 		keyID,
 	).Scan(&keyData)
 
-	var currentKey *knox.Key
+	var currentKey *types.Key
 	if err == nil {
-		var key knox.Key
+		var key types.Key
 		if err := json.Unmarshal(keyData, &key); err != nil {
 			return fmt.Errorf("failed to unmarshal existing key: %w", err)
 		}
@@ -270,7 +270,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*kn
 
 		// Ensure the key ID hasn't changed
 		if newKey.ID != keyID {
-			return knox.ErrInvalidKeyID
+			return types.ErrInvalidKeyID
 		}
 
 		// Marshal and store the updated key
@@ -393,7 +393,7 @@ func (b *Backend) BeginTx(ctx context.Context) (storage.Transaction, error) {
 }
 
 // GetKey retrieves a key within the transaction.
-func (t *Transaction) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
+func (t *Transaction) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
 	var keyData []byte
 	err := t.tx.QueryRowContext(ctx,
 		"SELECT key_data FROM knox_keys WHERE key_id = $1 FOR UPDATE",
@@ -407,7 +407,7 @@ func (t *Transaction) GetKey(ctx context.Context, keyID string) (*knox.Key, erro
 		return nil, fmt.Errorf("failed to query key: %w", err)
 	}
 
-	var key knox.Key
+	var key types.Key
 	if err := json.Unmarshal(keyData, &key); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal key: %w", err)
 	}
@@ -416,7 +416,7 @@ func (t *Transaction) GetKey(ctx context.Context, keyID string) (*knox.Key, erro
 }
 
 // PutKey stores or updates a key within the transaction.
-func (t *Transaction) PutKey(ctx context.Context, key *knox.Key) error {
+func (t *Transaction) PutKey(ctx context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}

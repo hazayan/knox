@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/context"
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 type contextKey int
@@ -22,8 +22,8 @@ const (
 )
 
 type PrincipalContext interface {
-	SetCurrentPrincipal(principal knox.Principal)
-	GetCurrentPrincipal() knox.Principal
+	SetCurrentPrincipal(principal types.Principal)
+	GetCurrentPrincipal() types.Principal
 }
 
 type principalContext struct {
@@ -42,21 +42,21 @@ func NewPrincipalContext(request *http.Request) PrincipalContext {
 	}
 }
 
-func (ctx *principalContext) GetCurrentPrincipal() knox.Principal {
+func (ctx *principalContext) GetCurrentPrincipal() types.Principal {
 	if rv := context.Get(ctx.request, principalCtxKey); rv != nil {
-		return rv.(knox.Principal)
+		return rv.(types.Principal)
 	}
 	return nil
 }
 
-func (ctx *principalContext) SetCurrentPrincipal(principal knox.Principal) {
+func (ctx *principalContext) SetCurrentPrincipal(principal types.Principal) {
 	if ctx.invocationCount > 0 {
 		panic("SetPrincipal was called more than once during the lifetime of the HTTP request")
 	}
 	ctx.setPrincipalInner(ctx.request, principal)
 }
 
-func (ctx *principalContext) setPrincipalInner(httpRequest *http.Request, principal knox.Principal) {
+func (ctx *principalContext) setPrincipalInner(httpRequest *http.Request, principal types.Principal) {
 	ctx.once.Do(func() {
 		context.Set(httpRequest, ctx.principalCtxKey, principal)
 		ctx.invocationCount += 1
@@ -66,7 +66,7 @@ func (ctx *principalContext) setPrincipalInner(httpRequest *http.Request, princi
 // Provider is used for authenticating requests via the authentication decorator.
 type Provider interface {
 	Name() string
-	Authenticate(token string, r *http.Request) (knox.Principal, error)
+	Authenticate(token string, r *http.Request) (types.Principal, error)
 	Version() byte
 	Type() byte
 }
@@ -90,7 +90,7 @@ func verifyCertificate(r *http.Request, cas *x509.CertPool,
 
 	chains, err := certs[0].Verify(opts)
 	if err != nil {
-		return nil, fmt.Errorf("auth: failed to verify client's certificate: " + err.Error())
+		return nil, fmt.Errorf("auth: failed to verify client's certificate: %w", err)
 	}
 	if len(chains) == 0 {
 		return nil, fmt.Errorf("auth: No cert chains could be verified")
@@ -128,7 +128,7 @@ func (p *MTLSAuthProvider) Type() byte {
 }
 
 // Authenticate performs TLS based Authentication for the MTLSAuthProvider
-func (p *MTLSAuthProvider) Authenticate(token string, r *http.Request) (knox.Principal, error) {
+func (p *MTLSAuthProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	cert, err := verifyCertificate(r, p.CAs, p.time)
 	if err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ func (p *SpiffeProvider) Type() byte {
 }
 
 // Authenticate performs TLS based Authentication and extracts the Spiffe URI extension
-func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (knox.Principal, error) {
+func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	cert, err := verifyCertificate(r, p.CAs, p.time)
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (knox.Princ
 	return spiffeToPrincipal(spiffeURIs)
 }
 
-func spiffeToPrincipal(spiffeURIs []string) (knox.Principal, error) {
+func spiffeToPrincipal(spiffeURIs []string) (types.Principal, error) {
 	if len(spiffeURIs) == 0 {
 		return nil, fmt.Errorf("auth: no spiffe identity in certificate")
 	}
@@ -269,7 +269,7 @@ func (p *GitHubProvider) Type() byte {
 }
 
 // Authenticate uses the token to get user data from github.com
-func (p *GitHubProvider) Authenticate(token string, r *http.Request) (knox.Principal, error) {
+func (p *GitHubProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	user := &GitHubLoginFormat{}
 	if err := p.getAPI("https://api.github.com/user", token, user); err != nil {
 		return nil, err
@@ -319,8 +319,8 @@ type httpClient interface {
 }
 
 // IsUser returns true if the principal, or first principal in the case of mux, is a user.
-func IsUser(p knox.Principal) bool {
-	if mux, ok := p.(knox.PrincipalMux); ok {
+func IsUser(p types.Principal) bool {
+	if mux, ok := p.(types.PrincipalMux); ok {
 		p = mux.Default()
 	}
 	_, ok := p.(user)
@@ -328,8 +328,8 @@ func IsUser(p knox.Principal) bool {
 }
 
 // IsService returns true if the principal, or first principal in the case of mux, is a service.
-func IsService(p knox.Principal) bool {
-	if mux, ok := p.(knox.PrincipalMux); ok {
+func IsService(p types.Principal) bool {
+	if mux, ok := p.(types.PrincipalMux); ok {
 		p = mux.Default()
 	}
 	_, ok := p.(service)
@@ -352,17 +352,17 @@ func setFromList(groups []string) *stringSet {
 }
 
 // NewUser creates a user principal with the given auth Provider.
-func NewUser(id string, groups []string) knox.Principal {
+func NewUser(id string, groups []string) types.Principal {
 	return user{id, *setFromList(groups)}
 }
 
 // NewMachine creates a machine principal with the given auth Provider.
-func NewMachine(id string) knox.Principal {
+func NewMachine(id string) types.Principal {
 	return machine(id)
 }
 
 // NewService creates a service principal with the given auth Provider.
-func NewService(domain string, path string) knox.Principal {
+func NewService(domain string, path string) types.Principal {
 	return service{domain, path}
 }
 
@@ -380,8 +380,8 @@ func (u user) GetID() string {
 	return u.ID
 }
 
-func (u user) Raw() []knox.RawPrincipal {
-	return []knox.RawPrincipal{
+func (u user) Raw() []types.RawPrincipal {
+	return []types.RawPrincipal{
 		{
 			ID:   u.GetID(),
 			Type: u.Type(),
@@ -396,14 +396,14 @@ func (u user) Type() string {
 
 // CanAccess determines if a User can access an object represented by the ACL
 // with a certain AccessType. It compares LDAP username and LDAP group.
-func (u user) CanAccess(acl knox.ACL, t knox.AccessType) bool {
+func (u user) CanAccess(acl types.ACL, t types.AccessType) bool {
 	for _, a := range acl {
 		switch a.Type {
-		case knox.User:
+		case types.User:
 			if a.ID == u.ID && a.AccessType.CanAccess(t) {
 				return true
 			}
-		case knox.UserGroup:
+		case types.UserGroup:
 			if u.inGroup(a.ID) && a.AccessType.CanAccess(t) {
 				return true
 			}
@@ -424,8 +424,8 @@ func (m machine) Type() string {
 	return "machine"
 }
 
-func (m machine) Raw() []knox.RawPrincipal {
-	return []knox.RawPrincipal{
+func (m machine) Raw() []types.RawPrincipal {
+	return []types.RawPrincipal{
 		{
 			ID:   m.GetID(),
 			Type: m.Type(),
@@ -435,14 +435,14 @@ func (m machine) Raw() []knox.RawPrincipal {
 
 // CanAccess determines if a Machine can access an object represented by the ACL
 // with a certain AccessType. It compares Machine hostname and hostname prefix.
-func (m machine) CanAccess(acl knox.ACL, t knox.AccessType) bool {
+func (m machine) CanAccess(acl types.ACL, t types.AccessType) bool {
 	for _, a := range acl {
 		switch a.Type {
-		case knox.Machine:
+		case types.Machine:
 			if a.ID == string(m) && a.AccessType.CanAccess(t) {
 				return true
 			}
-		case knox.MachinePrefix:
+		case types.MachinePrefix:
 			// TODO(devinlundberg): Investigate security implications of this
 			if strings.HasPrefix(string(m), a.ID) && a.AccessType.CanAccess(t) {
 				return true
@@ -468,8 +468,8 @@ func (s service) Type() string {
 	return "service"
 }
 
-func (s service) Raw() []knox.RawPrincipal {
-	return []knox.RawPrincipal{
+func (s service) Raw() []types.RawPrincipal {
+	return []types.RawPrincipal{
 		{
 			ID:   s.GetID(),
 			Type: s.Type(),
@@ -479,14 +479,14 @@ func (s service) Raw() []knox.RawPrincipal {
 
 // CanAccess determines if a Service can access an object represented by the ACL
 // with a certain AccessType. It compares Service id and id prefix.
-func (s service) CanAccess(acl knox.ACL, t knox.AccessType) bool {
+func (s service) CanAccess(acl types.ACL, t types.AccessType) bool {
 	for _, a := range acl {
 		switch a.Type {
-		case knox.Service:
+		case types.Service:
 			if a.ID == string(s.GetID()) && a.AccessType.CanAccess(t) {
 				return true
 			}
-		case knox.ServicePrefix:
+		case types.ServicePrefix:
 			if strings.HasPrefix(s.GetID(), a.ID) && a.AccessType.CanAccess(t) {
 				return true
 			}

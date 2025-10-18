@@ -15,14 +15,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var registeredFile = ".registered"
 var keysDir = "/keys/"
 
-// buildServer returns a server. Call Close when finished.
-func buildServer(d *returnParameters) *httptest.Server {
+// buildDaemonServer returns a server. Call Close when finished.
+func buildDaemonServer(d *returnParameters) *httptest.Server {
 	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		d.a(r)
 		d.Lock()
@@ -34,9 +34,9 @@ func buildServer(d *returnParameters) *httptest.Server {
 }
 
 func setGoodResponse(params *returnParameters, data interface{}) error {
-	resp := &knox.Response{
+	resp := &types.Response{
 		Status:    "ok",
-		Code:      knox.OKCode,
+		Code:      types.OKCode,
 		Host:      "test",
 		Timestamp: 1234567890,
 		Message:   "",
@@ -78,7 +78,7 @@ func (p *returnParameters) setFunc(a func(r *http.Request)) {
 
 func setUpTest(t *testing.T) (*returnParameters, string, daemon) {
 	var params returnParameters
-	srv := buildServer(&params)
+	srv := buildDaemonServer(&params)
 	addr := srv.Listener.Addr().String()
 	if err := setGoodResponse(&params, ""); err != nil {
 		t.Fatal("failed to initialize response params: " + err.Error())
@@ -87,7 +87,7 @@ func setUpTest(t *testing.T) (*returnParameters, string, daemon) {
 	if err != nil {
 		t.Fatal("Failed to create temp directory: " + err.Error())
 	}
-	cli := knox.MockClient(addr, "")
+	cli := MockClient(addr, "")
 	cli.KeyFolder = dir + keysDir
 	d := daemon{
 		dir:          dir,
@@ -108,10 +108,10 @@ func TearDownTest(dir string) {
 func TestProcessKey(t *testing.T) {
 	params, dir, d := setUpTest(t)
 	defer TearDownTest(dir)
-	expected := knox.Key{
+	expected := types.Key{
 		ID:          "testkey",
-		ACL:         knox.ACL([]knox.Access{}),
-		VersionList: knox.KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash",
 	}
 	if err := addRegisteredKey(expected.ID, d.registerFilename()); err != nil {
@@ -183,15 +183,15 @@ func TestProcessTinkKey(t *testing.T) {
 	params, dir, d := setUpTest(t)
 	defer TearDownTest(dir)
 	expectedTinkKeysetStr := "EmQKWAowdHlwZS5nb29nbGVhcGlzLmNvbS9nb29nbGUuY3J5cHRvLnRpbmsuQWVzR2NtS2V5EiIaIKMfoRISDw+QlZv88fJdP5qQG6sQdX79v6d5rMAi1JFtGAEQARjLvc6/AyAB"
-	var keyVersion knox.KeyVersion
+	var keyVersion types.KeyVersion
 	keyVersion.ID = 1234567890
 	keyVersion.Data = []byte{8, 203, 189, 206, 191, 3, 18, 100, 10, 88, 10, 48, 116, 121, 112, 101, 46, 103, 111, 111, 103, 108, 101, 97, 112, 105, 115, 46, 99, 111, 109, 47, 103, 111, 111, 103, 108, 101, 46, 99, 114, 121, 112, 116, 111, 46, 116, 105, 110, 107, 46, 65, 101, 115, 71, 99, 109, 75, 101, 121, 18, 34, 26, 32, 163, 31, 161, 18, 18, 15, 15, 144, 149, 155, 252, 241, 242, 93, 63, 154, 144, 27, 171, 16, 117, 126, 253, 191, 167, 121, 172, 192, 34, 212, 145, 109, 24, 1, 16, 1, 24, 203, 189, 206, 191, 3, 32, 1}
 	keyVersion.Status = 1
 	keyVersion.CreationTime = 12345
-	expected := knox.Key{
+	expected := types.Key{
 		ID:          "tink:aead:my_test_key",
-		ACL:         knox.ACL([]knox.Access{}),
-		VersionList: knox.KeyVersionList{keyVersion},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{keyVersion},
 		VersionHash: "VersionHash",
 		TinkKeyset:  "",
 	}
@@ -225,10 +225,10 @@ func TestProcessTinkKey(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	params, dir, d := setUpTest(t)
 	defer TearDownTest(dir)
-	expected := knox.Key{
+	expected := types.Key{
 		ID:          "testkey",
-		ACL:         knox.ACL([]knox.Access{}),
-		VersionList: knox.KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash",
 	}
 	if err := addRegisteredKey(expected.ID, d.registerFilename()); err != nil {
@@ -343,10 +343,10 @@ func TestUpdate(t *testing.T) {
 	}
 
 	// Check what happens on an update
-	newExpected := knox.Key{
+	newExpected := types.Key{
 		ID:          "testkey",
-		ACL:         knox.ACL([]knox.Access{}),
-		VersionList: knox.KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash2",
 	}
 	params.setFunc(func(r *http.Request) {

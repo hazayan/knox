@@ -21,7 +21,7 @@ Will authenticate user via OAuth2 password grant flow if available. Requires use
 
 The optional username argument can specify the user that to log in as otherwise it uses the current os user.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox help auth
 	`
@@ -118,7 +118,7 @@ func runLogin(
 	}
 	err = json.Unmarshal(data, &authResp)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Unexpected response from auth" + err.Error() + "data: " + string(data)), false}
+		return &ErrorStatus{fmt.Errorf("Unexpected response from auth: %w, data: %s", err, string(data)), false}
 	}
 	if authResp.Error != "" {
 		return &ErrorStatus{fmt.Errorf("Fail to authenticate: %q", authResp.Error), false}

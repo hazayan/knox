@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -42,7 +42,7 @@ func NewAESCryptorFromFile(path string) (*AESCryptor, error) {
 }
 
 // Encrypt encrypts a Knox key using envelope encryption.
-func (c *AESCryptor) Encrypt(key *knox.Key) (*keydb.DBKey, error) {
+func (c *AESCryptor) Encrypt(key *types.Key) (*keydb.DBKey, error) {
 	dbKey := &keydb.DBKey{
 		ID:          key.ID,
 		ACL:         key.ACL,
@@ -62,12 +62,12 @@ func (c *AESCryptor) Encrypt(key *knox.Key) (*keydb.DBKey, error) {
 }
 
 // Decrypt decrypts a Knox key.
-func (c *AESCryptor) Decrypt(dbKey *keydb.DBKey) (*knox.Key, error) {
-	key := &knox.Key{
+func (c *AESCryptor) Decrypt(dbKey *keydb.DBKey) (*types.Key, error) {
+	key := &types.Key{
 		ID:          dbKey.ID,
 		ACL:         dbKey.ACL,
 		VersionHash: dbKey.VersionHash,
-		VersionList: make(knox.KeyVersionList, len(dbKey.VersionList)),
+		VersionList: make(types.KeyVersionList, len(dbKey.VersionList)),
 	}
 
 	for i, ev := range dbKey.VersionList {
@@ -82,12 +82,12 @@ func (c *AESCryptor) Decrypt(dbKey *keydb.DBKey) (*knox.Key, error) {
 }
 
 // EncryptVersion encrypts a single key version.
-func (c *AESCryptor) EncryptVersion(key *knox.Key, version *knox.KeyVersion) (*keydb.EncKeyVersion, error) {
+func (c *AESCryptor) EncryptVersion(key *types.Key, version *types.KeyVersion) (*keydb.EncKeyVersion, error) {
 	return c.encryptVersion(version)
 }
 
 // encryptVersion performs the actual encryption using envelope encryption.
-func (c *AESCryptor) encryptVersion(version *knox.KeyVersion) (*keydb.EncKeyVersion, error) {
+func (c *AESCryptor) encryptVersion(version *types.KeyVersion) (*keydb.EncKeyVersion, error) {
 	// Generate a random DEK (Data Encryption Key) for this version
 	dek := make([]byte, 32) // 256-bit key
 	if _, err := io.ReadFull(rand.Reader, dek); err != nil {
@@ -130,7 +130,7 @@ func (c *AESCryptor) encryptVersion(version *knox.KeyVersion) (*keydb.EncKeyVers
 }
 
 // decryptVersion performs the actual decryption using envelope encryption.
-func (c *AESCryptor) decryptVersion(encVersion *keydb.EncKeyVersion) (*knox.KeyVersion, error) {
+func (c *AESCryptor) decryptVersion(encVersion *keydb.EncKeyVersion) (*types.KeyVersion, error) {
 	// Parse metadata
 	metadata, err := UnmarshalCryptoMetadata(encVersion.CryptoMetadata)
 	if err != nil {
@@ -160,7 +160,7 @@ func (c *AESCryptor) decryptVersion(encVersion *keydb.EncKeyVersion) (*knox.KeyV
 		return nil, fmt.Errorf("failed to decrypt data: %w", err)
 	}
 
-	return &knox.KeyVersion{
+	return &types.KeyVersion{
 		ID:           encVersion.ID,
 		Data:         data,
 		Status:       encVersion.Status,

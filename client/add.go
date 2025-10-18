@@ -1,9 +1,9 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"fmt"
 
-	"github.com/pinterest/knox"
 )
 
 func init() {
@@ -26,7 +26,7 @@ This key version will be set to active upon creation. The version id will be sen
 
 This command uses user access and requires write access in the key's ACL.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox create, knox promote
 	`,
@@ -63,7 +63,7 @@ func getDataWithTemplate(templateName string, keyID string) ([]byte, error) {
 		return nil, err
 	}
 	// get all versions (primary, active, inactive) of this knox identifier
-	allVersions, err := cli.NetworkGetKeyWithStatus(keyID, knox.Inactive)
+	allVersions, err := cli.NetworkGetKeyWithStatus(keyID, types.Inactive)
 	if err != nil {
 		return nil, fmt.Errorf("error getting key: %s", err.Error())
 	}

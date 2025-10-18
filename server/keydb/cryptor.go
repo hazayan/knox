@@ -8,16 +8,16 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var ErrCryptorVersion = fmt.Errorf("Cryptor version does not match")
 
 // Cryptor is an interface for converting a knox Key to a DB Key
 type Cryptor interface {
-	Decrypt(*DBKey) (*knox.Key, error)
-	Encrypt(*knox.Key) (*DBKey, error)
-	EncryptVersion(*knox.Key, *knox.KeyVersion) (*EncKeyVersion, error)
+	Decrypt(*DBKey) (*types.Key, error)
+	Encrypt(*types.Key) (*DBKey, error)
+	EncryptVersion(*types.Key, *types.KeyVersion) (*EncKeyVersion, error)
 }
 
 // NewAESGCMCryptor creates a Cryptor that performs AES GCM AEAD encryption on key data.
@@ -31,7 +31,7 @@ type aesGCMCryptor struct {
 	version byte
 }
 
-func (c *aesGCMCryptor) EncryptVersion(k *knox.Key, v *knox.KeyVersion) (*EncKeyVersion, error) {
+func (c *aesGCMCryptor) EncryptVersion(k *types.Key, v *types.KeyVersion) (*EncKeyVersion, error) {
 	b, err := aes.NewCipher(c.keyData)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (c *aesGCMCryptor) generateAD(kid string, vid uint64, creation int64) []byt
 	return b.Bytes()
 }
 
-func (c *aesGCMCryptor) decryptVersion(k *DBKey, v *EncKeyVersion) (*knox.KeyVersion, error) {
+func (c *aesGCMCryptor) decryptVersion(k *DBKey, v *EncKeyVersion) (*types.KeyVersion, error) {
 	md := aesCryptoMetadata(v.CryptoMetadata)
 	if md.Version() != c.version {
 		return nil, ErrCryptorVersion
@@ -88,7 +88,7 @@ func (c *aesGCMCryptor) decryptVersion(k *DBKey, v *EncKeyVersion) (*knox.KeyVer
 		return nil, err
 	}
 
-	return &knox.KeyVersion{
+	return &types.KeyVersion{
 		ID:           v.ID,
 		Data:         plaintext,
 		Status:       v.Status,
@@ -96,7 +96,7 @@ func (c *aesGCMCryptor) decryptVersion(k *DBKey, v *EncKeyVersion) (*knox.KeyVer
 	}, nil
 }
 
-func (c *aesGCMCryptor) Encrypt(k *knox.Key) (*DBKey, error) {
+func (c *aesGCMCryptor) Encrypt(k *types.Key) (*DBKey, error) {
 	dbVersions := make([]EncKeyVersion, len(k.VersionList))
 	for i, v := range k.VersionList {
 		dbv, err := c.EncryptVersion(k, &v)
@@ -115,8 +115,8 @@ func (c *aesGCMCryptor) Encrypt(k *knox.Key) (*DBKey, error) {
 	return &newKey, nil
 }
 
-func (c *aesGCMCryptor) Decrypt(k *DBKey) (*knox.Key, error) {
-	versions := make([]knox.KeyVersion, len(k.VersionList))
+func (c *aesGCMCryptor) Decrypt(k *DBKey) (*types.Key, error) {
+	versions := make([]types.KeyVersion, len(k.VersionList))
 	for i, v := range k.VersionList {
 		dbv, err := c.decryptVersion(k, &v)
 		if err != nil {
@@ -125,7 +125,7 @@ func (c *aesGCMCryptor) Decrypt(k *DBKey) (*knox.Key, error) {
 		versions[i] = *dbv
 	}
 
-	newKey := knox.Key{
+	newKey := types.Key{
 		ID:          k.ID,
 		ACL:         k.ACL,
 		VersionList: versions,

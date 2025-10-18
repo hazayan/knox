@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/auth"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/auth"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 func makeDB() (KeyManager, *keydb.TempDB) {
@@ -174,7 +174,7 @@ func TestGetKey(t *testing.T) {
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
-	case *knox.Key:
+	case *types.Key:
 		if k.ID != "a1" {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
@@ -193,7 +193,7 @@ func TestGetKey(t *testing.T) {
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
-	case *knox.Key:
+	case *types.Key:
 		if k.ID != "a1" {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
@@ -212,7 +212,7 @@ func TestGetKey(t *testing.T) {
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
-	case *knox.Key:
+	case *types.Key:
 		if k.ID != "a1" {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
@@ -312,7 +312,7 @@ func TestGetAccess(t *testing.T) {
 	switch acl := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
-	case knox.ACL:
+	case types.ACL:
 		if len(acl) != 1 {
 			t.Fatalf("Length of acl is %d not 1", len(acl))
 		}
@@ -325,7 +325,7 @@ func TestGetAccess(t *testing.T) {
 
 func TestPutAccess(t *testing.T) {
 	m, db := makeDB()
-	access := []knox.Access{{Type: knox.Machine, ID: "MrRoboto", AccessType: knox.Read}}
+	access := []types.Access{{Type: types.Machine, ID: "MrRoboto", AccessType: types.Read}}
 	accessJSON, jerr := json.Marshal(&access)
 	if jerr != nil {
 		t.Fatalf("%+v is not nil", jerr)
@@ -372,17 +372,17 @@ func TestPutAccess(t *testing.T) {
 	//Tests for setting ACLs with empty machinePrefix
 	//Should return error when used with AccessType Read,Write, or Admin
 	//Should return success when used with AccessType None(useful for revoking such existing ACLs)
-	accessTypes := []knox.AccessType{knox.None, knox.Read, knox.Write, knox.Admin}
+	accessTypes := []types.AccessType{types.None, types.Read, types.Write, types.Admin}
 	for _, accessType := range accessTypes {
-		access = []knox.Access{{Type: knox.MachinePrefix, ID: "", AccessType: accessType}}
+		access = []types.Access{{Type: types.MachinePrefix, ID: "", AccessType: accessType}}
 		accessJSON, jerr = json.Marshal(&access)
 		if jerr != nil {
 			t.Fatalf("%+v is not nil", jerr)
 		}
 		_, err = putAccessHandler(m, u, map[string]string{"keyID": "a1", "acl": string(accessJSON)})
-		if err == nil && accessType != knox.None {
+		if err == nil && accessType != types.None {
 			t.Fatal("Expected err")
-		} else if err != nil && accessType == knox.None {
+		} else if err != nil && accessType == types.None {
 			t.Fatalf("%+v is not nil", err)
 		}
 	}
@@ -391,7 +391,7 @@ func TestPutAccess(t *testing.T) {
 
 func TestLegacyPutAccess(t *testing.T) {
 	m, db := makeDB()
-	access := &knox.Access{Type: knox.Machine, ID: "MrRoboto", AccessType: knox.Read}
+	access := &types.Access{Type: types.Machine, ID: "MrRoboto", AccessType: types.Read}
 	accessJSON, jerr := json.Marshal(access)
 	if jerr != nil {
 		t.Fatalf("%+v is not nil", jerr)
@@ -443,17 +443,17 @@ func TestLegacyPutAccess(t *testing.T) {
 	//Tests for setting ACLs with empty machinePrefix
 	//Should return error when used with AccessType Read,Write, or Admin
 	//Should return success when used with AccessType None(useful for revoking such existing ACLs)
-	accessTypes := []knox.AccessType{knox.None, knox.Read, knox.Write, knox.Admin}
+	accessTypes := []types.AccessType{types.None, types.Read, types.Write, types.Admin}
 	for _, accessType := range accessTypes {
-		access = &knox.Access{Type: knox.MachinePrefix, ID: "", AccessType: accessType}
+		access = &types.Access{Type: types.MachinePrefix, ID: "", AccessType: accessType}
 		accessJSON, jerr = json.Marshal(access)
 		if jerr != nil {
 			t.Fatalf("%+v is not nil", jerr)
 		}
 		_, err = putAccessHandler(m, u, map[string]string{"keyID": "a1", "access": string(accessJSON)})
-		if err == nil && accessType != knox.None {
+		if err == nil && accessType != types.None {
 			t.Fatal("Expected err")
-		} else if err != nil && accessType == knox.None {
+		} else if err != nil && accessType == types.None {
 			t.Fatalf("%+v is not nil", err)
 		}
 	}
@@ -611,30 +611,30 @@ func TestPutVersions(t *testing.T) {
 
 func TestAuthorizeRequest(t *testing.T) {
 	type input struct {
-		Key        *knox.Key
-		Principal  knox.Principal
-		AccessType knox.AccessType
+		Key        *types.Key
+		Principal  types.Principal
+		AccessType types.AccessType
 	}
 
 	type testCase struct {
 		Name               string
 		Input              input
-		CallBackImpl       func(input knox.AccessCallbackInput) (bool, error)
+		CallBackImpl       func(input types.AccessCallbackInput) (bool, error)
 		ExpectedAuthorized bool
 		ExpectedError      error
 	}
 
 	triggerCallBackInput := input{
-		Key:        &knox.Key{ID: "test", ACL: knox.ACL{{ID: "test", AccessType: knox.Read, Type: knox.User}}},
+		Key:        &types.Key{ID: "test", ACL: types.ACL{{ID: "test", AccessType: types.Read, Type: types.User}}},
 		Principal:  auth.NewUser("test", []string{"returntrue"}),
-		AccessType: knox.Write,
+		AccessType: types.Write,
 	}
 
 	testCases := []testCase{
 		{
 			Name:  "AccessCallback returns true",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input knox.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
 				return true, nil
 			},
 			ExpectedAuthorized: true,
@@ -643,7 +643,7 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback returns false",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input knox.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
 				return false, nil
 			},
 			ExpectedAuthorized: false,
@@ -652,8 +652,8 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback returns false with valid input",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input knox.AccessCallbackInput) (bool, error) {
-				return input.AccessType == knox.Write && input.Key.ACL[0].ID == "test" && input.Key.ACL[0].Type == knox.User, nil
+			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+				return input.AccessType == types.Write && input.Key.ACL[0].ID == "test" && input.Key.ACL[0].Type == types.User, nil
 			},
 			ExpectedAuthorized: true,
 			ExpectedError:      nil,
@@ -668,7 +668,7 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback panics",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input knox.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
 				panic("intentional panic")
 			},
 			ExpectedAuthorized: false,
