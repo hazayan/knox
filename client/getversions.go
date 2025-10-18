@@ -1,11 +1,11 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/pinterest/knox"
 )
 
 func init() {
@@ -23,7 +23,7 @@ versions get all of the version ids for a key.
 
 This requires read access to the key and can use user or machine authentication.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox keys, knox get
 	`,
@@ -36,14 +36,14 @@ func runGetVersions(cmd *Command, args []string) *ErrorStatus {
 		return &ErrorStatus{fmt.Errorf("get takes only one argument. See 'knox help versions'"), false}
 	}
 
-	var status knox.VersionStatus
+	var status types.VersionStatus
 	switch strings.ToLower(*getVersionsState) {
 	case "active":
-		status = knox.Active
+		status = types.Active
 	case "primary":
-		status = knox.Primary
+		status = types.Primary
 	case "inactive":
-		status = knox.Inactive
+		status = types.Inactive
 	}
 
 	keyID := args[0]

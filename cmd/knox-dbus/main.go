@@ -14,10 +14,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/config"
-	"github.com/pinterest/knox/pkg/dbus"
-	"github.com/pinterest/knox/pkg/observability/logging"
+	"github.com/hazayan/knox/client"
+	"github.com/hazayan/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/dbus"
+	"github.com/hazayan/knox/pkg/observability/logging"
 )
 
 var (
@@ -105,7 +105,7 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func createKnoxClient(cfg *config.DBusConfig) (knox.APIClient, error) {
+func createKnoxClient(cfg *config.DBusConfig) (client.APIClient, error) {
 	// Create HTTP client with TLS
 	httpClient, err := createHTTPClient(cfg)
 	if err != nil {
@@ -116,7 +116,7 @@ func createKnoxClient(cfg *config.DBusConfig) (knox.APIClient, error) {
 	authHandlers := createAuthHandlers(cfg)
 
 	// Create Knox client
-	client := knox.NewClient(
+	knoxClient := client.NewClient(
 		cfg.Knox.Server,
 		httpClient,
 		authHandlers,
@@ -124,7 +124,7 @@ func createKnoxClient(cfg *config.DBusConfig) (knox.APIClient, error) {
 		version,
 	)
 
-	return client, nil
+	return knoxClient, nil
 }
 
 func createHTTPClient(cfg *config.DBusConfig) (*http.Client, error) {
@@ -166,18 +166,18 @@ func createHTTPClient(cfg *config.DBusConfig) (*http.Client, error) {
 	}, nil
 }
 
-func createAuthHandlers(cfg *config.DBusConfig) []knox.AuthHandler {
-	var handlers []knox.AuthHandler
+func createAuthHandlers(cfg *config.DBusConfig) []client.AuthHandler {
+	var handlers []client.AuthHandler
 
 	// mTLS auth handler (if client cert is configured)
 	if cfg.Knox.TLS.ClientCert != "" {
-		handlers = append(handlers, func() (string, string, knox.HTTP) {
+		handlers = append(handlers, func() (string, string, client.HTTP) {
 			return "0m", "mtls", nil
 		})
 	}
 
 	// Environment variable auth handler
-	handlers = append(handlers, func() (string, string, knox.HTTP) {
+	handlers = append(handlers, func() (string, string, client.HTTP) {
 		// Check for user auth token in environment
 		if token := os.Getenv("KNOX_USER_AUTH"); token != "" {
 			return "0u" + token, "user_token", nil
@@ -192,7 +192,7 @@ func createAuthHandlers(cfg *config.DBusConfig) []knox.AuthHandler {
 	})
 
 	// File-based auth handler
-	handlers = append(handlers, func() (string, string, knox.HTTP) {
+	handlers = append(handlers, func() (string, string, client.HTTP) {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return "", "", nil
