@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 // KeyRotationManager manages graceful rotation of encryption keys.
@@ -26,7 +26,7 @@ func NewKeyRotationManager(currentCryptor keydb.Cryptor) *KeyRotationManager {
 }
 
 // Encrypt always uses the current (newest) cryptor.
-func (krm *KeyRotationManager) Encrypt(key *knox.Key) (*keydb.DBKey, error) {
+func (krm *KeyRotationManager) Encrypt(key *types.Key) (*keydb.DBKey, error) {
 	krm.mu.RLock()
 	defer krm.mu.RUnlock()
 
@@ -35,7 +35,7 @@ func (krm *KeyRotationManager) Encrypt(key *knox.Key) (*keydb.DBKey, error) {
 
 // Decrypt tries the current cryptor first, then falls back to old cryptors.
 // This allows reading keys encrypted with old master keys during rotation.
-func (krm *KeyRotationManager) Decrypt(dbKey *keydb.DBKey) (*knox.Key, error) {
+func (krm *KeyRotationManager) Decrypt(dbKey *keydb.DBKey) (*types.Key, error) {
 	krm.mu.RLock()
 	defer krm.mu.RUnlock()
 
@@ -57,7 +57,7 @@ func (krm *KeyRotationManager) Decrypt(dbKey *keydb.DBKey) (*knox.Key, error) {
 }
 
 // EncryptVersion encrypts a single version using the current cryptor.
-func (krm *KeyRotationManager) EncryptVersion(key *knox.Key, version *knox.KeyVersion) (*keydb.EncKeyVersion, error) {
+func (krm *KeyRotationManager) EncryptVersion(key *types.Key, version *types.KeyVersion) (*keydb.EncKeyVersion, error) {
 	krm.mu.RLock()
 	defer krm.mu.RUnlock()
 
