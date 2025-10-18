@@ -1,9 +1,9 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"fmt"
 
-	"github.com/pinterest/knox"
 )
 
 var cmdDeactivate = &Command{
@@ -19,7 +19,7 @@ Primary keys cannot be deactivated. Only active keys can be deactivated.
 
 This command requires write access to the key.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox reactivate, knox promote
 	`,
@@ -32,7 +32,7 @@ func runDeactivate(cmd *Command, args []string) *ErrorStatus {
 	keyID := args[0]
 	keyVersion := args[1]
 
-	err := cli.UpdateVersion(keyID, keyVersion, knox.Inactive)
+	err := cli.UpdateVersion(keyID, keyVersion, types.Inactive)
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("Error updating version: %s", err.Error()), true}
 	}

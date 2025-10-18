@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/pkg/storage"
 )
 
 func init() {
@@ -22,7 +22,7 @@ func init() {
 // Backend implements storage.Backend using an in-memory map.
 type Backend struct {
 	mu   sync.RWMutex
-	data map[string]*knox.Key
+	data map[string]*types.Key
 
 	// Metrics
 	opCounts map[string]int64
@@ -31,7 +31,7 @@ type Backend struct {
 // New creates a new in-memory storage backend.
 func New() *Backend {
 	return &Backend{
-		data:     make(map[string]*knox.Key),
+		data:     make(map[string]*types.Key),
 		opCounts: make(map[string]int64),
 	}
 }
@@ -43,7 +43,7 @@ func NewBackend() *Backend {
 }
 
 // GetKey retrieves a key by ID.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
+func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -59,7 +59,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
 }
 
 // PutKey stores or updates a key.
-func (b *Backend) PutKey(ctx context.Context, key *knox.Key) error {
+func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}
@@ -107,14 +107,14 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 }
 
 // UpdateKey atomically updates a key using the provided update function.
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*knox.Key) (*knox.Key, error)) error {
+func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	b.opCounts["update"]++
 
 	// Get current key (or nil if it doesn't exist)
-	var currentKey *knox.Key
+	var currentKey *types.Key
 	if key, exists := b.data[keyID]; exists {
 		currentKey = b.copyKey(key)
 	}
@@ -133,7 +133,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*kn
 
 		// Ensure the key ID hasn't changed
 		if newKey.ID != keyID {
-			return knox.ErrInvalidKeyID
+			return types.ErrInvalidKeyID
 		}
 
 		// Store the updated key
@@ -158,7 +158,7 @@ func (b *Backend) Close() error {
 	defer b.mu.Unlock()
 
 	// Clear the data
-	b.data = make(map[string]*knox.Key)
+	b.data = make(map[string]*types.Key)
 	b.opCounts = make(map[string]int64)
 	return nil
 }
@@ -194,7 +194,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 }
 
 // copyKey creates a deep copy of a key.
-func (b *Backend) copyKey(key *knox.Key) *knox.Key {
+func (b *Backend) copyKey(key *types.Key) *types.Key {
 	if key == nil {
 		return nil
 	}
@@ -207,7 +207,7 @@ func (b *Backend) copyKey(key *knox.Key) *knox.Key {
 		panic("failed to marshal key: " + err.Error())
 	}
 
-	var copy knox.Key
+	var copy types.Key
 	if err := json.Unmarshal(data, &copy); err != nil {
 		// Should never happen for valid Knox keys
 		panic("failed to unmarshal key: " + err.Error())
