@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/config"
+	"github.com/hazayan/knox/client"
+	"github.com/hazayan/knox/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -45,12 +45,12 @@ Zsh:
 Fish:
   $ knox completion fish | source
   # To load completions for each session, add to ~/.config/fish/config.fish:
-  $ knox completion fish > ~/.config/fish/completions/knox.fish
+  $ knox completion fish > ~/.config/fish/completions/types.fish
 
 PowerShell:
   PS> knox completion powershell | Out-String | Invoke-Expression
   # To load completions for every new session, add to your PowerShell profile:
-  PS> knox completion powershell > knox.ps1`,
+  PS> knox completion powershell > types.ps1`,
 		DisableFlagsInUseLine: true,
 		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 		Args:                  cobra.ExactArgs(1),
@@ -110,12 +110,12 @@ func createHTTPClient(prof *config.ClientProfile) (*http.Client, error) {
 }
 
 // createAuthHandlers creates authentication handlers for the client.
-func createAuthHandlers(prof *config.ClientProfile) []knox.AuthHandler {
-	var handlers []knox.AuthHandler
+func createAuthHandlers(prof *config.ClientProfile) []client.AuthHandler {
+	var handlers []client.AuthHandler
 
 	// mTLS auth handler (if client cert is configured)
 	if prof.TLS.ClientCert != "" {
-		handlers = append(handlers, func() (string, string, knox.HTTP) {
+		handlers = append(handlers, func() (string, string, client.HTTP) {
 			// mTLS auth is handled by the HTTP client
 			// Return a marker token to indicate mTLS is being used
 			return "0m", "mtls", nil
@@ -123,7 +123,7 @@ func createAuthHandlers(prof *config.ClientProfile) []knox.AuthHandler {
 	}
 
 	// Environment variable auth handler
-	handlers = append(handlers, func() (string, string, knox.HTTP) {
+	handlers = append(handlers, func() (string, string, client.HTTP) {
 		// Check for user auth token in environment
 		if token := os.Getenv("KNOX_USER_AUTH"); token != "" {
 			return "0u" + token, "user_token", nil
@@ -138,7 +138,7 @@ func createAuthHandlers(prof *config.ClientProfile) []knox.AuthHandler {
 	})
 
 	// File-based auth handler (check for token in ~/.knox/token)
-	handlers = append(handlers, func() (string, string, knox.HTTP) {
+	handlers = append(handlers, func() (string, string, client.HTTP) {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return "", "", nil

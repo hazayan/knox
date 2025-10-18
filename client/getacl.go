@@ -19,7 +19,7 @@ Acl get the ACL for a key.
 
 This doesn't require any access to the key and allows, e.g., to see who has admin access to ask for grants.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox keys, knox get
 	`,

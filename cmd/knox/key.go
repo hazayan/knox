@@ -9,8 +9,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/pinterest/knox"
 	"github.com/spf13/cobra"
+
+	"github.com/hazayan/knox/client"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func newKeyCmd() *cobra.Command {
@@ -142,15 +144,15 @@ Examples:
 			}
 
 			// Parse version status if provided
-			var status knox.VersionStatus
+			var status types.VersionStatus
 			if versionStatus != "" {
 				switch strings.ToLower(versionStatus) {
 				case "primary":
-					status = knox.Primary
+					status = types.Primary
 				case "active":
-					status = knox.Active
+					status = types.Active
 				case "inactive":
-					status = knox.Inactive
+					status = types.Inactive
 				default:
 					return fmt.Errorf("invalid status: %s (must be Primary, Active, or Inactive)", versionStatus)
 				}
@@ -403,9 +405,9 @@ Examples:
 
 			for _, v := range key.VersionList {
 				status := "Active"
-				if v.Status == knox.Primary {
+				if v.Status == types.Primary {
 					status = "Primary"
-				} else if v.Status == knox.Inactive {
+				} else if v.Status == types.Inactive {
 					status = "Inactive"
 				}
 
@@ -422,7 +424,7 @@ Examples:
 
 // Helper functions
 
-func displayKey(key *knox.Key, showAll bool) error {
+func displayKey(key *types.Key, showAll bool) error {
 	if jsonOutput {
 		return json.NewEncoder(os.Stdout).Encode(key)
 	}
@@ -431,7 +433,7 @@ func displayKey(key *knox.Key, showAll bool) error {
 		fmt.Printf("Key: %s\n\n", key.ID)
 		for _, v := range key.VersionList.GetActive() {
 			status := "Active"
-			if v.Status == knox.Primary {
+			if v.Status == types.Primary {
 				status = "Primary"
 			}
 			fmt.Printf("[%s] Version %d: %s\n", status, v.ID, string(v.Data))
@@ -448,8 +450,8 @@ func displayKey(key *knox.Key, showAll bool) error {
 	return nil
 }
 
-func parseACL(entries []string) (knox.ACL, error) {
-	var acl knox.ACL
+func parseACL(entries []string) (types.ACL, error) {
+	var acl types.ACL
 
 	for _, entry := range entries {
 		parts := strings.Split(entry, ":")
@@ -458,38 +460,38 @@ func parseACL(entries []string) (knox.ACL, error) {
 		}
 
 		// Parse principal type
-		var principalType knox.PrincipalType
+		var principalType types.PrincipalType
 		switch strings.ToLower(parts[0]) {
 		case "user":
-			principalType = knox.User
+			principalType = types.User
 		case "usergroup":
-			principalType = knox.UserGroup
+			principalType = types.UserGroup
 		case "machine":
-			principalType = knox.Machine
+			principalType = types.Machine
 		case "machineprefix":
-			principalType = knox.MachinePrefix
+			principalType = types.MachinePrefix
 		case "service":
-			principalType = knox.Service
+			principalType = types.Service
 		case "serviceprefix":
-			principalType = knox.ServicePrefix
+			principalType = types.ServicePrefix
 		default:
 			return nil, fmt.Errorf("invalid principal type: %s", parts[0])
 		}
 
 		// Parse access type
-		var accessType knox.AccessType
+		var accessType types.AccessType
 		switch strings.ToLower(parts[2]) {
 		case "read":
-			accessType = knox.Read
+			accessType = types.Read
 		case "write":
-			accessType = knox.Write
+			accessType = types.Write
 		case "admin":
-			accessType = knox.Admin
+			accessType = types.Admin
 		default:
 			return nil, fmt.Errorf("invalid access type: %s", parts[2])
 		}
 
-		acl = append(acl, knox.Access{
+		acl = append(acl, types.Access{
 			Type:       principalType,
 			ID:         parts[1],
 			AccessType: accessType,
@@ -499,7 +501,7 @@ func parseACL(entries []string) (knox.ACL, error) {
 	return acl, nil
 }
 
-func getAPIClient() (knox.APIClient, error) {
+func getAPIClient() (client.APIClient, error) {
 	prof, err := getCurrentProfile()
 	if err != nil {
 		return nil, err
@@ -527,6 +529,6 @@ func getAPIClient() (knox.APIClient, error) {
 		os.MkdirAll(cacheFolder, 0700)
 	}
 
-	client := knox.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)
-	return client, nil
+	knoxClient := client.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)
+	return knoxClient, nil
 }

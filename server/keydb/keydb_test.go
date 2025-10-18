@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
-func newEncKeyVersion(d []byte, s knox.VersionStatus) EncKeyVersion {
+func newEncKeyVersion(d []byte, s types.VersionStatus) EncKeyVersion {
 	version := EncKeyVersion{}
 	version.EncData = d
 	version.Status = s
@@ -23,10 +23,10 @@ func newDBKey(id string, d []byte, version int64) DBKey {
 	key := DBKey{}
 	key.ID = id
 
-	key.ACL = knox.ACL{}
+	key.ACL = types.ACL{}
 	key.DBVersion = version
 
-	key.VersionList = []EncKeyVersion{newEncKeyVersion(d, knox.Primary)}
+	key.VersionList = []EncKeyVersion{newEncKeyVersion(d, types.Primary)}
 	return key
 }
 
@@ -39,11 +39,11 @@ func TestTemp(t *testing.T) {
 }
 
 func TestDBCopy(t *testing.T) {
-	a := knox.Access{}
+	a := types.Access{}
 	v := EncKeyVersion{}
 	r := DBKey{
 		ID:          "id1",
-		ACL:         []knox.Access{a},
+		ACL:         []types.Access{a},
 		VersionList: []EncKeyVersion{v},
 		VersionHash: "hash1",
 		DBVersion:   1,
@@ -142,7 +142,7 @@ func TesterAddGet(t *testing.T, db DB, timeout time.Duration) {
 					t.Fatalf("%c does not equal %c", newK.VersionList[0].EncData[0], k.VersionList[0].EncData[0])
 				}
 				complete = true
-			} else if err != knox.ErrKeyIDNotFound {
+			} else if err != types.ErrKeyIDNotFound {
 				t.Fatal(err)
 			}
 		}
@@ -156,8 +156,8 @@ func TesterAddGet(t *testing.T, db DB, timeout time.Duration) {
 	}
 
 	err = db.Add(&k)
-	if err != knox.ErrKeyExists {
-		t.Fatalf("%s does not equal %s", err, knox.ErrKeyExists)
+	if err != types.ErrKeyExists {
+		t.Fatalf("%s does not equal %s", err, types.ErrKeyExists)
 	}
 }
 
@@ -168,8 +168,8 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 	}
 	k := newDBKey("TesterAddUpdate1", []byte("a"), 0)
 	err = db.Update(&k)
-	if err != knox.ErrKeyIDNotFound {
-		t.Fatalf("%s does not equal %s", err, knox.ErrKeyIDNotFound)
+	if err != types.ErrKeyIDNotFound {
+		t.Fatalf("%s does not equal %s", err, types.ErrKeyIDNotFound)
 	}
 	err = db.Add(&k)
 	if err != nil {
@@ -187,7 +187,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 			if err == nil {
 				version = newK.DBVersion
 				complete = true
-			} else if err != knox.ErrKeyIDNotFound {
+			} else if err != types.ErrKeyIDNotFound {
 				t.Fatal(err)
 			}
 		}
@@ -200,7 +200,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 		t.Fatalf("%s does not equal %s", err, ErrDBVersion)
 	}
 
-	k.VersionList = append(k.VersionList, newEncKeyVersion([]byte("b"), knox.Active))
+	k.VersionList = append(k.VersionList, newEncKeyVersion([]byte("b"), types.Active))
 	k.DBVersion = version
 	err = db.Update(&k)
 	if err != nil {
@@ -219,7 +219,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 					t.Fatalf("%d does not equal 2", len(newK.VersionList))
 				}
 				var pk, ak EncKeyVersion
-				if newK.VersionList[0].Status == knox.Primary {
+				if newK.VersionList[0].Status == types.Primary {
 					pk = newK.VersionList[0]
 					ak = newK.VersionList[1]
 				} else {
@@ -248,8 +248,8 @@ func TesterAddRemove(t *testing.T, db DB, timeout time.Duration) {
 	}
 	k := newDBKey("TesterAddRemove1", []byte("a"), 0)
 	err = db.Remove(k.ID)
-	if err != knox.ErrKeyIDNotFound {
-		t.Fatalf("%s does not equal %s", err, knox.ErrKeyIDNotFound)
+	if err != types.ErrKeyIDNotFound {
+		t.Fatalf("%s does not equal %s", err, types.ErrKeyIDNotFound)
 	}
 	err = db.Add(&k)
 	if err != nil {
@@ -265,7 +265,7 @@ func TesterAddRemove(t *testing.T, db DB, timeout time.Duration) {
 			_, err := db.Get(k.ID)
 			if err == nil {
 				complete = true
-			} else if err != knox.ErrKeyIDNotFound {
+			} else if err != types.ErrKeyIDNotFound {
 				t.Fatal(err)
 			}
 		}
@@ -282,9 +282,9 @@ func TesterAddRemove(t *testing.T, db DB, timeout time.Duration) {
 			t.Fatal("Timed out waiting TestAddGet1 to get added")
 		case <-time.Tick(1 * time.Millisecond):
 			_, err := db.Get(k.ID)
-			if err == knox.ErrKeyIDNotFound {
+			if err == types.ErrKeyIDNotFound {
 				complete = true
-			} else if err != knox.ErrKeyIDNotFound && err != nil {
+			} else if err != types.ErrKeyIDNotFound && err != nil {
 				t.Fatal(err)
 			}
 		}
