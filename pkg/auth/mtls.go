@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pinterest/knox"
-	knoxauth "github.com/pinterest/knox/server/auth"
+	"github.com/hazayan/knox/pkg/types"
+	knoxauth "github.com/hazayan/knox/server/auth"
 )
 
 // MTLSProvider authenticates clients using TLS client certificates.
@@ -29,7 +29,7 @@ func (p *MTLSProvider) Name() string {
 }
 
 // Authenticate authenticates a request using TLS client certificates.
-func (p *MTLSProvider) Authenticate(token string, r *http.Request) (knox.Principal, error) {
+func (p *MTLSProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	// Check if TLS is used
 	if r.TLS == nil {
 		return nil, fmt.Errorf("TLS not enabled")
@@ -59,9 +59,9 @@ func (p *MTLSProvider) Authenticate(token string, r *http.Request) (knox.Princip
 
 	// Create and return principal
 	switch principalType {
-	case knox.Machine:
+	case types.Machine:
 		return knoxauth.NewMachine(identity), nil
-	case knox.User:
+	case types.User:
 		return knoxauth.NewUser(identity, []string{}), nil
 	default:
 		return nil, fmt.Errorf("unknown principal type")
@@ -100,15 +100,15 @@ func extractIdentity(cert *x509.Certificate) string {
 }
 
 // determinePrincipalType determines if this is a machine or user certificate.
-func determinePrincipalType(cert *x509.Certificate) knox.PrincipalType {
+func determinePrincipalType(cert *x509.Certificate) types.PrincipalType {
 	// If it has DNS SANs or EmailAddresses, likely a machine
 	if len(cert.DNSNames) > 0 {
-		return knox.Machine
+		return types.Machine
 	}
 
 	// If it has email addresses, likely a user
 	if len(cert.EmailAddresses) > 0 {
-		return knox.User
+		return types.User
 	}
 
 	// Check CN format
@@ -116,11 +116,11 @@ func determinePrincipalType(cert *x509.Certificate) knox.PrincipalType {
 
 	// If CN looks like a hostname (contains dots or dashes), treat as machine
 	if strings.Contains(cn, ".") || strings.Contains(cn, "-") {
-		return knox.Machine
+		return types.Machine
 	}
 
 	// Default to user
-	return knox.User
+	return types.User
 }
 
 // Verify interface compliance

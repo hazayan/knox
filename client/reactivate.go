@@ -1,9 +1,9 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"fmt"
 
-	"github.com/pinterest/knox"
 )
 
 var cmdReactivate = &Command{
@@ -18,7 +18,7 @@ Inactive keys should not be used for any purpose.
 
 This command requires write access to the key.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox deactivate, knox promote
 	`,
@@ -31,7 +31,7 @@ func runReactivate(cmd *Command, args []string) *ErrorStatus {
 	keyID := args[0]
 	versionID := args[1]
 
-	err := cli.UpdateVersion(keyID, versionID, knox.Active)
+	err := cli.UpdateVersion(keyID, versionID, types.Active)
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("Error reactivating version: %s", err.Error()), true}
 	}

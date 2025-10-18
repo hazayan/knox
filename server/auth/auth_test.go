@@ -11,7 +11,7 @@ import (
 
 	"testing"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func TestPrincipalContext(t *testing.T) {
@@ -63,83 +63,83 @@ func TestPrincipalContext(t *testing.T) {
 
 func TestUserCanAccess(t *testing.T) {
 	u := NewUser("test", []string{"returntrue"})
-	a1 := knox.Access{ID: "test", AccessType: knox.Write, Type: knox.User}
-	a2 := knox.Access{ID: "returnfalse", AccessType: knox.Admin, Type: knox.UserGroup}
-	a3 := knox.Access{ID: "returntrue", AccessType: knox.Admin, Type: knox.UserGroup}
+	a1 := types.Access{ID: "test", AccessType: types.Write, Type: types.User}
+	a2 := types.Access{ID: "returnfalse", AccessType: types.Admin, Type: types.UserGroup}
+	a3 := types.Access{ID: "returntrue", AccessType: types.Admin, Type: types.UserGroup}
 
-	acl1 := knox.ACL([]knox.Access{a1})
-	if !u.CanAccess(acl1, knox.Write) {
+	acl1 := types.ACL([]types.Access{a1})
+	if !u.CanAccess(acl1, types.Write) {
 		t.Error("user can't access user permission matching id")
 	}
-	if u.CanAccess(acl1, knox.Admin) {
+	if u.CanAccess(acl1, types.Admin) {
 		t.Error("user can access user permission with increased access type")
 	}
 
-	acl2 := knox.ACL([]knox.Access{a2})
-	if u.CanAccess(acl2, knox.Write) {
+	acl2 := types.ACL([]types.Access{a2})
+	if u.CanAccess(acl2, types.Write) {
 		t.Error("user can access group they are not in")
 	}
 
-	acl3 := knox.ACL([]knox.Access{a3})
-	if !u.CanAccess(acl3, knox.Read) {
+	acl3 := types.ACL([]types.Access{a3})
+	if !u.CanAccess(acl3, types.Read) {
 		t.Error("user can't access group they are in")
 	}
 
-	acl4 := knox.ACL([]knox.Access{a2, a3, a1})
-	if !u.CanAccess(acl4, knox.Admin) {
+	acl4 := types.ACL([]types.Access{a2, a3, a1})
+	if !u.CanAccess(acl4, types.Admin) {
 		t.Error("user can't access group they are in with multiple members")
 	}
 
-	acl5 := knox.ACL([]knox.Access{})
-	if u.CanAccess(acl5, knox.Admin) {
+	acl5 := types.ACL([]types.Access{})
+	if u.CanAccess(acl5, types.Admin) {
 		t.Error("user can access empty ACL")
 	}
 }
 func TestMachineCanAccess(t *testing.T) {
 	u := machine("test001")
-	a1 := knox.Access{ID: "test001", AccessType: knox.Write, Type: knox.Machine}
-	a2 := knox.Access{ID: "doesnotmatch", AccessType: knox.Admin, Type: knox.MachinePrefix}
-	a3 := knox.Access{ID: "test", AccessType: knox.Admin, Type: knox.MachinePrefix}
+	a1 := types.Access{ID: "test001", AccessType: types.Write, Type: types.Machine}
+	a2 := types.Access{ID: "doesnotmatch", AccessType: types.Admin, Type: types.MachinePrefix}
+	a3 := types.Access{ID: "test", AccessType: types.Admin, Type: types.MachinePrefix}
 
-	acl1 := knox.ACL([]knox.Access{a1})
-	if !u.CanAccess(acl1, knox.Write) {
+	acl1 := types.ACL([]types.Access{a1})
+	if !u.CanAccess(acl1, types.Write) {
 		t.Error("machine can't access user permission matching id")
 	}
-	if u.CanAccess(acl1, knox.Admin) {
+	if u.CanAccess(acl1, types.Admin) {
 		t.Error("machine can access user permission with increased access type")
 	}
 
-	acl2 := knox.ACL([]knox.Access{a2})
-	if u.CanAccess(acl2, knox.Write) {
+	acl2 := types.ACL([]types.Access{a2})
+	if u.CanAccess(acl2, types.Write) {
 		t.Error("machine can access group they are not in")
 	}
 
-	acl3 := knox.ACL([]knox.Access{a3})
-	if !u.CanAccess(acl3, knox.Read) {
+	acl3 := types.ACL([]types.Access{a3})
+	if !u.CanAccess(acl3, types.Read) {
 		t.Error("machine can't access group they are in")
 	}
 
-	acl4 := knox.ACL([]knox.Access{a2, a3, a1})
-	if !u.CanAccess(acl4, knox.Admin) {
+	acl4 := types.ACL([]types.Access{a2, a3, a1})
+	if !u.CanAccess(acl4, types.Admin) {
 		t.Error("machine can't access group they are in with multiple members")
 	}
 
-	acl5 := knox.ACL([]knox.Access{})
-	if u.CanAccess(acl5, knox.Admin) {
+	acl5 := types.ACL([]types.Access{})
+	if u.CanAccess(acl5, types.Admin) {
 		t.Error("machine can access empty ACL")
 	}
 }
 
 func TestServiceCanAccess(t *testing.T) {
 	s := NewService("example.com", "serviceA")
-	a1 := knox.Access{ID: "spiffe://example.com/serviceA", AccessType: knox.Read,
-		Type: knox.Service}
+	a1 := types.Access{ID: "spiffe://example.com/serviceA", AccessType: types.Read,
+		Type: types.Service}
 
-	acl1 := knox.ACL([]knox.Access{a1})
-	if s.CanAccess(acl1, knox.Admin) {
+	acl1 := types.ACL([]types.Access{a1})
+	if s.CanAccess(acl1, types.Admin) {
 		t.Error("service can't access user permission matching id")
 	}
-	if !s.CanAccess(acl1, knox.Read) {
+	if !s.CanAccess(acl1, types.Read) {
 		t.Error("service can't access group they are in")
 	}
 }
@@ -148,9 +148,9 @@ func TestPrincipalMuxType(t *testing.T) {
 	u := NewUser("test", []string{"returntrue"})
 	s := NewService("example.com", "serviceA")
 
-	user := knox.NewPrincipalMux(u, map[string]knox.Principal{"foo": u})
-	service := knox.NewPrincipalMux(s, map[string]knox.Principal{"foo": s})
-	both := knox.NewPrincipalMux(u, map[string]knox.Principal{"foo": u, "bar": s})
+	user := types.NewPrincipalMux(u, map[string]types.Principal{"foo": u})
+	service := types.NewPrincipalMux(s, map[string]types.Principal{"foo": s})
+	both := types.NewPrincipalMux(u, map[string]types.Principal{"foo": u, "bar": s})
 
 	if user.Type() != "user" {
 		t.Error("Type of user-only mux should be 'user'")
@@ -166,8 +166,8 @@ func TestPrincipalMuxType(t *testing.T) {
 func TestPrincipalMuxUserOrService(t *testing.T) {
 	u := NewUser("test", []string{"returntrue"})
 	s := NewService("example.com", "serviceA")
-	userMux := knox.NewPrincipalMux(u, map[string]knox.Principal{"foo": u, "bar": s})
-	serviceMux := knox.NewPrincipalMux(s, map[string]knox.Principal{"foo": u, "bar": s})
+	userMux := types.NewPrincipalMux(u, map[string]types.Principal{"foo": u, "bar": s})
+	serviceMux := types.NewPrincipalMux(s, map[string]types.Principal{"foo": u, "bar": s})
 
 	if !IsUser(userMux) {
 		t.Error("IsUser failed to identify that mux is user first.")
