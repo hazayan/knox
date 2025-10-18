@@ -1,11 +1,11 @@
-package knox_test
+package types_test
 
 import (
 	"bytes"
 	"encoding/json"
 	"testing"
 
-	. "github.com/pinterest/knox"
+	. "github.com/hazayan/knox/pkg/types"
 )
 
 func TestKeyVersionListHash(t *testing.T) {

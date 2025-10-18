@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pinterest/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/storage"
 	"github.com/spf13/viper"
 )
 

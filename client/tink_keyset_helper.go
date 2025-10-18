@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -16,7 +17,6 @@ import (
 	"github.com/google/tink/go/mac"
 	"github.com/google/tink/go/signature"
 	"github.com/google/tink/go/streamingaead"
-	"github.com/pinterest/knox"
 
 	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
 )
@@ -96,7 +96,7 @@ func convertTinkKeysetHandleToBytes(keysetHandle *keyset.Handle) ([]byte, error)
 // addNewTinkKeyset receives a knox version list and a tink key templateFunc, create a new tink keyset contains
 // a single fresh key from the given tink key templateFunc. Most importantly, the ID of this single fresh key is
 // different from the ID of all existing tink keys in the given knox version list (avoid Tink key ID duplications).
-func addNewTinkKeyset(templateFunc func() *tinkpb.KeyTemplate, knoxVersionList knox.KeyVersionList) ([]byte, error) {
+func addNewTinkKeyset(templateFunc func() *tinkpb.KeyTemplate, knoxVersionList types.KeyVersionList) ([]byte, error) {
 	existingTinkKeysID := make(map[uint32]struct{})
 	for _, v := range knoxVersionList {
 		tinkKeysetForAVersion, err := readTinkKeysetFromBytes(v.Data)
@@ -138,7 +138,7 @@ func readTinkKeysetFromBytes(data []byte) (*tinkpb.Keyset, error) {
 // one tink keyset "fullTinkKeyset". Also, this func records which tink key is from which knox version
 // in a map "tinkKeyIDToKnoxVersionID".
 func getTinkKeysetHandleFromKnoxVersionList(
-	knoxVersionList knox.KeyVersionList,
+	knoxVersionList types.KeyVersionList,
 ) (*keyset.Handle, map[uint32]uint64, error) {
 	fullTinkKeyset := new(tinkpb.Keyset)
 	tinkKeyIDToKnoxVersionID := make(map[uint32]uint64)
@@ -149,7 +149,7 @@ func getTinkKeysetHandleFromKnoxVersionList(
 			return nil, nil, err
 		}
 		singleKey := keyComponent.Key[0]
-		if v.Status == knox.Primary {
+		if v.Status == types.Primary {
 			fullTinkKeyset.PrimaryKeyId = singleKey.KeyId
 		}
 		fullTinkKeyset.Key = append(fullTinkKeyset.Key, singleKey)

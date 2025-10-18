@@ -16,8 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/pkg/storage"
 )
 
 func init() {
@@ -63,7 +63,7 @@ func New(baseDir string) (*Backend, error) {
 }
 
 // GetKey retrieves a key by ID.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
+func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
 	b.incrementOp("get")
 
 	lock := b.getLock(keyID)
@@ -80,7 +80,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
 		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
 
-	var key knox.Key
+	var key types.Key
 	if err := json.Unmarshal(data, &key); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal key: %w", err)
 	}
@@ -92,7 +92,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*knox.Key, error) {
 }
 
 // PutKey stores or updates a key.
-func (b *Backend) PutKey(ctx context.Context, key *knox.Key) error {
+func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 }
 
 // UpdateKey atomically updates a key using the provided update function.
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*knox.Key) (*knox.Key, error)) error {
+func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	b.incrementOp("update")
 
 	lock := b.getLock(keyID)
@@ -194,11 +194,11 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*kn
 	defer lock.Unlock()
 
 	// Get current key (or nil if it doesn't exist)
-	var currentKey *knox.Key
+	var currentKey *types.Key
 	path := b.keyPath(keyID)
 	data, err := os.ReadFile(path)
 	if err == nil {
-		var key knox.Key
+		var key types.Key
 		if err := json.Unmarshal(data, &key); err != nil {
 			return fmt.Errorf("failed to unmarshal existing key: %w", err)
 		}
@@ -222,7 +222,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*kn
 
 		// Ensure the key ID hasn't changed
 		if newKey.ID != keyID {
-			return knox.ErrInvalidKeyID
+			return types.ErrInvalidKeyID
 		}
 
 		// Write the updated key

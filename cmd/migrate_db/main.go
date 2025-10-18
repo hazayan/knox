@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 func moveKeyData(sDB keydb.DB, sCrypt keydb.Cryptor, dDB keydb.DB, dCrypt keydb.Cryptor) error {
@@ -35,18 +35,18 @@ func moveKeyData(sDB keydb.DB, sCrypt keydb.Cryptor, dDB keydb.DB, dCrypt keydb.
 func generateTestDBWithKeys(crypt keydb.Cryptor) keydb.DB {
 	source := keydb.NewTempDB()
 	d := []byte("test")
-	v1 := knox.KeyVersion{ID: 1, Data: d, Status: knox.Primary, CreationTime: 10}
-	v2 := knox.KeyVersion{ID: 2, Data: d, Status: knox.Active, CreationTime: 10}
-	v3 := knox.KeyVersion{ID: 3, Data: d, Status: knox.Inactive, CreationTime: 10}
-	validKVL := knox.KeyVersionList([]knox.KeyVersion{v1, v2, v3})
+	v1 := types.KeyVersion{ID: 1, Data: d, Status: types.Primary, CreationTime: 10}
+	v2 := types.KeyVersion{ID: 2, Data: d, Status: types.Active, CreationTime: 10}
+	v3 := types.KeyVersion{ID: 3, Data: d, Status: types.Inactive, CreationTime: 10}
+	validKVL := types.KeyVersionList([]types.KeyVersion{v1, v2, v3})
 
-	a1 := knox.Access{ID: "testmachine1", AccessType: knox.Admin, Type: knox.Machine}
-	a2 := knox.Access{ID: "testuser", AccessType: knox.Write, Type: knox.User}
-	a3 := knox.Access{ID: "testmachine", AccessType: knox.Read, Type: knox.MachinePrefix}
-	validACL := knox.ACL([]knox.Access{a1, a2, a3})
+	a1 := types.Access{ID: "testmachine1", AccessType: types.Admin, Type: types.Machine}
+	a2 := types.Access{ID: "testuser", AccessType: types.Write, Type: types.User}
+	a3 := types.Access{ID: "testmachine", AccessType: types.Read, Type: types.MachinePrefix}
+	validACL := types.ACL([]types.Access{a1, a2, a3})
 
-	key := knox.Key{ID: "test_key", ACL: validACL, VersionList: validKVL, VersionHash: validKVL.Hash()}
-	key2 := knox.Key{ID: "test_key2", ACL: validACL, VersionList: validKVL, VersionHash: validKVL.Hash()}
+	key := types.Key{ID: "test_key", ACL: validACL, VersionList: validKVL, VersionHash: validKVL.Hash()}
+	key2 := types.Key{ID: "test_key2", ACL: validACL, VersionList: validKVL, VersionHash: validKVL.Hash()}
 
 	dbkey, err := crypt.Encrypt(&key)
 	if err != nil {

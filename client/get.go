@@ -1,12 +1,12 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 
-	"github.com/pinterest/knox"
 )
 
 func init() {
@@ -28,7 +28,7 @@ Get gets the key data for a key.
 
 This requires read access to the key.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox create, knox daemon, knox register, knox keys
 	`,
@@ -63,7 +63,7 @@ func runGet(cmd *Command, args []string) *ErrorStatus {
 	keyID := args[0]
 
 	var err error
-	var key *knox.Key
+	var key *types.Key
 	if *getTinkKeyset {
 		tinkKeysetInBytes, err := retrieveTinkKeyset(keyID, *getNetwork)
 		if err != nil {
@@ -88,9 +88,9 @@ func runGet(cmd *Command, args []string) *ErrorStatus {
 		// By specifying status as inactive, we can get all key versions (active + inactive + primary)
 		// from knox server
 		if *getNetwork {
-			key, err = cli.NetworkGetKeyWithStatus(keyID, knox.Inactive)
+			key, err = cli.NetworkGetKeyWithStatus(keyID, types.Inactive)
 		} else {
-			key, err = cli.GetKeyWithStatus(keyID, knox.Inactive)
+			key, err = cli.GetKeyWithStatus(keyID, types.Inactive)
 		}
 	} else {
 		if *getNetwork {
@@ -136,7 +136,7 @@ func retrieveTinkKeyset(keyID string, getFromNetwork bool) ([]byte, *ErrorStatus
 		return nil, &ErrorStatus{fmt.Errorf("this knox identifier is not for tink keyset"), false}
 	}
 	// get the primary and all active versions of this knox identifier.
-	var primaryAndActiveVersions *knox.Key
+	var primaryAndActiveVersions *types.Key
 	var err error
 	if getFromNetwork {
 		primaryAndActiveVersions, err = cli.NetworkGetKey(keyID)
@@ -162,7 +162,7 @@ func retrieveTinkKeysetInfo(keyID string, getFromNetwork bool) (string, *ErrorSt
 		return "", &ErrorStatus{fmt.Errorf("this knox identifier is not for tink keyset"), false}
 	}
 	// get the primary and all active versions of this knox identifier.
-	var primaryAndActiveVersions *knox.Key
+	var primaryAndActiveVersions *types.Key
 	var err error
 	if getFromNetwork {
 		primaryAndActiveVersions, err = cli.NetworkGetKey(keyID)

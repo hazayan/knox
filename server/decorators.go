@@ -6,9 +6,9 @@ import (
 	"net/url"
 
 	"github.com/gorilla/context"
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/log"
-	"github.com/pinterest/knox/server/auth"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/log"
+	"github.com/hazayan/knox/server/auth"
 )
 
 type contextKey int
@@ -34,7 +34,7 @@ func setAPIError(r *http.Request, val *HTTPError) {
 }
 
 // GetPrincipal gets the principal authenticated through the authentication decorator
-func GetPrincipal(r *http.Request) knox.Principal {
+func GetPrincipal(r *http.Request) types.Principal {
 	ctx := getOrInitializePrincipalContext(r)
 	return ctx.GetCurrentPrincipal()
 }
@@ -42,7 +42,7 @@ func GetPrincipal(r *http.Request) knox.Principal {
 // SetPrincipal sets the principal authenticated through the authentication decorator.
 // For security reasons, this method will only set the Principal in the context for
 // the first invocation. Subsequent invocations WILL cause a panic.
-func SetPrincipal(r *http.Request, val knox.Principal) {
+func SetPrincipal(r *http.Request, val types.Principal) {
 	ctx := getOrInitializePrincipalContext(r)
 	ctx.SetCurrentPrincipal(val)
 }
@@ -163,7 +163,7 @@ func scrub(params map[string]string) map[string]string {
 	return params
 }
 
-func buildRequest(req *http.Request, p knox.Principal, params map[string]string) request {
+func buildRequest(req *http.Request, p types.Principal, params map[string]string) request {
 	params = scrub(params)
 
 	r := request{
@@ -187,7 +187,7 @@ func buildRequest(req *http.Request, p knox.Principal, params map[string]string)
 	if p != nil {
 		r.Principal = p.GetID()
 		r.AuthType = p.Type()
-		if mux, ok := p.(knox.PrincipalMux); ok {
+		if mux, ok := p.(types.PrincipalMux); ok {
 			r.FallbackPrincipals = mux.GetIDs()
 		}
 	} else {
@@ -219,8 +219,8 @@ func Authentication(providers []auth.Provider, matcher ProviderMatcher) func(htt
 
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			var defaultPrincipal knox.Principal
-			allPrincipals := map[string]knox.Principal{}
+			var defaultPrincipal types.Principal
+			allPrincipals := map[string]types.Principal{}
 			errReturned := fmt.Errorf("No matching authentication providers found")
 
 			for _, p := range providers {
@@ -241,11 +241,11 @@ func Authentication(providers []auth.Provider, matcher ProviderMatcher) func(htt
 				}
 			}
 			if defaultPrincipal == nil {
-				WriteErr(errF(knox.UnauthenticatedCode, errReturned.Error()))(w, r)
+				WriteErr(errF(types.UnauthenticatedCode, errReturned.Error()))(w, r)
 				return
 			}
 
-			SetPrincipal(r, knox.NewPrincipalMux(defaultPrincipal, allPrincipals))
+			SetPrincipal(r, types.NewPrincipalMux(defaultPrincipal, allPrincipals))
 			f(w, r)
 			return
 		}

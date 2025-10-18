@@ -17,18 +17,18 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/time/rate"
 
-	"github.com/pinterest/knox"
-	knoxauth "github.com/pinterest/knox/pkg/auth"
-	"github.com/pinterest/knox/pkg/config"
-	"github.com/pinterest/knox/pkg/crypto"
-	"github.com/pinterest/knox/pkg/observability/logging"
-	"github.com/pinterest/knox/pkg/observability/metrics"
-	"github.com/pinterest/knox/pkg/storage"
-	_ "github.com/pinterest/knox/pkg/storage/filesystem" // Register filesystem backend
-	_ "github.com/pinterest/knox/pkg/storage/memory"     // Register memory backend
-	_ "github.com/pinterest/knox/pkg/storage/postgres"   // Register postgres backend
-	"github.com/pinterest/knox/server"
-	"github.com/pinterest/knox/server/auth"
+	"github.com/hazayan/knox/pkg/types"
+	knoxauth "github.com/hazayan/knox/pkg/auth"
+	"github.com/hazayan/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/crypto"
+	"github.com/hazayan/knox/pkg/observability/logging"
+	"github.com/hazayan/knox/pkg/observability/metrics"
+	"github.com/hazayan/knox/pkg/storage"
+	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
+	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
+	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
+	"github.com/hazayan/knox/server"
+	"github.com/hazayan/knox/server/auth"
 )
 
 var (
@@ -341,7 +341,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 			}
 
 			// Try each auth provider
-			var principal knox.Principal
+			var principal types.Principal
 			var err error
 			var providerName string
 

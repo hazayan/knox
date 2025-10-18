@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var (
@@ -26,10 +26,10 @@ var (
 // Implementations must be safe for concurrent use by multiple goroutines.
 type Backend interface {
 	// GetKey retrieves a key by its ID. Returns ErrKeyNotFound if the key doesn't exist.
-	GetKey(ctx context.Context, keyID string) (*knox.Key, error)
+	GetKey(ctx context.Context, keyID string) (*types.Key, error)
 
 	// PutKey stores or updates a key. The key must be valid (key.Validate() == nil).
-	PutKey(ctx context.Context, key *knox.Key) error
+	PutKey(ctx context.Context, key *types.Key) error
 
 	// DeleteKey removes a key by its ID. Returns ErrKeyNotFound if the key doesn't exist.
 	DeleteKey(ctx context.Context, keyID string) error
@@ -44,7 +44,7 @@ type Backend interface {
 	// If the key doesn't exist, the update function receives nil.
 	// If the update function returns an error, the update is aborted.
 	// This provides optimistic concurrency control.
-	UpdateKey(ctx context.Context, keyID string, updateFn func(*knox.Key) (*knox.Key, error)) error
+	UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error
 
 	// Ping checks if the storage backend is healthy and reachable.
 	Ping(ctx context.Context) error
@@ -68,10 +68,10 @@ type TransactionalBackend interface {
 // All methods must be called from the same goroutine that created the transaction.
 type Transaction interface {
 	// GetKey retrieves a key within the transaction context.
-	GetKey(ctx context.Context, keyID string) (*knox.Key, error)
+	GetKey(ctx context.Context, keyID string) (*types.Key, error)
 
 	// PutKey stores or updates a key within the transaction context.
-	PutKey(ctx context.Context, key *knox.Key) error
+	PutKey(ctx context.Context, key *types.Key) error
 
 	// DeleteKey removes a key within the transaction context.
 	DeleteKey(ctx context.Context, keyID string) error

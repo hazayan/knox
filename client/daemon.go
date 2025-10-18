@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"gopkg.in/fsnotify.v1"
-
-	"github.com/pinterest/knox"
 )
 
 var cmdDaemon = &Command{
@@ -30,7 +28,7 @@ This process will keep running until sent a kill signal or it crashes.
 
 This maintains a file system cache of knox keys that is used for all other knox commands.
 
-For more about knox, see https://github.com/pinterest/knox.
+For more about knox, see https://github.com/pinterest/types.
 
 See also: knox register, knox unregister
 	`,
@@ -79,7 +77,7 @@ type daemon struct {
 	registerFile    string
 	registerKeyFile Keys
 	keysDir         string
-	cli             knox.APIClient
+	cli             APIClient
 	updateErrCount  uint64
 	getKeyErrCount  uint64
 	successCount    uint64

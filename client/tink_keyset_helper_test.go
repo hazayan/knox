@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/hazayan/knox/pkg/types"
 	"bytes"
 	"encoding/json"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/mac"
 	"github.com/google/tink/go/testkeyset"
-	"github.com/pinterest/knox"
 
 	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
 )
@@ -126,8 +126,8 @@ func TestConvertTinkKeysetHandleToBytes(t *testing.T) {
 func getDummyKnoxVersionList(
 	counts int,
 	templateFunc func() *tinkpb.KeyTemplate,
-) (knox.KeyVersionList, map[uint32]uint64) {
-	var dummyVersionList knox.KeyVersionList
+) (types.KeyVersionList, map[uint32]uint64) {
+	var dummyVersionList types.KeyVersionList
 	tinkKeyIDToKnoxVersionID := make(map[uint32]uint64)
 	// counts decide how many versions this dummy version list will have
 	for i := 0; i < counts; i++ {
@@ -149,14 +149,14 @@ func getDummyKnoxVersionList(
 			fatalf(err.Error())
 		}
 		// Add a new version to the dummy version list. Only one Primary version, all others are Active version.
-		var status knox.VersionStatus
+		var status types.VersionStatus
 		if i == 0 {
-			status = knox.Primary
+			status = types.Primary
 		} else {
-			status = knox.Active
+			status = types.Active
 		}
 		// To be noticed, index i is used as dummy knox version ID and dummy creation time.
-		dummyVersionList = append(dummyVersionList, knox.KeyVersion{
+		dummyVersionList = append(dummyVersionList, types.KeyVersion{
 			ID:           uint64(i),
 			Data:         keysetInBytes,
 			Status:       status,
@@ -231,7 +231,7 @@ func TestGetTinkKeysetHandleFromKnoxVersionList(t *testing.T) {
 	dummyVersionList, tinkKeyIDtoKnoxVersionID := getDummyKnoxVersionList(1000, keyTemplate)
 	keysetHandle, mapping, err := getTinkKeysetHandleFromKnoxVersionList(dummyVersionList)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("%s", err.Error())
 	}
 	if _, err := aead.New(keysetHandle); err != nil {
 		t.Fatalf("cannot get primitive from generated keyset handle: %s", err)
@@ -284,7 +284,7 @@ func TestGetKeysetInfoFromTinkKeysetHandle(t *testing.T) {
 	}
 	keysetInfoForPrint, err := json.MarshalIndent(keysetInfo, "", "  ")
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("%s", err.Error())
 	}
 	expected := string(keysetInfoForPrint)
 	got, err := getKeysetInfoFromTinkKeysetHandle(keysetHandle, tinkKeyIDToKnoxVersionID)

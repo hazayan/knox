@@ -1,4 +1,4 @@
-package knox
+package client
 
 import (
 	"bytes"
@@ -14,6 +14,8 @@ import (
 	"runtime"
 	"sync/atomic"
 	"testing"
+
+	"github.com/hazayan/knox/pkg/types"
 )
 
 type mockHTTPClient struct {
@@ -33,9 +35,9 @@ func (m *mockHTTPClient) getCounter() uint64 {
 func TestMockClient(t *testing.T) {
 	p := "primary"
 	a := []string{"active1", "active2"}
-	k0 := Key{
-		VersionList: []KeyVersion{
-			{Data: []byte(p), Status: Primary}, {Data: []byte(a[0]), Status: Active}, {Data: []byte(a[1]), Status: Active}}}
+	k0 := types.Key{
+		VersionList: []types.KeyVersion{
+			{Data: []byte(p), Status: types.Primary}, {Data: []byte(a[0]), Status: types.Active}, {Data: []byte(a[1]), Status: types.Active}}}
 
 	m := NewMock(p, a)
 	p1 := m.GetPrimary()
@@ -59,9 +61,9 @@ func TestMockClient(t *testing.T) {
 }
 
 func buildGoodResponse(data interface{}) ([]byte, error) {
-	resp := &Response{
+	resp := &types.Response{
 		Status:    "ok",
-		Code:      OKCode,
+		Code:      types.OKCode,
 		Host:      "test",
 		Timestamp: 1234567890,
 		Message:   "",
@@ -72,7 +74,7 @@ func buildGoodResponse(data interface{}) ([]byte, error) {
 }
 
 func buildErrorResponse(code int, data interface{}) ([]byte, error) {
-	resp := &Response{
+	resp := &types.Response{
 		Status:    "err",
 		Code:      code,
 		Host:      "test",
@@ -121,10 +123,10 @@ func isKnoxDaemonRunning() bool {
 }
 
 func TestGetKey(t *testing.T) {
-	expected := Key{
+	expected := types.Key{
 		ID:          "testkey",
-		ACL:         ACL([]Access{}),
-		VersionList: KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash",
 	}
 	resp, err := buildGoodResponse(expected)
@@ -166,10 +168,10 @@ func TestGetKey(t *testing.T) {
 
 // TestGetKeyWithMultipleAuth tests getting keys with multiple auth methods
 func TestGetKeyWithMultipleAuth(t *testing.T) {
-	expected := Key{
+	expected := types.Key{
 		ID:          "testkey",
-		ACL:         ACL([]Access{}),
-		VersionList: KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash",
 	}
 
@@ -185,7 +187,7 @@ func TestGetKeyWithMultipleAuth(t *testing.T) {
 		var resp []byte
 		var err error
 		if ops == 1 {
-			resp, err = buildErrorResponse(UnauthorizedCode, nil)
+			resp, err = buildErrorResponse(types.UnauthorizedCode, nil)
 			if err != nil {
 				t.Fatalf("%s is not nil", err)
 			}
@@ -255,7 +257,7 @@ func TestGetKeyWithMultipleAuth(t *testing.T) {
 // TestNoAuthPrincipals tests the case where no auth handlers are available
 func TestNoAuthPrincipals(t *testing.T) {
 	// Create a test server - won't be used since auth fails before request is made
-	resp, err := buildErrorResponse(UnauthenticatedCode, nil)
+	resp, err := buildErrorResponse(types.UnauthenticatedCode, nil)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -293,7 +295,7 @@ func TestNoAuthPrincipals(t *testing.T) {
 // TestOnlyUnauthPrincipals tests the case where a principal is provided but it is unauthorized
 func TestOnlyUnauthPrincipals(t *testing.T) {
 	// Create a test server which returns an unauthorized error
-	resp, err := buildErrorResponse(UnauthorizedCode, nil)
+	resp, err := buildErrorResponse(types.UnauthorizedCode, nil)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -390,15 +392,15 @@ func TestCreateKey(t *testing.T) {
 
 	cli := MockClient(srv.Listener.Addr().String(), "")
 
-	acl := ACL([]Access{
+	acl := types.ACL([]types.Access{
 		{
-			Type:       User,
-			AccessType: Read,
+			Type:       types.User,
+			AccessType: types.Read,
 			ID:         "test",
 		},
 	})
 
-	badACL := ACL([]Access{
+	badACL := types.ACL([]types.Access{
 		{
 			Type:       233,
 			AccessType: 80927,
@@ -500,7 +502,7 @@ func TestPutVersion(t *testing.T) {
 		t.Fatal("error is nil")
 	}
 
-	err = cli.UpdateVersion("testkey", "123", Primary)
+	err = cli.UpdateVersion("testkey", "123", types.Primary)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -527,13 +529,13 @@ func TestPutAccess(t *testing.T) {
 
 	cli := MockClient(srv.Listener.Addr().String(), "")
 
-	a := Access{
-		Type:       User,
-		AccessType: Read,
+	a := types.Access{
+		Type:       types.User,
+		AccessType: types.Read,
 		ID:         "test",
 	}
 
-	badA := Access{
+	badA := types.Access{
 		Type:       233,
 		AccessType: 80927,
 		ID:         "test",
@@ -569,7 +571,7 @@ func TestConcurrentDeletes(t *testing.T) {
 				t.Fatalf("%s is not nil", err)
 			}
 		} else {
-			resp, err = buildErrorResponse(InternalServerErrorCode, "")
+			resp, err = buildErrorResponse(types.InternalServerErrorCode, "")
 			if err != nil {
 				t.Fatalf("%s is not nil", err)
 			}
@@ -597,10 +599,10 @@ func TestConcurrentDeletes(t *testing.T) {
 }
 
 func TestGetKeyWithStatus(t *testing.T) {
-	expected := Key{
+	expected := types.Key{
 		ID:          "testkey",
-		ACL:         ACL([]Access{}),
-		VersionList: KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash",
 	}
 	resp, err := buildGoodResponse(expected)
@@ -620,9 +622,9 @@ func TestGetKeyWithStatus(t *testing.T) {
 			t.Fatal("query param for status is missing")
 		}
 
-		var status VersionStatus
+		var status types.VersionStatus
 		err := json.Unmarshal([]byte(statusParams[0]), &status)
-		if err != nil || status != Inactive {
+		if err != nil || status != types.Inactive {
 			t.Fatal("query param for status is incorrect:", err)
 		}
 	})
@@ -630,7 +632,7 @@ func TestGetKeyWithStatus(t *testing.T) {
 
 	cli := MockClient(srv.Listener.Addr().String(), "")
 
-	k, err := cli.GetKeyWithStatus("testkey", Inactive)
+	k, err := cli.GetKeyWithStatus("testkey", types.Inactive)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -652,7 +654,7 @@ func TestGetKeyWithStatus(t *testing.T) {
 }
 
 func TestGetInvalidKeys(t *testing.T) {
-	expected := Key{
+	expected := types.Key{
 		ID:          "",
 		ACL:         nil,
 		VersionList: nil,

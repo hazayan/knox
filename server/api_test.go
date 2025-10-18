@@ -12,44 +12,44 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pinterest/knox"
-	"github.com/pinterest/knox/server/auth"
-	"github.com/pinterest/knox/server/keydb"
+	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server/auth"
+	"github.com/hazayan/knox/server/keydb"
 )
 
 const TESTVAL int = 1
 
 type mockAuthFail struct{}
 
-func (a mockAuthFail) Authenticate(r *http.Request) (knox.Principal, error) {
+func (a mockAuthFail) Authenticate(r *http.Request) (types.Principal, error) {
 	return nil, fmt.Errorf("Error!")
 }
-func (a mockAuthFail) IsUser(p knox.Principal) bool {
+func (a mockAuthFail) IsUser(p types.Principal) bool {
 	return false
 }
 
 type mockAuthTrue struct{}
 
-func (a mockAuthTrue) Authenticate(r *http.Request) (knox.Principal, error) {
+func (a mockAuthTrue) Authenticate(r *http.Request) (types.Principal, error) {
 	return nil, nil
 }
-func (a mockAuthTrue) IsUser(p knox.Principal) bool {
+func (a mockAuthTrue) IsUser(p types.Principal) bool {
 	return true
 }
 
-func mockFailureHandler(m KeyManager, principal knox.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-	return nil, errF(knox.InternalServerErrorCode, "")
+func mockFailureHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+	return nil, errF(types.InternalServerErrorCode, "")
 }
 
-func mockHandler(m KeyManager, principal knox.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func mockHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
 	return TESTVAL, nil
 }
 
-func additionalMockHandler(m KeyManager, principal knox.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func additionalMockHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
 	return "The meaning of life is 42", nil
 }
 
-func mockAccessCallback(input knox.AccessCallbackInput) (bool, error) {
+func mockAccessCallback(input types.AccessCallbackInput) (bool, error) {
 	return true, nil
 }
 
@@ -86,26 +86,26 @@ func mockFailureRoute() Route {
 func TestAddDefaultAccess(t *testing.T) {
 	dUID := "testuser2"
 	u2 := auth.NewUser(dUID, []string{})
-	a := &knox.Access{ID: dUID, AccessType: knox.Read, Type: knox.User}
+	a := &types.Access{ID: dUID, AccessType: types.Read, Type: types.User}
 
 	AddDefaultAccess(a)
 	id := "testkeyid"
 	uid := "testuser"
-	acl := knox.ACL([]knox.Access{})
+	acl := types.ACL([]types.Access{})
 	data := []byte("testdata")
 	u := auth.NewUser(uid, []string{})
 	key := newKey(id, acl, data, u)
-	if !u.CanAccess(key.ACL, knox.Admin) {
+	if !u.CanAccess(key.ACL, types.Admin) {
 		t.Fatal("creator does not have access to his key")
 	}
-	if !u2.CanAccess(key.ACL, knox.Read) {
+	if !u2.CanAccess(key.ACL, types.Read) {
 		t.Fatal("default access does not have access to his key")
 	}
 	if len(key.ACL) != 2 {
 		text, _ := json.Marshal(key.ACL)
 		t.Fatal("The Key's ACL is too big: " + string(text))
 	}
-	defaultAccess = []knox.Access{}
+	defaultAccess = []types.Access{}
 
 }
 
@@ -114,7 +114,7 @@ func TestSetAccessCallback(t *testing.T) {
 
 	SetAccessCallback(mockAccessCallback)
 
-	input := knox.AccessCallbackInput{}
+	input := types.AccessCallbackInput{}
 
 	if accessCallback == nil {
 		t.Fatal("accessCallback should not be nil")
@@ -169,10 +169,10 @@ func TestParseFormParameter(t *testing.T) {
 }
 
 func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder) {
-	if w.Code != HTTPErrMap[knox.InternalServerErrorCode].Code {
+	if w.Code != HTTPErrMap[types.InternalServerErrorCode].Code {
 		t.Fatal("unexpected response code")
 	}
-	var resp knox.Response
+	var resp types.Response
 	err := json.Unmarshal([]byte(w.Body.String()), &resp)
 	if err != nil {
 		t.Fatal("Test returned invalid JSON data")
@@ -183,7 +183,7 @@ func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder
 	if resp.Status != "error" {
 		t.Fatal("unexpected status")
 	}
-	if resp.Code != knox.InternalServerErrorCode {
+	if resp.Code != types.InternalServerErrorCode {
 		t.Fatal("unexpected error code")
 	}
 	if resp.Message != "" {
@@ -198,7 +198,7 @@ func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder
 }
 
 func TestErrorHandler(t *testing.T) {
-	testErr := errF(knox.InternalServerErrorCode, "")
+	testErr := errF(types.InternalServerErrorCode, "")
 	handler := WriteErr(testErr)
 
 	w := httptest.NewRecorder()
@@ -208,7 +208,7 @@ func TestErrorHandler(t *testing.T) {
 
 func TestNewKeyVersion(t *testing.T) {
 	data := []byte("testdata")
-	status := knox.Active
+	status := types.Active
 	beforeTime := time.Now().UnixNano()
 	version := newKeyVersion(data, status)
 	afterTime := time.Now().UnixNano()
@@ -230,7 +230,7 @@ func TestNewKeyVersion(t *testing.T) {
 func TestNewKey(t *testing.T) {
 	id := "testkeyid"
 	uid := "testuser"
-	acl := knox.ACL([]knox.Access{{ID: "testmachine", AccessType: knox.Admin, Type: knox.Machine}})
+	acl := types.ACL([]types.Access{{ID: "testmachine", AccessType: types.Admin, Type: types.Machine}})
 	data := []byte("testdata")
 	u := auth.NewUser(uid, []string{})
 	key := newKey(id, acl, data, u)
@@ -240,7 +240,7 @@ func TestNewKey(t *testing.T) {
 	if len(key.VersionList) != 1 || !bytes.Equal(key.VersionList[0].Data, data) {
 		t.Fatal("data does not match: " + string(key.VersionList[0].Data) + "!=" + string(data))
 	}
-	if !u.CanAccess(key.ACL, knox.Admin) {
+	if !u.CanAccess(key.ACL, types.Admin) {
 		t.Fatal("creator does not have access to his key")
 	}
 	if len(key.ACL) != len(defaultAccess)+2 {
@@ -389,7 +389,7 @@ func TestAdditionalRouteFunctionality(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
-	resp := &knox.Response{}
+	resp := &types.Response{}
 	decoder := json.NewDecoder(w.Body)
 	err = decoder.Decode(resp)
 	if err != nil {

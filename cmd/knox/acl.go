@@ -6,7 +6,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/pinterest/knox"
+	"github.com/hazayan/knox/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -196,32 +196,32 @@ Examples:
 
 // Helper functions
 
-func formatPrincipalType(pt knox.PrincipalType) string {
+func formatPrincipalType(pt types.PrincipalType) string {
 	switch pt {
-	case knox.User:
+	case types.User:
 		return "User"
-	case knox.UserGroup:
+	case types.UserGroup:
 		return "UserGroup"
-	case knox.Machine:
+	case types.Machine:
 		return "Machine"
-	case knox.MachinePrefix:
+	case types.MachinePrefix:
 		return "MachinePrefix"
-	case knox.Service:
+	case types.Service:
 		return "Service"
-	case knox.ServicePrefix:
+	case types.ServicePrefix:
 		return "ServicePrefix"
 	default:
 		return "Unknown"
 	}
 }
 
-func formatAccessType(at knox.AccessType) string {
+func formatAccessType(at types.AccessType) string {
 	switch at {
-	case knox.Read:
+	case types.Read:
 		return "Read"
-	case knox.Write:
+	case types.Write:
 		return "Write"
-	case knox.Admin:
+	case types.Admin:
 		return "Admin"
 	default:
 		return "None"
