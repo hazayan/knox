@@ -3,26 +3,27 @@ package types_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 
-	. "github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func TestKeyVersionListHash(t *testing.T) {
 	d := []byte("test")
-	v1 := KeyVersion{1, d, Primary, 10}
-	v2 := KeyVersion{2, d, Active, 10}
-	v3 := KeyVersion{3, d, Active, 10}
-	versions := []KeyVersion{v1, v2, v3}
-	statuses := []VersionStatus{Active, Inactive}
+	v1 := types.KeyVersion{1, d, types.Primary, 10}
+	v2 := types.KeyVersion{2, d, types.Active, 10}
+	v3 := types.KeyVersion{3, d, types.Active, 10}
+	versions := []types.KeyVersion{v1, v2, v3}
+	statuses := []types.VersionStatus{types.Active, types.Inactive}
 	hashes := map[string]string{}
 	for i := range versions {
-		versions[i].Status = Primary
+		versions[i].Status = types.Primary
 		for _, s1 := range statuses {
 			versions[(i+1)%3].Status = s1
 			for _, s2 := range statuses {
 				versions[(i+2)%3].Status = s2
-				h := KeyVersionList([]KeyVersion{versions[0], versions[1], versions[2]}).Hash()
+				h := types.KeyVersionList([]types.KeyVersion{versions[0], versions[1], versions[2]}).Hash()
 				text, _ := json.Marshal(versions)
 				if _, match := hashes[h]; match {
 					t.Error("hashes match: " + string(text) + " == " + hashes[h])
@@ -35,72 +36,72 @@ func TestKeyVersionListHash(t *testing.T) {
 
 func TestKeyVersionListUpdate(t *testing.T) {
 	d := []byte("test")
-	v1 := KeyVersion{1, d, Primary, 10}
-	v2 := KeyVersion{2, d, Active, 10}
-	v3 := KeyVersion{3, d, Inactive, 10}
-	kvl := KeyVersionList([]KeyVersion{v1, v2, v3})
-	_, Primary2PrimaryErr := kvl.Update(v1.ID, Primary)
-	if Primary2PrimaryErr == nil {
+	v1 := types.KeyVersion{1, d, types.Primary, 10}
+	v2 := types.KeyVersion{2, d, types.Active, 10}
+	v3 := types.KeyVersion{3, d, types.Inactive, 10}
+	kvl := types.KeyVersionList([]types.KeyVersion{v1, v2, v3})
+	_, primary2PrimaryErr := kvl.Update(v1.ID, types.Primary)
+	if primary2PrimaryErr == nil {
 		t.Error("Primary can't go to Primary")
 	}
-	_, Primary2ActiveErr := kvl.Update(v1.ID, Active)
-	if Primary2ActiveErr == nil {
+	_, primary2ActiveErr := kvl.Update(v1.ID, types.Active)
+	if primary2ActiveErr == nil {
 		t.Error("Primary can go to Active")
 	}
-	_, Primary2InActiveErr := kvl.Update(v1.ID, Inactive)
-	if Primary2InActiveErr == nil {
+	_, primary2InactiveErr := kvl.Update(v1.ID, types.Inactive)
+	if primary2InactiveErr == nil {
 		t.Error("Primary can go to Inactive")
 	}
-	_, Active2ActiveErr := kvl.Update(v2.ID, Active)
-	if Active2ActiveErr == nil {
+	_, active2ActiveErr := kvl.Update(v2.ID, types.Active)
+	if active2ActiveErr == nil {
 		t.Error("Active can go to Active")
 	}
-	_, inActive2InActiveErr := kvl.Update(v3.ID, Inactive)
+	_, inActive2InActiveErr := kvl.Update(v3.ID, types.Inactive)
 	if inActive2InActiveErr == nil {
 		t.Error("InActive can go to Inactive")
 	}
-	_, inActive2PrimaryErr := kvl.Update(v3.ID, Primary)
+	_, inActive2PrimaryErr := kvl.Update(v3.ID, types.Primary)
 	if inActive2PrimaryErr == nil {
 		t.Error("InActive can go to Primary")
 	}
-	kvl, inActive2ActiveErr := kvl.Update(v3.ID, Active)
+	kvl, inActive2ActiveErr := kvl.Update(v3.ID, types.Active)
 	if inActive2ActiveErr != nil {
 		t.Error("InActive can't go to Active")
 	}
 	for _, kv := range kvl {
-		if kv.ID == v1.ID && kv.Status != Primary {
+		if kv.ID == v1.ID && kv.Status != types.Primary {
 			t.Error("Wrong type on v1")
 		}
-		if kv.ID == v2.ID && kv.Status != Active {
+		if kv.ID == v2.ID && kv.Status != types.Active {
 			t.Error("Wrong type on v2")
 		}
-		if kv.ID == v3.ID && kv.Status != Active {
+		if kv.ID == v3.ID && kv.Status != types.Active {
 			t.Error("Wrong type on v3")
 		}
 	}
-	kvl, Active2InativeErr := kvl.Update(v3.ID, Inactive)
-	if Active2InativeErr != nil {
+	kvl, active2InactiveErr := kvl.Update(v3.ID, types.Inactive)
+	if active2InactiveErr != nil {
 		t.Error("Active can't go to Inactive")
 	}
 
-	kvl, Active2PrimaryErr := kvl.Update(v2.ID, Primary)
-	if Active2PrimaryErr != nil {
+	kvl, active2PrimaryErr := kvl.Update(v2.ID, types.Primary)
+	if active2PrimaryErr != nil {
 		t.Error("Active can't go to Primary")
 	}
 	for _, kv := range kvl {
-		if kv.ID == v1.ID && kv.Status != Active {
+		if kv.ID == v1.ID && kv.Status != types.Active {
 			t.Error("Wrong type on v1")
 		}
-		if kv.ID == v2.ID && kv.Status != Primary {
+		if kv.ID == v2.ID && kv.Status != types.Primary {
 			t.Error("Wrong type on v2")
 		}
-		if kv.ID == v3.ID && kv.Status != Inactive {
+		if kv.ID == v3.ID && kv.Status != types.Inactive {
 			t.Error("Wrong type on v3")
 		}
 	}
 
-	_, dneErr := kvl.Update(2387498237, Active)
-	if dneErr != ErrKeyVersionNotFound {
+	_, dneErr := kvl.Update(2387498237, types.Active)
+	if !errors.Is(dneErr, types.ErrKeyVersionNotFound) {
 		t.Error("Expected version to not exist")
 	}
 }
@@ -115,16 +116,16 @@ func marshalUnmarshal(t *testing.T, in json.Marshaler, out json.Unmarshaler) {
 		t.Error(uErr)
 	}
 }
+
 func TestAccessTypeMarshaling(t *testing.T) {
-	for _, in := range []AccessType{Read, Write, Admin, None} {
-		var out AccessType
+	for _, in := range []types.AccessType{types.Read, types.Write, types.Admin, types.None} {
+		var out types.AccessType
 		marshalUnmarshal(t, &in, &out)
 		if in != out {
 			t.Error("Unmarshaled not same as input ", in, out)
 		}
 	}
-	var invalid AccessType
-	invalid = 12938798732 // This is not currently an AccessType
+	var invalid types.AccessType = 12938798732 // This is not currently an AccessType
 	_, marshalErr := invalid.MarshalJSON()
 	if marshalErr == nil {
 		t.Error("Marshaled invalid enum")
@@ -134,17 +135,16 @@ func TestAccessTypeMarshaling(t *testing.T) {
 		t.Error("Unmarshaled invalid string")
 	}
 }
+
 func TestPrincipalTypeMarshaling(t *testing.T) {
-	for _, in := range []PrincipalType{User, UserGroup, Machine, MachinePrefix, Service, ServicePrefix} {
-		var out PrincipalType
+	for _, in := range []types.PrincipalType{types.User, types.UserGroup, types.Machine, types.MachinePrefix, types.Service, types.ServicePrefix} {
+		var out types.PrincipalType
 		marshalUnmarshal(t, &in, &out)
 		if in != out {
 			t.Error("Unmarshaled not same as input ", in, out)
 		}
-
 	}
-	var invalid PrincipalType
-	invalid = 12938798732 // This is not currently an PrincipalType
+	var invalid types.PrincipalType = 12938798732 // This is not currently an PrincipalType
 	_, marshalErr := invalid.MarshalJSON()
 	if marshalErr == nil {
 		t.Error("Marshaled invalid enum")
@@ -154,21 +154,19 @@ func TestPrincipalTypeMarshaling(t *testing.T) {
 		t.Error("Did not unmarshal invalid string")
 	}
 	if invalid != -1 {
-		t.Error("Unmarshalling invalid Principal type should result in -1")
+		t.Error("Unmarshaling invalid Principal type should result in -1")
 	}
-
 }
+
 func TestVersionStatusMarshaling(t *testing.T) {
-	for _, in := range []VersionStatus{Primary, Active, Inactive} {
-		var out VersionStatus
+	for _, in := range []types.VersionStatus{types.Primary, types.Active, types.Inactive} {
+		var out types.VersionStatus
 		marshalUnmarshal(t, &in, &out)
 		if in != out {
 			t.Error("Unmarshaled not same as input ", in, out)
 		}
-
 	}
-	var invalid VersionStatus
-	invalid = 12938798732 // This is not currently an VersionStatus
+	var invalid types.VersionStatus = 12938798732 // This is not currently an VersionStatus
 	_, marshalErr := invalid.MarshalJSON()
 	if marshalErr == nil {
 		t.Error("Marshaled invalid enum")
@@ -178,11 +176,12 @@ func TestVersionStatusMarshaling(t *testing.T) {
 		t.Error("Unmarshaled invalid string")
 	}
 }
+
 func TestKeyPathMarhaling(t *testing.T) {
-	key := Key{
+	key := types.Key{
 		ID:          "test",
-		ACL:         ACL([]Access{}),
-		VersionList: KeyVersionList{},
+		ACL:         types.ACL([]types.Access{}),
+		VersionList: types.KeyVersionList{},
 		VersionHash: "VersionHash",
 	}
 
@@ -190,7 +189,7 @@ func TestKeyPathMarhaling(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to marshal key: %v", err)
 	} else if bytes.Contains(out, []byte("path")) {
-		t.Errorf("Found unexpected 'path' key in JSON output")
+		t.Error("Found unexpected 'path' key in JSON output")
 	}
 
 	key.Path = "/var/lib/knox/v0/keys/test:test"
@@ -198,39 +197,39 @@ func TestKeyPathMarhaling(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to marshal key: %v", err)
 	} else if !bytes.Contains(out, []byte("path")) {
-		t.Errorf("Expected 'path' key in JSON output")
+		t.Error("Expected 'path' key in JSON output")
 	}
 }
 
 func TestACLValidate(t *testing.T) {
-	a1 := Access{ID: "testmachine1", AccessType: Admin, Type: Machine}
-	a2 := Access{ID: "testuser", AccessType: Write, Type: User}
-	a3 := Access{ID: "testmachine", AccessType: Read, Type: MachinePrefix}
-	a6 := Access{ID: "spiffe://example.com/serviceA", AccessType: Read, Type: Service}
-	a7 := Access{ID: "spiffe://example.com/serviceA/", AccessType: Read, Type: ServicePrefix}
-	validACL := ACL([]Access{a1, a2, a3, a6, a7})
+	a1 := types.Access{ID: "testmachine1", AccessType: types.Admin, Type: types.Machine}
+	a2 := types.Access{ID: "testuser", AccessType: types.Write, Type: types.User}
+	a3 := types.Access{ID: "testmachine", AccessType: types.Read, Type: types.MachinePrefix}
+	a6 := types.Access{ID: "spiffe://example.com/serviceA", AccessType: types.Read, Type: types.Service}
+	a7 := types.Access{ID: "spiffe://example.com/serviceA/", AccessType: types.Read, Type: types.ServicePrefix}
+	validACL := types.ACL([]types.Access{a1, a2, a3, a6, a7})
 	if validACL.Validate() != nil {
 		t.Error("ValidACL should be valid")
 	}
 
-	a4 := Access{ID: "testmachine", AccessType: None, Type: MachinePrefix}
-	noneACL := ACL([]Access{a1, a2, a4})
+	a4 := types.Access{ID: "testmachine", AccessType: types.None, Type: types.MachinePrefix}
+	noneACL := types.ACL([]types.Access{a1, a2, a4})
 	if noneACL.Validate() == nil {
 		t.Error("noneACL should err")
 	}
 
-	a5 := Access{ID: "testmachine1", AccessType: Write, Type: Machine}
-	dupACL := ACL([]Access{a1, a5, a3})
+	a5 := types.Access{ID: "testmachine1", AccessType: types.Write, Type: types.Machine}
+	dupACL := types.ACL([]types.Access{a1, a5, a3})
 	if dupACL.Validate() == nil {
 		t.Error("dupACL should err")
 	}
 }
 
 func TestACLAddMultiple(t *testing.T) {
-	a1 := Access{ID: "testmachine", AccessType: Admin, Type: Machine}
-	a3 := Access{ID: "testmachine", AccessType: None, Type: Machine}
-	a4 := Access{ID: "testmachine2", AccessType: Admin, Type: Machine}
-	acl := ACL([]Access{a1})
+	a1 := types.Access{ID: "testmachine", AccessType: types.Admin, Type: types.Machine}
+	a3 := types.Access{ID: "testmachine", AccessType: types.None, Type: types.Machine}
+	a4 := types.Access{ID: "testmachine2", AccessType: types.Admin, Type: types.Machine}
+	acl := types.ACL([]types.Access{a1})
 	acl2 := acl.Add(a4)
 	if len(acl2) != 2 {
 		t.Error("Unexpected ACL for adding access")
@@ -246,17 +245,16 @@ func TestACLAddMultiple(t *testing.T) {
 	if len(acl4) != 1 {
 		t.Error("Unexpected ACL length")
 	}
-
 }
 
 func TestACLAdd(t *testing.T) {
-	a1 := Access{ID: "testmachine", AccessType: Admin, Type: Machine}
-	a2 := Access{ID: "testmachine", AccessType: Write, Type: Machine}
-	a3 := Access{ID: "testmachine", AccessType: None, Type: Machine}
-	a4 := Access{ID: "testmachine2", AccessType: Admin, Type: Machine}
-	acl := ACL([]Access{a1})
+	a1 := types.Access{ID: "testmachine", AccessType: types.Admin, Type: types.Machine}
+	a2 := types.Access{ID: "testmachine", AccessType: types.Write, Type: types.Machine}
+	a3 := types.Access{ID: "testmachine", AccessType: types.None, Type: types.Machine}
+	a4 := types.Access{ID: "testmachine2", AccessType: types.Admin, Type: types.Machine}
+	acl := types.ACL([]types.Access{a1})
 	acl1 := acl.Add(a2)
-	if len(acl1) != 1 || acl1[0].AccessType != Write {
+	if len(acl1) != 1 || acl1[0].AccessType != types.Write {
 		t.Error("Unexpected ACL for adding different access type")
 	}
 	acl2 := acl.Add(a3)
@@ -267,39 +265,39 @@ func TestACLAdd(t *testing.T) {
 	if len(acl3) != 2 {
 		t.Error("Unexpected ACL for adding access")
 	}
-
 }
+
 func TestAccessTypeCanAccess(t *testing.T) {
-	if Read.CanAccess(Admin) || Read.CanAccess(Write) || !Read.CanAccess(Read) || !Read.CanAccess(None) {
+	if types.Read.CanAccess(types.Admin) || types.Read.CanAccess(types.Write) || !types.Read.CanAccess(types.Read) || !types.Read.CanAccess(types.None) {
 		t.Error("Read has incorrect access")
 	}
-	if Write.CanAccess(Admin) || !Write.CanAccess(Write) || !Write.CanAccess(Read) || !Write.CanAccess(None) {
+	if types.Write.CanAccess(types.Admin) || !types.Write.CanAccess(types.Write) || !types.Write.CanAccess(types.Read) || !types.Write.CanAccess(types.None) {
 		t.Error("Write has incorrect access")
 	}
-	if !Admin.CanAccess(Admin) || !Admin.CanAccess(Write) || !Admin.CanAccess(Read) || !Admin.CanAccess(None) {
+	if !types.Admin.CanAccess(types.Admin) || !types.Admin.CanAccess(types.Write) || !types.Admin.CanAccess(types.Read) || !types.Admin.CanAccess(types.None) {
 		t.Error("Admin has incorrect access")
 	}
-	if None.CanAccess(Admin) || None.CanAccess(Write) || None.CanAccess(Read) || !None.CanAccess(None) {
+	if types.None.CanAccess(types.Admin) || types.None.CanAccess(types.Write) || types.None.CanAccess(types.Read) || !types.None.CanAccess(types.None) {
 		t.Error("None has incorrect access")
 	}
 }
 
 func TestKeyValidate(t *testing.T) {
 	d := []byte("test")
-	v1 := KeyVersion{1, d, Primary, 10}
-	v2 := KeyVersion{2, d, Active, 10}
-	v3 := KeyVersion{3, d, Inactive, 10}
-	v4 := KeyVersion{3, d, Active, 10}
-	validKVL := KeyVersionList([]KeyVersion{v1, v2, v3})
-	invalidKVL := KeyVersionList([]KeyVersion{v1, v2, v3, v4})
+	v1 := types.KeyVersion{1, d, types.Primary, 10}
+	v2 := types.KeyVersion{2, d, types.Active, 10}
+	v3 := types.KeyVersion{3, d, types.Inactive, 10}
+	v4 := types.KeyVersion{3, d, types.Active, 10}
+	validKVL := types.KeyVersionList([]types.KeyVersion{v1, v2, v3})
+	invalidKVL := types.KeyVersionList([]types.KeyVersion{v1, v2, v3, v4})
 
-	a1 := Access{ID: "testmachine1", AccessType: Admin, Type: Machine}
-	a2 := Access{ID: "testuser", AccessType: Write, Type: User}
-	a3 := Access{ID: "testmachine", AccessType: Read, Type: MachinePrefix}
-	a4 := Access{ID: "testmachine", AccessType: None, Type: MachinePrefix}
-	a5 := Access{ID: "spiffe://example.com/serviceA", AccessType: Admin, Type: Service}
-	validACL := ACL([]Access{a1, a2, a3, a5})
-	invalidACL := ACL([]Access{a1, a2, a4})
+	a1 := types.Access{ID: "testmachine1", AccessType: types.Admin, Type: types.Machine}
+	a2 := types.Access{ID: "testuser", AccessType: types.Write, Type: types.User}
+	a3 := types.Access{ID: "testmachine", AccessType: types.Read, Type: types.MachinePrefix}
+	a4 := types.Access{ID: "testmachine", AccessType: types.None, Type: types.MachinePrefix}
+	a5 := types.Access{ID: "spiffe://example.com/serviceA", AccessType: types.Admin, Type: types.Service}
+	validACL := types.ACL([]types.Access{a1, a2, a3, a5})
+	invalidACL := types.ACL([]types.Access{a1, a2, a4})
 
 	validKeyID := "test_key"
 	invalidKeyID := "testkey "
@@ -307,11 +305,11 @@ func TestKeyValidate(t *testing.T) {
 	validHash := validKVL.Hash()
 	invalidHash := "INVALID_HASH"
 
-	validKey := Key{ID: validKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
-	invalidKey1 := Key{ID: invalidKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
-	invalidKey2 := Key{ID: validKeyID, ACL: invalidACL, VersionList: validKVL, VersionHash: validHash}
-	invalidKey3 := Key{ID: validKeyID, ACL: validACL, VersionList: invalidKVL, VersionHash: validHash}
-	invalidKey4 := Key{ID: validKeyID, ACL: validACL, VersionList: validKVL, VersionHash: invalidHash}
+	validKey := types.Key{ID: validKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
+	invalidKey1 := types.Key{ID: invalidKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
+	invalidKey2 := types.Key{ID: validKeyID, ACL: invalidACL, VersionList: validKVL, VersionHash: validHash}
+	invalidKey3 := types.Key{ID: validKeyID, ACL: validACL, VersionList: invalidKVL, VersionHash: validHash}
+	invalidKey4 := types.Key{ID: validKeyID, ACL: validACL, VersionList: validKVL, VersionHash: invalidHash}
 
 	if validKey.Validate() != nil {
 		t.Error("Valid Key should validate successfully")
@@ -328,27 +326,26 @@ func TestKeyValidate(t *testing.T) {
 	if invalidKey4.Validate() == nil {
 		t.Error("Invalid Version Hash should fail to validate successfully")
 	}
-
 }
 
 func TestKeyVersionListValidate(t *testing.T) {
 	d := []byte("test")
-	v1 := KeyVersion{1, d, Primary, 10}
-	v2 := KeyVersion{2, d, Active, 10}
-	v3 := KeyVersion{3, d, Inactive, 10}
-	validKVL := KeyVersionList([]KeyVersion{v1, v2, v3})
+	v1 := types.KeyVersion{1, d, types.Primary, 10}
+	v2 := types.KeyVersion{2, d, types.Active, 10}
+	v3 := types.KeyVersion{3, d, types.Inactive, 10}
+	validKVL := types.KeyVersionList([]types.KeyVersion{v1, v2, v3})
 	if validKVL.Validate() != nil {
 		t.Error("Valid KVL should be valid")
 	}
 
-	v4 := KeyVersion{3, d, Active, 10}
-	dupKVL := KeyVersionList([]KeyVersion{v1, v2, v3, v4})
+	v4 := types.KeyVersion{3, d, types.Active, 10}
+	dupKVL := types.KeyVersionList([]types.KeyVersion{v1, v2, v3, v4})
 	if dupKVL.Validate() == nil {
 		t.Error("Duplicate version id, KVL should be invalid.")
 	}
 
-	v5 := KeyVersion{4, d, Primary, 10}
-	twoPrimaryKVL := KeyVersionList([]KeyVersion{v1, v2, v3, v5})
+	v5 := types.KeyVersion{4, d, types.Primary, 10}
+	twoPrimaryKVL := types.KeyVersionList([]types.KeyVersion{v1, v2, v3, v5})
 	if twoPrimaryKVL.Validate() == nil {
 		t.Error("KVL with two primary versions should be invalid.")
 	}
@@ -356,10 +353,10 @@ func TestKeyVersionListValidate(t *testing.T) {
 
 func TestKVLGetActive(t *testing.T) {
 	d := []byte("test")
-	v1 := KeyVersion{1, d, Primary, 10}
-	v2 := KeyVersion{2, d, Active, 10}
-	v3 := KeyVersion{3, d, Inactive, 10}
-	kvl := KeyVersionList([]KeyVersion{v1, v2, v3})
+	v1 := types.KeyVersion{1, d, types.Primary, 10}
+	v2 := types.KeyVersion{2, d, types.Active, 10}
+	v3 := types.KeyVersion{3, d, types.Inactive, 10}
+	kvl := types.KeyVersionList([]types.KeyVersion{v1, v2, v3})
 	keys := kvl.GetActive()
 	if len(keys) != 2 {
 		t.Error("Invalid number of keys returned from GetActive")
@@ -378,10 +375,10 @@ func TestKVLGetActive(t *testing.T) {
 
 func TestKVLGetPrimary(t *testing.T) {
 	d := []byte("test")
-	v1 := KeyVersion{1, d, Primary, 10}
-	v2 := KeyVersion{2, d, Active, 10}
-	v3 := KeyVersion{3, d, Inactive, 10}
-	kvl := KeyVersionList([]KeyVersion{v1, v2, v3})
+	v1 := types.KeyVersion{1, d, types.Primary, 10}
+	v2 := types.KeyVersion{2, d, types.Active, 10}
+	v3 := types.KeyVersion{3, d, types.Inactive, 10}
+	kvl := types.KeyVersionList([]types.KeyVersion{v1, v2, v3})
 	keyVersion := kvl.GetPrimary()
 	if keyVersion.ID != v1.ID {
 		t.Error("Incorrect version returned from getPrimary")
@@ -389,8 +386,8 @@ func TestKVLGetPrimary(t *testing.T) {
 }
 
 func TestMinComponentsValidator(t *testing.T) {
-	validate := func(id string, min int, valid bool) {
-		err := ServicePrefixPathComponentsValidator(min)(ServicePrefix, id)
+	validate := func(id string, minComponents int, valid bool) {
+		err := types.ServicePrefixPathComponentsValidator(minComponents)(types.ServicePrefix, id)
 		if valid && err != nil {
 			t.Fatal("Should be valid, but was not:", id)
 		}
@@ -420,9 +417,9 @@ func TestMinComponentsValidator(t *testing.T) {
 }
 
 func TestPrincipalValidation(t *testing.T) {
-	validatePrincipal := func(principalType PrincipalType, id string, expected bool) {
-		extraValidators := []PrincipalValidator{
-			ServicePrefixPathComponentsValidator(1),
+	validatePrincipal := func(principalType types.PrincipalType, id string, expected bool) {
+		extraValidators := []types.PrincipalValidator{
+			types.ServicePrefixPathComponentsValidator(1),
 		}
 
 		err := principalType.IsValidPrincipal(id, extraValidators)
@@ -436,33 +433,33 @@ func TestPrincipalValidation(t *testing.T) {
 
 	// -- Invalid examples --
 	// Empty strings
-	validatePrincipal(User, "", false)
-	validatePrincipal(UserGroup, "", false)
-	validatePrincipal(Machine, "", false)
-	validatePrincipal(MachinePrefix, "", false)
-	validatePrincipal(Service, "", false)
-	validatePrincipal(ServicePrefix, "", false)
+	validatePrincipal(types.User, "", false)
+	validatePrincipal(types.UserGroup, "", false)
+	validatePrincipal(types.Machine, "", false)
+	validatePrincipal(types.MachinePrefix, "", false)
+	validatePrincipal(types.Service, "", false)
+	validatePrincipal(types.ServicePrefix, "", false)
 
 	// Not valid URLs
-	validatePrincipal(Service, "not-a-url", false)
-	validatePrincipal(ServicePrefix, "not-a-url", false)
+	validatePrincipal(types.Service, "not-a-url", false)
+	validatePrincipal(types.ServicePrefix, "not-a-url", false)
 
 	// Wrong URL scheme
-	validatePrincipal(Service, "https://example.com", false)
-	validatePrincipal(ServicePrefix, "https://example.com", false)
+	validatePrincipal(types.Service, "https://example.com", false)
+	validatePrincipal(types.ServicePrefix, "https://example.com", false)
 
 	// Not enough components
-	validatePrincipal(ServicePrefix, "spiffe://example.com", false)
-	validatePrincipal(ServicePrefix, "spiffe://example.com/", false)
+	validatePrincipal(types.ServicePrefix, "spiffe://example.com", false)
+	validatePrincipal(types.ServicePrefix, "spiffe://example.com/", false)
 
 	// No trailing slash
-	validatePrincipal(ServicePrefix, "spiffe://example.com/foo", false)
+	validatePrincipal(types.ServicePrefix, "spiffe://example.com/foo", false)
 
 	// -- Valid examples --
-	validatePrincipal(User, "test", true)
-	validatePrincipal(UserGroup, "test", true)
-	validatePrincipal(Machine, "test", true)
-	validatePrincipal(MachinePrefix, "test", true)
-	validatePrincipal(Service, "spiffe://example.com/service", true)
-	validatePrincipal(ServicePrefix, "spiffe://example.com/prefix/", true)
+	validatePrincipal(types.User, "test", true)
+	validatePrincipal(types.UserGroup, "test", true)
+	validatePrincipal(types.Machine, "test", true)
+	validatePrincipal(types.MachinePrefix, "test", true)
+	validatePrincipal(types.Service, "spiffe://example.com/service", true)
+	validatePrincipal(types.ServicePrefix, "spiffe://example.com/prefix/", true)
 }

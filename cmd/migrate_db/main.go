@@ -1,3 +1,4 @@
+// Package main provides a migration utility for Knox database keys and encryption.
 package main
 
 import (
@@ -57,7 +58,9 @@ func generateTestDBWithKeys(crypt keydb.Cryptor) keydb.DB {
 		panic(err)
 	}
 
-	source.Add(dbkey, dbkey2)
+	if err := source.Add(dbkey, dbkey2); err != nil {
+		panic(err)
+	}
 	return source
 }
 
@@ -75,5 +78,4 @@ func main() {
 	}
 
 	fmt.Printf("source: %v, dest: %v", source, dest)
-
 }

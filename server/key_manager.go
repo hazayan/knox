@@ -34,7 +34,7 @@ func (m *keyManager) GetAllKeyIDs() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	output := []string{}
+	var output []string
 	for _, k := range keys {
 		output = append(output, k.ID)
 	}
@@ -46,7 +46,7 @@ func (m *keyManager) GetUpdatedKeyIDs(versions map[string]string) ([]string, err
 	if err != nil {
 		return nil, err
 	}
-	output := []string{}
+	var output []string
 	for _, k := range keys {
 		if v, ok := versions[k.ID]; ok && k.VersionHash != v {
 			output = append(output, k.ID)
@@ -62,7 +62,7 @@ func (m *keyManager) GetKey(id string, status types.VersionStatus) (*types.Key, 
 	}
 	k, err := m.cryptor.Decrypt(encK)
 	if err != nil {
-		return nil, fmt.Errorf("Error decrypting key: %s", err.Error())
+		return nil, fmt.Errorf("error decrypting key: %s", err.Error())
 	}
 	switch status {
 	case types.Inactive:
@@ -117,7 +117,7 @@ func (m *keyManager) AddVersion(id string, v *types.KeyVersion) error {
 
 	k, err := m.cryptor.Decrypt(encK)
 	if err != nil {
-		return fmt.Errorf("Error decrypting key: %s", err.Error())
+		return fmt.Errorf("error decrypting key: %s", err.Error())
 	}
 
 	k.VersionList = append(k.VersionList, *v)
@@ -145,7 +145,7 @@ func (m *keyManager) UpdateVersion(keyID string, versionID uint64, s types.Versi
 	}
 	k, err := m.cryptor.Decrypt(encK)
 	if err != nil {
-		return fmt.Errorf("Error decrypting key: %s", err.Error())
+		return fmt.Errorf("error decrypting key: %s", err.Error())
 	}
 	// Validate the change makes sense
 	kvl, err := k.VersionList.Update(versionID, s)

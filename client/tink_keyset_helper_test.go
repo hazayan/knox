@@ -1,20 +1,18 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/tink/go/aead"
 	"github.com/google/tink/go/insecurecleartextkeyset"
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/mac"
-	"github.com/google/tink/go/testkeyset"
-
 	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
+	"github.com/google/tink/go/testkeyset"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func TestNameOfSupportedTinkKeyTemplates(t *testing.T) {
@@ -31,38 +29,38 @@ func TestNameOfSupportedTinkKeyTemplates(t *testing.T) {
 	}
 	expected := strings.Join(names, "\n")
 	if expected != nameOfSupportedTinkKeyTemplates() {
-		t.Fatalf("cannot list name of supported tink key templates correctly")
+		t.Fatal("cannot list name of supported tink key templates correctly")
 	}
 }
 
 func TestObeyNamingRule(t *testing.T) {
 	if err := obeyNamingRule("invalid", "invalid"); err == nil {
-		t.Fatalf("cannot identify invalid tink key template")
+		t.Fatal("cannot identify invalid tink key template")
 	}
 	for k := range tinkKeyTemplates {
 		illegalKnoxIdentifier := "wrongKnoxIdentifier"
 		err := obeyNamingRule(k, illegalKnoxIdentifier)
 		if err == nil {
-			t.Fatalf("cannot identify illegal knox identifer for template '%s'", k)
+			t.Fatalf("cannot identify illegal knox identifier for template '%s'", k)
 		}
 	}
 	for k, v := range tinkKeyTemplates {
 		legalKnoxIdentifier := v.knoxIDPrefix + "test"
 		err := obeyNamingRule(k, legalKnoxIdentifier)
 		if err != nil {
-			t.Fatalf("cannot accept legal knox identifer for template '%s'", k)
+			t.Fatalf("cannot accept legal knox identifier for template '%s'", k)
 		}
 	}
 }
 
 func TestIsIDforTinkKeyset(t *testing.T) {
 	if isIDforTinkKeyset("invalid") {
-		t.Fatalf("cannot identify knox identifier that is not for tink keyset")
+		t.Fatal("cannot identify knox identifier that is not for tink keyset")
 	}
 	for _, templateInfo := range tinkKeyTemplates {
 		knoxIdentifierForTinkKeyset := templateInfo.knoxIDPrefix + "test"
 		if !isIDforTinkKeyset(knoxIdentifierForTinkKeyset) {
-			t.Fatalf("cannot identify knox identifier that is for tink keyset")
+			t.Fatal("cannot identify knox identifier that is for tink keyset")
 		}
 	}
 }
@@ -115,7 +113,7 @@ func TestConvertTinkKeysetHandleToBytes(t *testing.T) {
 		t.Fatalf("unexpected error reading tink keyset data: %v", err)
 	}
 	if err := keyset.Validate(tinkKeyset); err != nil {
-		t.Fatalf("when convert tink keyset handle to bytes, the keyset becomes invalid")
+		t.Fatal("when convert tink keyset handle to bytes, the keyset becomes invalid")
 	}
 }
 
@@ -130,7 +128,7 @@ func getDummyKnoxVersionList(
 	var dummyVersionList types.KeyVersionList
 	tinkKeyIDToKnoxVersionID := make(map[uint32]uint64)
 	// counts decide how many versions this dummy version list will have
-	for i := 0; i < counts; i++ {
+	for i := range counts {
 		// get a tink keyset handle that contains a fresh single key and the keyID is not duplicated
 		var keysetHandle *keyset.Handle
 		var err error
@@ -187,7 +185,7 @@ func TestAddNewTinkKeyset(t *testing.T) {
 	tinkKey := tinkKeyset.Key[0]
 	_, isDuplicated := tinkKeyIDToKnoxVersionID[tinkKey.KeyId]
 	if isDuplicated {
-		t.Fatalf("the ID of new Tink key is duplicated")
+		t.Fatal("the ID of new Tink key is duplicated")
 	}
 	if tinkKeyset.PrimaryKeyId != tinkKey.KeyId {
 		t.Fatalf("incorrect primary key id, expect %d, got %d", tinkKey.KeyId, tinkKeyset.PrimaryKeyId)
@@ -214,15 +212,15 @@ func TestReadTinkKeysetFromBytes(t *testing.T) {
 	writer := keyset.NewBinaryWriter(bytesBuffer)
 	err = insecurecleartextkeyset.Write(keysetHandle, writer)
 	if err != nil {
-		t.Fatalf("unexpected error writing tink keyset handle")
+		t.Fatal("unexpected error writing tink keyset handle")
 	}
 	tinkKeyset, err := readTinkKeysetFromBytes(bytesBuffer.Bytes())
 	if err != nil {
-		t.Fatalf("cannot read tink keyset from bytes")
+		t.Fatal("cannot read tink keyset from bytes")
 	}
 	err = keyset.Validate(tinkKeyset)
 	if err != nil {
-		t.Fatalf("the result of readTinkKeysetFromBytes is not a valid Tink keyset")
+		t.Fatal("the result of readTinkKeysetFromBytes is not a valid Tink keyset")
 	}
 }
 
@@ -238,9 +236,27 @@ func TestGetTinkKeysetHandleFromKnoxVersionList(t *testing.T) {
 	}
 	for k, v := range tinkKeyIDtoKnoxVersionID {
 		if v != mapping[k] {
-			t.Fatalf("cannot map tink key id to knox version id correctly")
+			t.Fatal("cannot map tink key id to knox version id correctly")
 		}
 	}
+}
+
+// tinkKeysetEqual compares two Tink keysets for equality by comparing their serialized binary form.
+func tinkKeysetEqual(a, b *tinkpb.Keyset) bool {
+	// Serialize both keysets to binary and compare
+	aBuf := &bytes.Buffer{}
+	aWriter := keyset.NewBinaryWriter(aBuf)
+	if err := aWriter.Write(a); err != nil {
+		return false
+	}
+
+	bBuf := &bytes.Buffer{}
+	bWriter := keyset.NewBinaryWriter(bBuf)
+	if err := bWriter.Write(b); err != nil {
+		return false
+	}
+
+	return bytes.Equal(aBuf.Bytes(), bBuf.Bytes())
 }
 
 func TestConvertCleartextTinkKeysetToHandle(t *testing.T) {
@@ -256,8 +272,8 @@ func TestConvertCleartextTinkKeysetToHandle(t *testing.T) {
 		t.Fatalf("unexpected error reading keyset: %v", err)
 	}
 	parsedKeyset := insecurecleartextkeyset.KeysetMaterial(parsedHandle)
-	if !proto.Equal(tinkKeyset, parsedKeyset) {
-		t.Fatalf("parsed keyset (%s) doesn't match original keyset (%s)", parsedKeyset, tinkKeyset)
+	if !tinkKeysetEqual(tinkKeyset, parsedKeyset) {
+		t.Fatal("parsed keyset doesn't match original keyset")
 	}
 }
 
@@ -289,7 +305,7 @@ func TestGetKeysetInfoFromTinkKeysetHandle(t *testing.T) {
 	expected := string(keysetInfoForPrint)
 	got, err := getKeysetInfoFromTinkKeysetHandle(keysetHandle, tinkKeyIDToKnoxVersionID)
 	if err != nil || expected != got {
-		t.Fatalf("cannot get keyset info in json format")
+		t.Fatal("cannot get keyset info in json format")
 	}
 }
 
@@ -316,7 +332,7 @@ func TestNewTinkKeysetInfo(t *testing.T) {
 	})
 	got, _ := json.Marshal(newTinkKeysetInfo(keysetHandle.KeysetInfo(), tinkKeyIDToKnoxVersionID))
 	if string(got) != string(expected) {
-		t.Fatalf("cannot create JSONTinkKeysetInfo correctly")
+		t.Fatal("cannot create JSONTinkKeysetInfo correctly")
 	}
 }
 
@@ -340,6 +356,6 @@ func TestNewTinkKeysInfo(t *testing.T) {
 	expected, _ := json.Marshal(keysInfo)
 	got, _ := json.Marshal(newTinkKeysInfo(keysetHandle.KeysetInfo().KeyInfo, tinkKeyIDToKnoxVersionID))
 	if string(got) != string(expected) {
-		t.Fatalf("cannot create JSONTinkKeysetInfo_KeyInfo correctly")
+		t.Fatal("cannot create JSONTinkKeysetInfo_KeyInfo correctly")
 	}
 }

@@ -1,12 +1,12 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -33,12 +33,15 @@ For more about knox, see https://github.com/hazayan/knox.
 See also: knox create, knox daemon, knox register, knox keys
 	`,
 }
-var getVersion = cmdGet.Flag.String("v", "", "")
-var getJSON = cmdGet.Flag.Bool("j", false, "")
-var getNetwork = cmdGet.Flag.Bool("n", false, "")
-var getAll = cmdGet.Flag.Bool("a", false, "")
-var getTinkKeyset = cmdGet.Flag.Bool("tink-keyset", false, "get the stored tink keyset of the given knox identifier entirely")
-var getTinkKeysetInfo = cmdGet.Flag.Bool("tink-keyset-info", false, "get the metadata of the stored tink keyset of the given knox identifier")
+
+var (
+	getVersion        = cmdGet.Flag.String("v", "", "")
+	getJSON           = cmdGet.Flag.Bool("j", false, "")
+	getNetwork        = cmdGet.Flag.Bool("n", false, "")
+	getAll            = cmdGet.Flag.Bool("a", false, "")
+	getTinkKeyset     = cmdGet.Flag.Bool("tink-keyset", false, "get the stored tink keyset of the given knox identifier entirely")
+	getTinkKeysetInfo = cmdGet.Flag.Bool("tink-keyset-info", false, "get the metadata of the stored tink keyset of the given knox identifier")
+)
 
 func successGetKeyMetric(keyID string) {
 	clientGetKeyMetrics(map[string]string{
@@ -56,9 +59,9 @@ func failureGetKeyMetric(keyID string, err error) {
 	})
 }
 
-func runGet(cmd *Command, args []string) *ErrorStatus {
+func runGet(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("get takes only one argument. See 'knox help get'"), false}
+		return &ErrorStatus{errors.New("get takes only one argument. See 'knox help get'"), false}
 	}
 	keyID := args[0]
 
@@ -101,7 +104,7 @@ func runGet(cmd *Command, args []string) *ErrorStatus {
 	}
 	if err != nil {
 		failureGetKeyMetric(keyID, err)
-		return &ErrorStatus{fmt.Errorf("Error getting key: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error getting key: %s", err.Error()), true}
 	}
 	if *getJSON {
 		data, err := json.Marshal(key)
@@ -133,7 +136,7 @@ func runGet(cmd *Command, args []string) *ErrorStatus {
 
 func retrieveTinkKeyset(keyID string, getFromNetwork bool) ([]byte, *ErrorStatus) {
 	if !isIDforTinkKeyset(keyID) {
-		return nil, &ErrorStatus{fmt.Errorf("this knox identifier is not for tink keyset"), false}
+		return nil, &ErrorStatus{errors.New("this knox identifier is not for tink keyset"), false}
 	}
 	// get the primary and all active versions of this knox identifier.
 	var primaryAndActiveVersions *types.Key
@@ -159,7 +162,7 @@ func retrieveTinkKeyset(keyID string, getFromNetwork bool) ([]byte, *ErrorStatus
 
 func retrieveTinkKeysetInfo(keyID string, getFromNetwork bool) (string, *ErrorStatus) {
 	if !isIDforTinkKeyset(keyID) {
-		return "", &ErrorStatus{fmt.Errorf("this knox identifier is not for tink keyset"), false}
+		return "", &ErrorStatus{errors.New("this knox identifier is not for tink keyset"), false}
 	}
 	// get the primary and all active versions of this knox identifier.
 	var primaryAndActiveVersions *types.Key

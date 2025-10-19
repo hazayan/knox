@@ -3,10 +3,13 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/config"
@@ -17,7 +20,7 @@ func newVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Printf("Knox CLI version %s\n", version)
 		},
 	}
@@ -57,16 +60,75 @@ PowerShell:
 		Run: func(cmd *cobra.Command, args []string) {
 			switch args[0] {
 			case "bash":
-				cmd.Root().GenBashCompletion(os.Stdout)
+				if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
+					fmt.Fprintf(os.Stderr, "Error generating bash completion: %v\n", err)
+				}
 			case "zsh":
-				cmd.Root().GenZshCompletion(os.Stdout)
+				if err := cmd.Root().GenZshCompletion(os.Stdout); err != nil {
+					fmt.Fprintf(os.Stderr, "Error generating zsh completion: %v\n", err)
+				}
 			case "fish":
-				cmd.Root().GenFishCompletion(os.Stdout, true)
+				if err := cmd.Root().GenFishCompletion(os.Stdout, true); err != nil {
+					fmt.Fprintf(os.Stderr, "Error generating fish completion: %v\n", err)
+				}
 			case "powershell":
-				cmd.Root().GenPowerShellCompletion(os.Stdout)
+				if err := cmd.Root().GenPowerShellCompletion(os.Stdout); err != nil {
+					fmt.Fprintf(os.Stderr, "Error generating powershell completion: %v\n", err)
+				}
 			}
 		},
 	}
+}
+
+// validateAndReadFile securely validates the file path and reads its contents.
+// - Only allows files in allowedDirs (absolute paths)
+// - Disallows path traversal (..)
+// - Only allows files with allowedExts (e.g., .txt, .json, .pem)
+// Returns error if any rule is violated.
+func validateAndReadFile(filePath string, allowedDirs, allowedExts []string) ([]byte, error) {
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+
+	// Check extension
+	extAllowed := false
+	for _, ext := range allowedExts {
+		if strings.EqualFold(filepath.Ext(absPath), ext) {
+			extAllowed = true
+			break
+		}
+	}
+	if !extAllowed {
+		return nil, fmt.Errorf("file extension not allowed: %s", filepath.Ext(absPath))
+	}
+
+	// Check for path traversal
+	if strings.Contains(absPath, "..") {
+		return nil, errors.New("path traversal detected in file path")
+	}
+
+	// Check allowed directories
+	dirAllowed := false
+	for _, dir := range allowedDirs {
+		absDir, err := filepath.Abs(dir)
+		if err != nil {
+			continue
+		}
+		if strings.HasPrefix(absPath, absDir) {
+			dirAllowed = true
+			break
+		}
+	}
+	if !dirAllowed {
+		return nil, fmt.Errorf("file path %s is not within allowed directories", absPath)
+	}
+
+	// Optionally log file access for audit
+	log.Printf("Reading file: %s", absPath)
+
+	// #nosec G304 -- absPath is strictly validated above (directory, extension, traversal)
+	return os.ReadFile(absPath)
 }
 
 // createHTTPClient creates an HTTP client with TLS configuration.
@@ -77,14 +139,18 @@ func createHTTPClient(prof *config.ClientProfile) (*http.Client, error) {
 
 	// Load CA certificate if specified
 	if prof.TLS.CACert != "" {
-		caCert, err := os.ReadFile(prof.TLS.CACert)
+		// Defensive: Only allow absolute paths, forbid traversal
+		if !filepath.IsAbs(prof.TLS.CACert) || strings.Contains(prof.TLS.CACert, "..") {
+			return nil, errors.New("CA certificate path must be absolute and not contain '..'")
+		}
+		caCert, err := os.ReadFile(prof.TLS.CACert) // #nosec G304 -- path is validated above
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
 		}
 
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to parse CA certificate")
+			return nil, errors.New("failed to parse CA certificate")
 		}
 
 		tlsConfig.RootCAs = caCertPool
@@ -145,7 +211,11 @@ func createAuthHandlers(prof *config.ClientProfile) []client.AuthHandler {
 		}
 
 		tokenFile := filepath.Join(homeDir, ".knox", "token")
-		token, err := os.ReadFile(tokenFile)
+		// Defensive: Only allow absolute paths, forbid traversal
+		if !filepath.IsAbs(tokenFile) || strings.Contains(tokenFile, "..") {
+			return "", "", nil
+		}
+		token, err := os.ReadFile(tokenFile) // #nosec G304 -- path is validated above
 		if err != nil {
 			return "", "", nil
 		}

@@ -2,7 +2,8 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/hazayan/knox/pkg/types"
@@ -72,7 +73,7 @@ func TestGetKeys(t *testing.T) {
 		}
 	}
 
-	db.SetError(fmt.Errorf("Test Error!"))
+	db.SetError(errors.New("test error"))
 	_, err = getKeysHandler(m, u, map[string]string{"queryString": "a1=NOHASH"})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -153,7 +154,7 @@ func TestPostKeys(t *testing.T) {
 		}
 	}
 
-	db.SetError(fmt.Errorf("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = postKeysHandler(m, u, map[string]string{"id": "a3", "data": "MQ=="})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -170,7 +171,7 @@ func TestGetKey(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	i, err := getKeyHandler(m, u, map[string]string{"keyID": "a1"})
+	i, _ := getKeyHandler(m, u, map[string]string{"keyID": "a1"})
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
@@ -179,7 +180,7 @@ func TestGetKey(t *testing.T) {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
 		if len(k.ACL) != 0 {
-			t.Fatalf("Expected key acl to be empty")
+			t.Fatal("Expected key acl to be empty")
 		}
 		if len(k.VersionList) != 1 {
 			t.Fatalf("Expected len to be 1 not %d", len(k.VersionList))
@@ -189,7 +190,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	i, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Inactive\""})
+	i, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Inactive\""})
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
@@ -198,7 +199,7 @@ func TestGetKey(t *testing.T) {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
 		if len(k.ACL) != 0 {
-			t.Fatalf("Expected key acl to be empty")
+			t.Fatal("Expected key acl to be empty")
 		}
 		if len(k.VersionList) != 1 {
 			t.Fatalf("Expected len to be 1 not %d", len(k.VersionList))
@@ -208,7 +209,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	i, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Primary\""})
+	i, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Primary\""})
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
@@ -217,7 +218,7 @@ func TestGetKey(t *testing.T) {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
 		if len(k.ACL) != 0 {
-			t.Fatalf("Expected key acl to be empty")
+			t.Fatal("Expected key acl to be empty")
 		}
 		if len(k.VersionList) != 1 {
 			t.Fatalf("Expected len to be 1 not %d", len(k.VersionList))
@@ -227,7 +228,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	i, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "AJSDFLKJlks"})
+	_, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "AJSDFLKJlks"})
 	if err == nil {
 		t.Fatal("Expected err")
 	}
@@ -262,7 +263,7 @@ func TestDeleteKey(t *testing.T) {
 		t.Fatal("Expected err")
 	}
 
-	db.SetError(fmt.Errorf("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = deleteKeyHandler(m, u, map[string]string{"keyID": "a1"})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -319,7 +320,6 @@ func TestGetAccess(t *testing.T) {
 		if acl[0].ID != "testuser" {
 			t.Fatalf("Expected acl value to be testuser not %s", acl[0].ID)
 		}
-
 	}
 }
 
@@ -357,7 +357,7 @@ func TestPutAccess(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	db.SetError(fmt.Errorf("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = putAccessHandler(m, u, map[string]string{"keyID": "a1", "acl": string(accessJSON)})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -369,9 +369,9 @@ func TestPutAccess(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	//Tests for setting ACLs with empty machinePrefix
-	//Should return error when used with AccessType Read,Write, or Admin
-	//Should return success when used with AccessType None(useful for revoking such existing ACLs)
+	// Tests for setting ACLs with empty machinePrefix
+	// Should return error when used with AccessType Read,Write, or Admin
+	// Should return success when used with AccessType None(useful for revoking such existing ACLs)
 	accessTypes := []types.AccessType{types.None, types.Read, types.Write, types.Admin}
 	for _, accessType := range accessTypes {
 		access = []types.Access{{Type: types.MachinePrefix, ID: "", AccessType: accessType}}
@@ -386,7 +386,6 @@ func TestPutAccess(t *testing.T) {
 			t.Fatalf("%+v is not nil", err)
 		}
 	}
-
 }
 
 func TestLegacyPutAccess(t *testing.T) {
@@ -428,7 +427,7 @@ func TestLegacyPutAccess(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	db.SetError(fmt.Errorf("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = putAccessHandler(m, u, map[string]string{"keyID": "a1", "access": string(accessJSON)})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -440,9 +439,9 @@ func TestLegacyPutAccess(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	//Tests for setting ACLs with empty machinePrefix
-	//Should return error when used with AccessType Read,Write, or Admin
-	//Should return success when used with AccessType None(useful for revoking such existing ACLs)
+	// Tests for setting ACLs with empty machinePrefix
+	// Should return error when used with AccessType Read,Write, or Admin
+	// Should return success when used with AccessType None(useful for revoking such existing ACLs)
 	accessTypes := []types.AccessType{types.None, types.Read, types.Write, types.Admin}
 	for _, accessType := range accessTypes {
 		access = &types.Access{Type: types.MachinePrefix, ID: "", AccessType: accessType}
@@ -493,7 +492,7 @@ func TestPostVersion(t *testing.T) {
 		t.Fatal("Expected err")
 	}
 
-	db.SetError(fmt.Errorf("WAHAHAHA error"))
+	db.SetError(errors.New("WAHAHAHA error"))
 
 	_, err = postVersionHandler(m, u, map[string]string{"keyID": "a1", "data": "Mg=="})
 	if err == nil {
@@ -542,8 +541,8 @@ func TestPutVersions(t *testing.T) {
 	if !ok {
 		t.Fatal("Version should be a uint64")
 	}
-	oldString := fmt.Sprintf("%d", old)
-	newString := fmt.Sprintf("%d", n)
+	oldString := strconv.FormatUint(old, 10)
+	newString := strconv.FormatUint(n, 10)
 
 	_, err = putVersionsHandler(m, u, map[string]string{"keyID": "a1", "versionID": newString})
 	if err == nil {
@@ -570,7 +569,7 @@ func TestPutVersions(t *testing.T) {
 		t.Fatal("Expected err")
 	}
 
-	db.SetError(fmt.Errorf("WAHAHAHA error"))
+	db.SetError(errors.New("WAHAHAHA error"))
 	_, err = putVersionsHandler(m, u, map[string]string{"keyID": "a1", "versionID": newString, "status": `"Primary"`})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -606,7 +605,6 @@ func TestPutVersions(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected err")
 	}
-
 }
 
 func TestAuthorizeRequest(t *testing.T) {
@@ -634,7 +632,7 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback returns true",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(_ types.AccessCallbackInput) (bool, error) {
 				return true, nil
 			},
 			ExpectedAuthorized: true,
@@ -643,7 +641,7 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback returns false",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(_ types.AccessCallbackInput) (bool, error) {
 				return false, nil
 			},
 			ExpectedAuthorized: false,
@@ -668,11 +666,11 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback panics",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(_ types.AccessCallbackInput) (bool, error) {
 				panic("intentional panic")
 			},
 			ExpectedAuthorized: false,
-			ExpectedError:      fmt.Errorf("Recovered from panic in access callback: intentional panic"),
+			ExpectedError:      errors.New("recovered from panic in access callback: intentional panic"),
 		},
 	}
 

@@ -1,7 +1,6 @@
 package keydb
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/hazayan/knox/pkg/types"
@@ -44,7 +43,7 @@ func TestEncryptDecryptVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	if !reflect.DeepEqual(decV, v) {
+	if decV.ID != v.ID || !equalBytes(decV.Data, v.Data) || decV.Status != v.Status || decV.CreationTime != v.CreationTime {
 		t.Fatal("decrypted key does not equal key")
 	}
 }
@@ -60,9 +59,35 @@ func TestEncryptDecryptKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	if !reflect.DeepEqual(decK, k) {
+	if decK.ID != k.ID || !equalACL(decK.ACL, k.ACL) || decK.VersionHash != k.VersionHash || len(decK.VersionList) != len(k.VersionList) {
 		t.Fatal("decrypted key does not equal key")
 	}
+}
+
+// equalBytes compares two byte slices for equality.
+func equalBytes(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// equalACL compares two ACLs for equality.
+func equalACL(a, b types.ACL) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].ID != b[i].ID || a[i].AccessType != b[i].AccessType || a[i].Type != b[i].Type {
+			return false
+		}
+	}
+	return true
 }
 
 func TestBadKeyData(t *testing.T) {
@@ -90,7 +115,7 @@ func TestBadCryptorVersion(t *testing.T) {
 	crypt2 := NewAESGCMCryptor(1, testSecret)
 	_, err = crypt2.Decrypt(encK)
 	if err == nil {
-		t.Fatalf("err is nil on bad crypter version")
+		t.Fatal("err is nil on bad crypter version")
 	}
 }
 

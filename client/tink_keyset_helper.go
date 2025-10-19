@@ -1,7 +1,6 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -15,10 +14,10 @@ import (
 	"github.com/google/tink/go/insecurecleartextkeyset"
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/mac"
+	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
 	"github.com/google/tink/go/signature"
 	"github.com/google/tink/go/streamingaead"
-
-	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 // tinkKeyTemplateInfo represents the info for a supported tink keyset template.
@@ -27,7 +26,7 @@ type tinkKeyTemplateInfo struct {
 	templateFunc func() *tinkpb.KeyTemplate
 }
 
-// tinkKeyTemplates contains the supported tink key templates and the correcsponding naming rule for knox identifier
+// tinkKeyTemplates contains the supported tink key templates and the correcsponding naming rule for knox identifier.
 var tinkKeyTemplates = map[string]tinkKeyTemplateInfo{
 	"TINK_AEAD_AES256_GCM":                               {"tink:aead:", aead.AES256GCMKeyTemplate},
 	"TINK_AEAD_AES128_GCM":                               {"tink:aead:", aead.AES128GCMKeyTemplate},
@@ -51,7 +50,7 @@ func nameOfSupportedTinkKeyTemplates() string {
 }
 
 // obeyNamingRule checks whether knox identifier start with "tink:<tink_primitive_short_name>:".
-func obeyNamingRule(templateName string, knoxIentifier string) error {
+func obeyNamingRule(templateName, knoxIentifier string) error {
 	templateInfo, ok := tinkKeyTemplates[templateName]
 	if !ok {
 		return errors.New("not supported Tink key template. See 'knox key-templates'")
@@ -81,7 +80,7 @@ func createNewTinkKeyset(templateFunc func() *tinkpb.KeyTemplate) ([]byte, error
 	return convertTinkKeysetHandleToBytes(keysetHandle)
 }
 
-// convertTinkKeysetHandleToBytes extracts keyset from tink keyset handle and converts it to bytes
+// convertTinkKeysetHandleToBytes extracts keyset from tink keyset handle and converts it to bytes.
 func convertTinkKeysetHandleToBytes(keysetHandle *keyset.Handle) ([]byte, error) {
 	bytesBuffer := new(bytes.Buffer)
 	writer := keyset.NewBinaryWriter(bytesBuffer)
@@ -162,11 +161,13 @@ func getTinkKeysetHandleFromKnoxVersionList(
 	return keysetHandle, tinkKeyIDToKnoxVersionID, nil
 }
 
-// convertCleartextTinkKeysetToHandle converts cleartext tink keyset to tink keyset handle
+// convertCleartextTinkKeysetToHandle converts cleartext tink keyset to tink keyset handle.
 func convertCleartextTinkKeysetToHandle(cleartextTinkKeyset *tinkpb.Keyset) (*keyset.Handle, error) {
 	bytesBuffer := new(bytes.Buffer)
 	writer := keyset.NewBinaryWriter(bytesBuffer)
-	writer.Write(cleartextTinkKeyset)
+	if err := writer.Write(cleartextTinkKeyset); err != nil {
+		return nil, fmt.Errorf("failed to write cleartext Tink keyset: %w", err)
+	}
 	reader := keyset.NewBinaryReader(bytesBuffer)
 	// To get keyset handle from cleartext keyset, must use package "insecurecleartextkeyset"
 	keysetHandle, err := insecurecleartextkeyset.Read(reader)
@@ -193,15 +194,15 @@ func getKeysetInfoFromTinkKeysetHandle(
 
 // tinkKeysetInfo translates tink keyset info to JSON format, doesn't contain any actual key material.
 type tinkKeysetInfo struct {
-	PrimaryKeyId uint32         `json:"primary_key_id"`
+	PrimaryKeyID uint32         `json:"primary_key_id"`
 	KeyInfo      []*tinkKeyInfo `json:"key_info"`
 }
 
 // tinkKeyInfo translates tink key info to JSON format, doesn't contain any actual key material.
 type tinkKeyInfo struct {
-	TypeUrl          string `json:"type_url"`
+	TypeURL          string `json:"type_url"`
 	Status           string `json:"status"`
-	KeyId            uint32 `json:"key_id"`
+	KeyID            uint32 `json:"key_id"`
 	OutputPrefixType string `json:"output_prefix_type"`
 	KnoxVersionID    uint64 `json:"knox_version_id"`
 }
@@ -219,11 +220,11 @@ func newTinkKeysetInfo(
 
 // newTinkKeyInfo translates Tink key info to JSON format.
 func newTinkKeysInfo(
-	keysetInfo_KeyInfo []*tinkpb.KeysetInfo_KeyInfo,
+	keysetInfoKeyInfo []*tinkpb.KeysetInfo_KeyInfo,
 	tinkKeyIDToKnoxVersionID map[uint32]uint64,
 ) []*tinkKeyInfo {
 	var tinkKeysInfo []*tinkKeyInfo
-	for _, v := range keysetInfo_KeyInfo {
+	for _, v := range keysetInfoKeyInfo {
 		tinkKeysInfo = append(tinkKeysInfo, &tinkKeyInfo{
 			v.TypeUrl,
 			v.Status.String(),

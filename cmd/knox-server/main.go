@@ -5,19 +5,16 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/spf13/cobra"
-	"golang.org/x/time/rate"
-
-	"github.com/hazayan/knox/pkg/types"
 	knoxauth "github.com/hazayan/knox/pkg/auth"
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/crypto"
@@ -27,8 +24,12 @@ import (
 	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
 	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
 	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
+	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server"
 	"github.com/hazayan/knox/server/auth"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/cobra"
+	"golang.org/x/time/rate"
 )
 
 var (
@@ -53,7 +54,7 @@ func main() {
 	}
 }
 
-func runServer(cmd *cobra.Command, args []string) error {
+func runServer(_ *cobra.Command, _ []string) error {
 	// Load configuration
 	cfg, err := config.LoadServerConfig(cfgFile)
 	if err != nil {
@@ -271,7 +272,7 @@ func createTLSConfig(cfg config.TLSConfig) (*tls.Config, error) {
 
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to parse client CA certificate")
+			return nil, errors.New("failed to parse client CA certificate")
 		}
 
 		tlsConfig.ClientCAs = caCertPool
@@ -295,7 +296,7 @@ func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next(wrapped, r)
 
 		duration := time.Since(start)
-		logging.WithFields(map[string]interface{}{
+		logging.WithFields(map[string]any{
 			"method":      r.Method,
 			"path":        r.URL.Path,
 			"status":      wrapped.statusCode,
@@ -314,7 +315,7 @@ func metricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next(wrapped, r)
 
 		duration := time.Since(start).Seconds()
-		metrics.RecordRequest(r.Method, r.URL.Path, fmt.Sprintf("%d", wrapped.statusCode), duration)
+		metrics.RecordRequest(r.Method, r.URL.Path, strconv.Itoa(wrapped.statusCode), duration)
 	}
 }
 
@@ -332,7 +333,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				logging.Warn("Request missing Authorization header")
-				logging.AuditAuthAttempt("", "", "", "denied_no_token", map[string]interface{}{
+				logging.AuditAuthAttempt("", "", "", "denied_no_token", map[string]any{
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 				})
@@ -355,7 +356,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 
 			if principal == nil || err != nil {
 				logging.Warnf("Authentication failed: %v", err)
-				logging.AuditAuthAttempt("", "", providerName, "denied_invalid_token", map[string]interface{}{
+				logging.AuditAuthAttempt("", "", providerName, "denied_invalid_token", map[string]any{
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 					"error":       err.Error(),
@@ -370,7 +371,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 				principal.Type(),
 				providerName,
 				"success",
-				map[string]interface{}{
+				map[string]any{
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 				},
@@ -383,7 +384,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 	}
 }
 
-// rateLimiter holds rate limiters per client IP/principal
+// rateLimiter holds rate limiters per client IP/principal.
 type rateLimiter struct {
 	limiters map[string]*rate.Limiter
 	mu       sync.RWMutex
@@ -492,7 +493,7 @@ func secureCompare(a, b string) bool {
 	}
 
 	result := 0
-	for i := 0; i < len(a); i++ {
+	for i := range len(a) {
 		result |= int(a[i]) ^ int(b[i])
 	}
 

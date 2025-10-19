@@ -55,7 +55,7 @@ func getURINamesFromSANExtension(sanExtension []byte) (uris []string, err error)
 	return uris, err
 }
 
-// GetURINamesFromExtensions retrieves URIs from the SAN extension of a slice of extensions
+// GetURINamesFromExtensions retrieves URIs from the SAN extension of a slice of extensions.
 func GetURINamesFromExtensions(extensions *[]pkix.Extension) (uris []string, err error) {
 	for _, ext := range *extensions {
 		if ext.Id.Equal(oidExtensionSubjectAltName) {

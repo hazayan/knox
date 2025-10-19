@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,12 +12,13 @@ import (
 	"path"
 	"path/filepath"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
-const DefaultUsageLine = "login [username]"
-const DefaultShortDescription = "login as user and save authentication data"
-const DefaultLongDescriptionFormat = `
+const (
+	DefaultUsageLine             = "login [username]"
+	DefaultShortDescription      = "login as user and save authentication data"
+	DefaultLongDescriptionFormat = `
 Will authenticate user via OAuth2 password grant flow if available. Requires user to enter username and password. The authentication data is saved in "%v".
 
 The optional username argument can specify the user that to log in as otherwise it uses the current os user.
@@ -25,16 +27,15 @@ For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox help auth
 	`
-const DefaultTokenFileLocation = ".knox_user_auth"
+)
+const DefaultTokenFileLocation = ".knox_token"
 
+// NewLoginCommand creates a new login command with the specified OAuth configuration.
 func NewLoginCommand(
 	oauthTokenEndpoint string,
 	oauthClientID string,
 	tokenFileLocation string,
-	usageLine string,
-	shortDescription string,
-	longDescription string) *Command {
-
+) *Command {
 	runLoginAugmented := func(cmd *Command, args []string) *ErrorStatus {
 		return runLogin(cmd, oauthClientID, tokenFileLocation, oauthTokenEndpoint, args)
 	}
@@ -51,20 +52,10 @@ func NewLoginCommand(
 		tokenFileLocation = path.Join(currentUser.HomeDir, tokenFileLocation)
 	}
 
-	if usageLine == "" {
-		usageLine = DefaultUsageLine
-	}
-	if shortDescription == "" {
-		shortDescription = DefaultShortDescription
-	}
-	if longDescription == "" {
-		longDescription = fmt.Sprintf(DefaultLongDescriptionFormat, tokenFileLocation)
-	}
-
 	return &Command{
 		UsageLine: DefaultUsageLine,
 		Short:     DefaultShortDescription,
-		Long:      longDescription,
+		Long:      fmt.Sprintf(DefaultLongDescriptionFormat, tokenFileLocation),
 		Run:       runLoginAugmented,
 	}
 }
@@ -75,15 +66,16 @@ type authTokenResp struct {
 }
 
 func runLogin(
-	cmd *Command,
+	_ *Command,
 	oauthClientID string,
 	tokenFileLocation string,
 	oauthTokenEndpoint string,
-	args []string) *ErrorStatus {
+	args []string,
+) *ErrorStatus {
 	var username string
 	u, err := user.Current()
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error getting OS user: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("error getting OS user: %s", err.Error()), false}
 	}
 	switch len(args) {
 	case 0:
@@ -91,16 +83,26 @@ func runLogin(
 	case 1:
 		username = args[0]
 	default:
-		return &ErrorStatus{fmt.Errorf("Invalid arguments. See 'knox login -h'"), false}
+		return &ErrorStatus{errors.New("invalid arguments. See 'knox login -h'"), false}
 	}
 
 	fmt.Println("Please enter your password:")
-	password, err := terminal.ReadPassword(int(os.Stdin.Fd()))
+	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Problem getting password: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("problem getting password: %s", err.Error()), false}
 	}
 
-	resp, err := http.PostForm(oauthTokenEndpoint,
+	// Validate OAuth endpoint URL for security
+	parsedURL, err := url.Parse(oauthTokenEndpoint)
+	if err != nil {
+		return &ErrorStatus{fmt.Errorf("invalid OAuth endpoint URL: %s", err.Error()), false}
+	}
+	if parsedURL.Scheme != "https" {
+		return &ErrorStatus{errors.New("OAuth endpoint must use HTTPS"), false}
+	}
+
+	// URL is validated above to ensure it uses HTTPS (see gosec G107)
+	resp, err := http.PostForm(oauthTokenEndpoint, // #nosec G107 -- URL is validated above to ensure it uses HTTPS
 		url.Values{
 			"grant_type": {"password"},
 			"client_id":  {oauthClientID},
@@ -109,24 +111,24 @@ func runLogin(
 		})
 	if err != nil {
 		// this is not Knox server error, thus assigning serverError as false
-		return &ErrorStatus{fmt.Errorf("Error connecting to auth: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("error connecting to auth: %s", err.Error()), false}
 	}
 	var authResp authTokenResp
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Failed to read data: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("failed to read data: %s", err.Error()), false}
 	}
 	err = json.Unmarshal(data, &authResp)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Unexpected response from auth: %w, data: %s", err, string(data)), false}
+		return &ErrorStatus{fmt.Errorf("unexpected response from auth: %w, data: %s", err, string(data)), false}
 	}
 	if authResp.Error != "" {
-		return &ErrorStatus{fmt.Errorf("Fail to authenticate: %q", authResp.Error), false}
+		return &ErrorStatus{fmt.Errorf("fail to authenticate: %q", authResp.Error), false}
 	}
 
-	err = os.WriteFile(tokenFileLocation, data, 0600)
+	err = os.WriteFile(tokenFileLocation, data, 0o600)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Failed to write auth data to file: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("failed to write auth data to file: %s", err.Error()), false}
 	}
 
 	return nil

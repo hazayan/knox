@@ -2,18 +2,20 @@ package client
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,16 +25,18 @@ import (
 const refresh = 10 * time.Second
 
 // For linear random backoff on write requests.
-const baseBackoff = 50 * time.Millisecond
-const maxBackoff = 3 * time.Second
-const maxRetryAttempts = 3
-
-var (
-	errNoAuth           = errors.New("No authentication data given. Use 'knox login' or set KNOX_USER_AUTH or KNOX_MACHINE_AUTH")
-	errUnsuccessfulAuth = errors.New("Unsuccessful authorization. No attempted principals were able to perform the requested operation")
+const (
+	baseBackoff      = 50 * time.Millisecond
+	maxBackoff       = 3 * time.Second
+	maxRetryAttempts = 3
 )
 
-// Client is an interface for interacting with a specific knox key
+var (
+	errNoAuth           = errors.New("no authentication data given. Use 'knox login' or set KNOX_USER_AUTH or KNOX_MACHINE_AUTH")
+	errUnsuccessfulAuth = errors.New("unsuccessful authorization. No attempted principals were able to perform the requested operation")
+)
+
+// Client is an interface for interacting with a specific knox key.
 type Client interface {
 	// GetPrimary returns the primary key version for the knox key.
 	// This should be used for sending relationships like signing, encrypting, or api secrets
@@ -57,12 +61,12 @@ func (c *fileClient) update() error {
 	var key types.Key
 	f, err := os.Open("/var/lib/knox/v0/keys/" + c.keyID)
 	if err != nil {
-		return fmt.Errorf("Knox key file err: %s", err.Error())
+		return fmt.Errorf("knox key file err: %s", err.Error())
 	}
 	defer f.Close()
 	err = json.NewDecoder(f).Decode(&key)
 	if err != nil {
-		return fmt.Errorf("Knox json decode err: %s", err.Error())
+		return fmt.Errorf("knox json decode err: %s", err.Error())
 	}
 	c.setValues(&key)
 	return nil
@@ -109,7 +113,7 @@ func NewFileClient(keyID string) (Client, error) {
 	}
 	err = json.Unmarshal(jsonKey, &key)
 	if err != nil {
-		return nil, fmt.Errorf("Knox json decode err: %s", err.Error())
+		return nil, fmt.Errorf("knox json decode err: %s", err.Error())
 	}
 	c.setValues(&key)
 	go func() {
@@ -123,7 +127,7 @@ func NewFileClient(keyID string) (Client, error) {
 	return c, nil
 }
 
-// NewMockKeyVersion creates a Knox types.KeyVersion to be used for testing
+// NewMockKeyVersion creates a Knox types.KeyVersion to be used for testing.
 func NewMockKeyVersion(keydata []byte, status types.VersionStatus) types.KeyVersion {
 	return types.KeyVersion{Data: keydata, Status: status}
 }
@@ -154,10 +158,10 @@ func Register(keyID string) ([]byte, error) {
 	if err != nil {
 		errorMsg := fmt.Sprintf("error getting knox key %s. error: %v", keyID, err)
 		if stdout.Len() > 0 {
-			errorMsg += ", stdout: '" + string(stdout.Bytes()) + "'"
+			errorMsg += ", stdout: '" + stdout.String() + "'"
 		}
 		if stderr.Len() > 0 {
-			errorMsg += ", stderr: '" + string(stderr.Bytes()) + "'"
+			errorMsg += ", stderr: '" + stderr.String() + "'"
 		}
 		return nil, errors.New(errorMsg)
 	}
@@ -170,7 +174,13 @@ func Register(keyID string) ([]byte, error) {
 func GetBackoffDuration(attempt int) time.Duration {
 	basef := float64(baseBackoff)
 	// Add some randomness.
-	duration := rand.Float64()*float64(attempt) + basef
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback to deterministic value if crypto/rand fails
+		randomBytes = []byte{1, 2, 3, 4, 5, 6, 7, 8}
+	}
+	randomValue := float64(binary.BigEndian.Uint64(randomBytes)) / float64(^uint64(0))
+	duration := randomValue*float64(attempt) + basef
 
 	if duration > float64(maxBackoff) {
 		return maxBackoff
@@ -195,6 +205,7 @@ type APIClient interface {
 	NetworkGetKeyWithStatus(keyID string, status types.VersionStatus) (*types.Key, error)
 }
 
+// HTTP is an interface for making HTTP requests in the Knox client.
 type HTTP interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -220,17 +231,44 @@ func NewClient(host string, client HTTP, authHandlers []AuthHandler, keyFolder, 
 	}
 }
 
+// validateCacheFilePath ensures the cache file path is safe and allowed.
+func validateCacheFilePath(baseDir, file string) (string, error) {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", err
+	}
+	absFile, err := filepath.Abs(filepath.Join(baseDir, file))
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(absFile, absBase) {
+		return "", errors.New("cache file path is outside allowed directory")
+	}
+	if strings.Contains(absFile, "..") {
+		return "", errors.New("path traversal detected in cache file path")
+	}
+	// Only allow .json files for cache
+	if filepath.Ext(absFile) != ".json" {
+		return "", errors.New("cache file must have .json extension")
+	}
+	return absFile, nil
+}
+
 // CacheGetKey gets the key from file system cache.
 func (c *HTTPClient) CacheGetKey(keyID string) (*types.Key, error) {
 	if c.KeyFolder == "" {
-		return nil, fmt.Errorf("no folder set for cached key")
+		return nil, errors.New("no folder set for cached key")
 	}
-	path := path.Join(c.KeyFolder, keyID)
-	b, err := os.ReadFile(path)
+	cacheFile, err := validateCacheFilePath(c.KeyFolder, keyID+".json")
 	if err != nil {
 		return nil, err
 	}
-	k := types.Key{Path: path}
+
+	b, err := os.ReadFile(cacheFile) // #nosec G304 -- cacheFile is validated by validateCacheFilePath
+	if err != nil {
+		return nil, err
+	}
+	k := types.Key{Path: cacheFile}
 	err = json.Unmarshal(b, &k)
 	if err != nil {
 		return nil, err
@@ -238,7 +276,7 @@ func (c *HTTPClient) CacheGetKey(keyID string) (*types.Key, error) {
 
 	// do not return the invalid format cached keys
 	if k.ID == "" || k.ACL == nil || k.VersionList == nil || k.VersionHash == "" {
-		return nil, fmt.Errorf("invalid key content for the cached key")
+		return nil, errors.New("invalid key content for the cached key")
 	}
 
 	return &k, nil
@@ -261,18 +299,21 @@ func (c *HTTPClient) GetKey(keyID string) (*types.Key, error) {
 // CacheGetKeyWithStatus gets the key with status from file system cache.
 func (c *HTTPClient) CacheGetKeyWithStatus(keyID string, status types.VersionStatus) (*types.Key, error) {
 	if c.KeyFolder == "" {
-		return nil, fmt.Errorf("no folder set for cached key")
+		return nil, errors.New("no folder set for cached key")
 	}
 	st, err := status.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
-	path := c.KeyFolder + keyID + "?status=" + string(st)
-	b, err := os.ReadFile(path)
+	cacheFile, err := validateCacheFilePath(c.KeyFolder, keyID+"_"+string(st)+".json")
 	if err != nil {
 		return nil, err
 	}
-	k := types.Key{Path: path}
+	b, err := os.ReadFile(cacheFile) // #nosec G304 -- cacheFile is validated by validateCacheFilePath
+	if err != nil {
+		return nil, err
+	}
+	k := types.Key{Path: cacheFile}
 	err = json.Unmarshal(b, &k)
 	if err != nil {
 		return nil, err
@@ -330,22 +371,11 @@ func (c *HTTPClient) UpdateVersion(keyID, versionID string, status types.Version
 	return c.UncachedClient.UpdateVersion(keyID, versionID, status)
 }
 
-func (c *HTTPClient) getClient() (HTTP, error) {
-	if c.UncachedClient.DefaultClient == nil {
-		c.UncachedClient.DefaultClient = &http.Client{}
-	}
-	return c.UncachedClient.DefaultClient, nil
-}
-
-func (c *HTTPClient) getHTTPData(method string, path string, body url.Values, data interface{}) error {
-	return c.UncachedClient.getHTTPData(method, path, body, data)
-}
-
 // UncachedHTTPClient is a client that uses HTTP to talk to Knox without caching.
 type UncachedHTTPClient struct {
 	// Host is used as the host for http connections
 	Host string
-	//AuthHandlers contains a list of auth handlers which return the authorization string for authenticating to knox. Users should be prefixed by 0u, machines by 0m. On fail, return empty string.
+	// AuthHandlers contains a list of auth handlers which return the authorization string for authenticating to knox. Users should be prefixed by 0u, machines by 0m. On fail, return empty string.
 	AuthHandlers []AuthHandler
 	// DefaultClient is the http client for making network calls
 	DefaultClient HTTP
@@ -374,7 +404,7 @@ func (c *UncachedHTTPClient) NetworkGetKey(keyID string) (*types.Key, error) {
 
 	// do not return the invalid format remote keys
 	if key.ID == "" || key.ACL == nil || key.VersionList == nil || key.VersionHash == "" {
-		return nil, fmt.Errorf("invalid key content for the remote key")
+		return nil, errors.New("invalid key content for the remote key")
 	}
 
 	return key, err
@@ -488,14 +518,14 @@ func (c *UncachedHTTPClient) UpdateVersion(keyID, versionID string, status types
 	return err
 }
 
-func (c *UncachedHTTPClient) getClient() (HTTP, error) {
+func (c *UncachedHTTPClient) getClient() HTTP {
 	if c.DefaultClient == nil {
 		c.DefaultClient = &http.Client{}
 	}
-	return c.DefaultClient, nil
+	return c.DefaultClient
 }
 
-func (c *UncachedHTTPClient) getHTTPData(method string, path string, body url.Values, data interface{}) error {
+func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, data any) error {
 	if len(c.AuthHandlers) == 0 {
 		return errNoAuth
 	}
@@ -530,10 +560,7 @@ func (c *UncachedHTTPClient) getHTTPData(method string, path string, body url.Va
 		if clientOverride != nil {
 			cli = clientOverride
 		} else {
-			cli, err = c.getClient()
-			if err != nil {
-				return err
-			}
+			cli = c.getClient()
 		}
 
 		resp := &types.Response{}
@@ -544,22 +571,20 @@ func (c *UncachedHTTPClient) getHTTPData(method string, path string, body url.Va
 			if err != nil {
 				return err
 			}
-			if resp.Status != "ok" {
-				if resp.Code == types.UnauthorizedCode || resp.Code == types.UnauthenticatedCode {
-					// If we get a 401 or 403, we need to continue to a different auth handler.
-					break
-				} else {
-					// If the failure is non authentication related, retry if we got a 500.
-					if (resp.Code != types.InternalServerErrorCode) || (i == maxRetryAttempts) {
-						// If we get a 500, we need to retry the request.
-						return fmt.Errorf("%s", resp.Message)
-					}
-					time.Sleep(GetBackoffDuration(i))
-				}
-			} else {
+			if resp.Status == "ok" {
 				// If we got a successful response, we can return the data.
 				return nil
 			}
+			if resp.Code == types.UnauthorizedCode || resp.Code == types.UnauthenticatedCode {
+				// If we get a 401 or 403, we need to continue to a different auth handler.
+				break
+			}
+			// If the failure is non authentication related, retry if we got a 500.
+			if (resp.Code != types.InternalServerErrorCode) || (i == maxRetryAttempts) {
+				// If we get a 500, we need to retry the request.
+				return fmt.Errorf("%s", resp.Message)
+			}
+			time.Sleep(GetBackoffDuration(i))
 		}
 	}
 
@@ -581,7 +606,7 @@ func getHTTPResp(cli HTTP, r *http.Request, resp *types.Response) error {
 	return decoder.Decode(resp)
 }
 
-// MockClient builds a client that ignores certs and talks to the given host.
+// MockClient builds a client for testing that uses a custom certificate pool.
 func MockClient(host, keyFolder string) *HTTPClient {
 	return &HTTPClient{
 		KeyFolder: keyFolder,
@@ -590,8 +615,16 @@ func MockClient(host, keyFolder string) *HTTPClient {
 			AuthHandlers: []AuthHandler{func() (string, string, HTTP) {
 				return "TESTAUTH", "TESTAUTHTYPE", nil
 			}},
-			DefaultClient: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}},
-			Version:       "mock",
+			DefaultClient: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				},
+			}}},
+			Version: "mock",
 		},
 	}
 }
