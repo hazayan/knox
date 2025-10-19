@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -19,7 +20,7 @@ See also: knox register, knox daemon
 
 func runUnregister(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("You must include a key ID to deregister. See 'knox help unregister'"), false}
+		return &ErrorStatus{errors.New("You must include a key ID to deregister. See 'knox help unregister'"), false}
 	}
 	k := NewKeysFile(daemonFolder + daemonToRegister)
 	err := k.Lock()

@@ -3,11 +3,11 @@
 package etcd
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"context"
 	"errors"
 
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -29,7 +29,7 @@ func New(endpoints []string, prefix string) (*Backend, error) {
 	return nil, errors.New("etcd backend not yet implemented")
 }
 
-// Placeholder methods to satisfy the interface
+// Placeholder methods to satisfy the interface.
 func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
 	return nil, errors.New("not implemented")
 }

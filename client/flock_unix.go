@@ -49,7 +49,7 @@ func (f *flock) lock(k *KeysFile, mode os.FileMode, exclusive bool, timeout time
 		err = syscall.Flock(fd, flag|syscall.LOCK_NB)
 		if err == nil {
 			return nil
-		} else if err != syscall.EWOULDBLOCK {
+		} else if !errors.Is(err, syscall.EWOULDBLOCK) {
 			return err
 		}
 

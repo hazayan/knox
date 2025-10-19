@@ -47,7 +47,7 @@ const defaultTokenFileLocation = ".knox_user_auth"
 
 var cli APIClient
 
-// VisibilityParams exposes functions for the knox client to provide information
+// VisibilityParams exposes functions for the knox client to provide information.
 type VisibilityParams struct {
 	Logf           func(string, ...interface{})
 	Errorf         func(string, ...interface{})
@@ -56,11 +56,13 @@ type VisibilityParams struct {
 	GetKeyMetrics  func(map[string]string)
 }
 
-var logf = func(string, ...interface{}) {}
-var errorf = func(string, ...interface{}) {}
-var daemonReportMetrics = func(map[string]uint64) {}
-var clientInvokeMetrics = func(map[string]string) {}
-var clientGetKeyMetrics = func(map[string]string) {}
+var (
+	logf                = func(string, ...interface{}) {}
+	errorf              = func(string, ...interface{}) {}
+	daemonReportMetrics = func(map[string]uint64) {}
+	clientInvokeMetrics = func(map[string]string) {}
+	clientGetKeyMetrics = func(map[string]string) {}
+)
 
 // Run is how to execute commands. It uses global variables and isn't safe to call in parallel.
 func Run(
@@ -68,7 +70,6 @@ func Run(
 	p *VisibilityParams,
 	loginCommand *Command,
 ) {
-
 	cli = client
 	if p != nil {
 		if p.Logf != nil {
@@ -193,7 +194,7 @@ type Command struct {
 	CustomFlags bool
 }
 
-// ErrorStatus wraps the error status of knox client command execution
+// ErrorStatus wraps the error status of knox client command execution.
 type ErrorStatus struct {
 	error
 	serverError bool
@@ -222,8 +223,10 @@ func (c *Command) Runnable() bool {
 	return c.Run != nil
 }
 
-var exitStatus = 0
-var exitMu sync.Mutex
+var (
+	exitStatus = 0
+	exitMu     sync.Mutex
+)
 
 func setExitStatus(n int) {
 	exitMu.Lock()

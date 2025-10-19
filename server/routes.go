@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -139,7 +140,6 @@ func getKeysHandler(m KeyManager, principal types.Principal, parameters map[stri
 // The route for this handler is POST /v0/keys/
 // The postKeysHandler must be a User.
 func postKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
 	// Authorize
 	if !auth.IsUser(principal) {
 		return nil, errF(types.UnauthorizedCode, fmt.Sprintf("Must be a user to create keys, principal is %s", principal.GetID()))
@@ -175,10 +175,10 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 	key := newKey(keyID, acl, decodedData, principal)
 	err := m.AddNewKey(&key)
 	if err != nil {
-		if err == types.ErrKeyExists {
+		if errors.Is(err, types.ErrKeyExists) {
 			return nil, errF(types.KeyIdentifierExistsCode, fmt.Sprintf("Key %s already exists", keyID))
 		}
-		if err == types.ErrInvalidKeyID {
+		if errors.Is(err, types.ErrInvalidKeyID) {
 			return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("KeyID includes unsupported characters %s", keyID))
 		}
 
@@ -189,7 +189,7 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 
 // getKeyHandler gets the key matching the keyID in the request.
 // The route for this handler is GET /v0/keys/<key_id>/
-// The principal must have Read access to the key
+// The principal must have Read access to the key.
 func getKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
 	keyID := parameters["keyID"]
 
@@ -205,7 +205,7 @@ func getKeyHandler(m KeyManager, principal types.Principal, parameters map[strin
 	// Get data
 	key, getErr := m.GetKey(keyID, status)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -234,7 +234,7 @@ func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[st
 
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -259,15 +259,14 @@ func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[st
 }
 
 // getAccessHandler gets the ACL for a specific Key.
-// The route for this handler is GET /v0/keys/<key_id>/access/
+// The route for this handler is GET /v0/keys/<key_id>/access/.
 func getAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
 	keyID := parameters["keyID"]
 
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -319,7 +318,7 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 	// Get the Key
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -361,7 +360,6 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 // The route for this handler is PUT /v0/keys/<key_id>/versions/
 // The principal needs Write access.
 func postVersionHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
 	keyID := parameters["keyID"]
 	dataStr, dataOK := parameters["data"]
 	if !dataOK {
@@ -381,7 +379,7 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Inactive)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -401,7 +399,6 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 	version := newKeyVersion(decodedData, types.Active)
 
 	err := m.AddVersion(keyID, &version)
-
 	if err != nil {
 		return nil, errF(types.InternalServerErrorCode, err.Error())
 	}
@@ -422,7 +419,6 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 // The route for this handler is PUT /v0/keys/<key_id>/versions/<version_id>/
 // The principal needs Write access.
 func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
 	keyID := parameters["keyID"]
 	versionID := parameters["versionID"]
 
@@ -443,7 +439,7 @@ func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Inactive)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -461,12 +457,12 @@ func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[
 
 	err := m.UpdateVersion(keyID, id, status)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil, nil
-	case types.ErrKeyVersionNotFound:
+	case errors.Is(err, types.ErrKeyVersionNotFound):
 		return nil, errF(types.KeyVersionDoesNotExistCode, err.Error())
-	case types.ErrPrimaryToInactive, types.ErrPrimaryToActive, types.ErrInactiveToPrimary:
+	case errors.Is(err, types.ErrPrimaryToInactive), errors.Is(err, types.ErrPrimaryToActive), errors.Is(err, types.ErrInactiveToPrimary):
 		return nil, errF(types.BadRequestDataCode, err.Error())
 	default:
 		return nil, errF(types.InternalServerErrorCode, err.Error())
@@ -492,5 +488,5 @@ func authorizeRequest(key *types.Key, principal types.Principal, access types.Ac
 		})
 	}
 
-	return
+	return allow, err
 }

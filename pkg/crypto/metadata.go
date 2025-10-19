@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -30,13 +31,13 @@ func UnmarshalCryptoMetadata(data []byte) (*CryptoMetadata, error) {
 
 	// Validate required fields
 	if metadata.Algorithm == "" {
-		return nil, fmt.Errorf("missing algorithm in metadata")
+		return nil, errors.New("missing algorithm in metadata")
 	}
 	if metadata.EncryptedDEK == "" {
-		return nil, fmt.Errorf("missing encrypted DEK in metadata")
+		return nil, errors.New("missing encrypted DEK in metadata")
 	}
 	if metadata.Version == 0 {
-		return nil, fmt.Errorf("missing version in metadata")
+		return nil, errors.New("missing version in metadata")
 	}
 
 	return &metadata, nil

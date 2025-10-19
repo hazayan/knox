@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,10 +10,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
-
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/types"
+	"github.com/spf13/cobra"
 )
 
 func newKeyCmd() *cobra.Command {
@@ -76,7 +76,7 @@ Examples:
 			}
 
 			if len(keyData) == 0 {
-				return fmt.Errorf("no data provided")
+				return errors.New("no data provided")
 			}
 
 			// Parse ACL entries
@@ -337,7 +337,7 @@ Examples:
 			}
 
 			if len(keyData) == 0 {
-				return fmt.Errorf("no data provided")
+				return errors.New("no data provided")
 			}
 
 			client, err := getAPIClient()
@@ -405,9 +405,10 @@ Examples:
 
 			for _, v := range key.VersionList {
 				status := "Active"
-				if v.Status == types.Primary {
+				switch v.Status {
+				case types.Primary:
 					status = "Primary"
-				} else if v.Status == types.Inactive {
+				case types.Inactive:
 					status = "Inactive"
 				}
 
@@ -443,7 +444,7 @@ func displayKey(key *types.Key, showAll bool) error {
 		if primary != nil {
 			fmt.Println(string(primary.Data))
 		} else {
-			return fmt.Errorf("no primary version found")
+			return errors.New("no primary version found")
 		}
 	}
 
@@ -526,7 +527,7 @@ func getAPIClient() (client.APIClient, error) {
 			cacheFolder = filepath.Join(home, cacheFolder[2:])
 		}
 		// Create cache directory if it doesn't exist
-		os.MkdirAll(cacheFolder, 0700)
+		os.MkdirAll(cacheFolder, 0o700)
 	}
 
 	knoxClient := client.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)

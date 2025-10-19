@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -22,8 +23,9 @@ const TESTVAL int = 1
 type mockAuthFail struct{}
 
 func (a mockAuthFail) Authenticate(r *http.Request) (types.Principal, error) {
-	return nil, fmt.Errorf("Error!")
+	return nil, errors.New("Error!")
 }
+
 func (a mockAuthFail) IsUser(p types.Principal) bool {
 	return false
 }
@@ -33,6 +35,7 @@ type mockAuthTrue struct{}
 func (a mockAuthTrue) Authenticate(r *http.Request) (types.Principal, error) {
 	return nil, nil
 }
+
 func (a mockAuthTrue) IsUser(p types.Principal) bool {
 	return true
 }
@@ -106,7 +109,6 @@ func TestAddDefaultAccess(t *testing.T) {
 		t.Fatal("The Key's ACL is too big: " + string(text))
 	}
 	defaultAccess = []types.Access{}
-
 }
 
 func TestSetAccessCallback(t *testing.T) {
@@ -165,7 +167,6 @@ func TestParseFormParameter(t *testing.T) {
 	if ok {
 		t.Fatal("Key parameter should not be present in nil request body")
 	}
-
 }
 
 func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder) {
@@ -173,7 +174,7 @@ func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder
 		t.Fatal("unexpected response code")
 	}
 	var resp types.Response
-	err := json.Unmarshal([]byte(w.Body.String()), &resp)
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	if err != nil {
 		t.Fatal("Test returned invalid JSON data")
 	}
@@ -247,7 +248,6 @@ func TestNewKey(t *testing.T) {
 		text, _ := json.Marshal(key.ACL)
 		t.Fatal("The Key's ACL is too big: " + string(text))
 	}
-
 }
 
 func TestBuildRequest(t *testing.T) {

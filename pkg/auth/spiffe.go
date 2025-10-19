@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -36,12 +37,12 @@ func (p *SPIFFEProvider) Name() string {
 func (p *SPIFFEProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	// Check if TLS is used
 	if r.TLS == nil {
-		return nil, fmt.Errorf("TLS not enabled")
+		return nil, errors.New("TLS not enabled")
 	}
 
 	// Check if client provided certificates
 	if len(r.TLS.PeerCertificates) == 0 {
-		return nil, fmt.Errorf("no client certificates provided")
+		return nil, errors.New("no client certificates provided")
 	}
 
 	// Get the client certificate
@@ -63,7 +64,7 @@ func (p *SPIFFEProvider) Authenticate(token string, r *http.Request) (types.Prin
 	// Extract workload identity from SPIFFE ID
 	identity := extractWorkloadIdentity(spiffeID)
 	if identity == "" {
-		return nil, fmt.Errorf("cannot extract workload identity from SPIFFE ID")
+		return nil, errors.New("cannot extract workload identity from SPIFFE ID")
 	}
 
 	// SPIFFE identities are typically for machines/services
@@ -89,7 +90,7 @@ func extractSPIFFEID(cert *x509.Certificate) (*url.URL, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no SPIFFE ID found in certificate")
+	return nil, errors.New("no SPIFFE ID found in certificate")
 }
 
 // validateTrustDomain validates that the SPIFFE ID is from the expected trust domain.
@@ -102,7 +103,7 @@ func (p *SPIFFEProvider) validateTrustDomain(spiffeID *url.URL) error {
 }
 
 // extractWorkloadIdentity extracts the workload identity from SPIFFE ID path.
-// Example: spiffe://example.com/ns/production/sa/web-server -> production/web-server
+// Example: spiffe://example.com/ns/production/sa/web-server -> production/web-server.
 func extractWorkloadIdentity(spiffeID *url.URL) string {
 	// Remove leading slash
 	path := strings.TrimPrefix(spiffeID.Path, "/")
@@ -129,11 +130,11 @@ func ParseSPIFFEID(spiffeIDStr string) (trustDomain string, path string, err err
 	}
 
 	if u.Host == "" {
-		return "", "", fmt.Errorf("SPIFFE ID missing trust domain")
+		return "", "", errors.New("SPIFFE ID missing trust domain")
 	}
 
 	return u.Host, strings.TrimPrefix(u.Path, "/"), nil
 }
 
-// Verify interface compliance
+// Verify interface compliance.
 var _ knoxauth.Provider = (*SPIFFEProvider)(nil)
