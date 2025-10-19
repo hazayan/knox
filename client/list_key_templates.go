@@ -13,7 +13,7 @@ var cmdListKeyTemplates = &Command{
 `,
 }
 
-func runListKeyTemplates(cmd *Command, args []string) *ErrorStatus {
+func runListKeyTemplates(_ *Command, _ []string) *ErrorStatus {
 	fmt.Println("The following tink key templates are supported:")
 	fmt.Println(nameOfSupportedTinkKeyTemplates())
 	return nil

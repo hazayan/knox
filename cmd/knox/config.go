@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ Examples:
   knox config init
   knox config init --server knox.example.com:9000
   knox config init --server localhost:9000 --force`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Check if config already exists
 			if !force {
 				if _, err := os.Stat(cfgFile); err == nil {
@@ -83,7 +84,7 @@ Examples:
 			}
 
 			fmt.Printf("✓ Configuration initialized: %s\n", cfgFile)
-			fmt.Printf("  Profile: default\n")
+			fmt.Print("  Profile: default\n")
 			fmt.Printf("  Server: %s\n", server)
 			fmt.Printf("  Cache: %s\n", cacheDir)
 
@@ -109,7 +110,7 @@ func newConfigShowCmd() *cobra.Command {
 Examples:
   knox config show
   knox config show --json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Load config without the PersistentPreRun check
 			localCfg, err := config.LoadClientConfig(cfgFile)
 			if err != nil {
@@ -148,7 +149,9 @@ Examples:
 					marker, name, prof.Server, cacheStatus, tlsStatus)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
@@ -189,7 +192,7 @@ Examples:
   knox config profile add production --server knox.prod.example.com:9000
   knox config profile add staging --server knox.staging.example.com:9000`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
 
 			// Load existing config
@@ -242,7 +245,10 @@ Examples:
 	cmd.Flags().StringVar(&clientCert, "client-cert", "", "Client certificate file")
 	cmd.Flags().StringVar(&clientKey, "client-key", "", "Client key file")
 	cmd.Flags().StringVar(&cacheDir, "cache-dir", "", "Cache directory")
-	cmd.MarkFlagRequired("server")
+	if err := cmd.MarkFlagRequired("server"); err != nil {
+		// Log the error but continue - this is a configuration issue
+		fmt.Fprintf(os.Stderr, "Warning: failed to mark server flag as required: %v\n", err)
+	}
 
 	return cmd
 }
@@ -256,7 +262,7 @@ func newConfigProfileRemoveCmd() *cobra.Command {
 Examples:
   knox config profile remove staging`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
 
 			// Load existing config
@@ -272,7 +278,7 @@ Examples:
 
 			// Don't allow removing the current profile
 			if localCfg.CurrentProfile == profileName {
-				return fmt.Errorf("cannot remove current profile (use 'knox config profile use' to switch first)")
+				return errors.New("cannot remove current profile (use 'knox config profile use' to switch first)")
 			}
 
 			// Remove profile
@@ -301,7 +307,7 @@ Examples:
   knox config profile use production
   knox config profile use default`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
 
 			// Load existing config
@@ -340,7 +346,7 @@ func newConfigProfileListCmd() *cobra.Command {
 Examples:
   knox config profile list
   knox config profile list --json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Load config
 			localCfg, err := config.LoadClientConfig(cfgFile)
 			if err != nil {
@@ -372,7 +378,9 @@ Examples:
 					marker, name, prof.Server, cacheStatus)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}

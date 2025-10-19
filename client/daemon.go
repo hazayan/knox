@@ -2,11 +2,11 @@ package client
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -34,28 +34,29 @@ See also: knox register, knox unregister
 	`,
 }
 
-var daemonFolder = "/var/lib/knox"
-var daemonToRegister = "/.registered"
-var daemonKeys = "/v0/keys/"
+var (
+	daemonFolder     = "/var/lib/knox"
+	daemonToRegister = "/.registered"
+	daemonKeys       = "/v0/keys/"
+)
 
-var lockTimeout = 10 * time.Second
-var lockRetryTime = 50 * time.Millisecond
-
-var defaultFilePermission os.FileMode = 0666
-var defaultDirPermission os.FileMode = 0777
+var (
+	lockTimeout                       = 10 * time.Second
+	defaultFilePermission os.FileMode = 0o666
+	defaultDirPermission  os.FileMode = 0o777
+)
 
 var daemonRefreshTime = 10 * time.Minute
 
 const tinkPrefix = "tink:"
 
-func runDaemon(cmd *Command, args []string) *ErrorStatus {
-
+func runDaemon(_ *Command, _ []string) *ErrorStatus {
 	if os.Getenv("KNOX_MACHINE_AUTH") == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("You're on a host with no name: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("you're on a host with no name: %s", err.Error()), false}
 		}
-		os.Setenv("KNOX_MACHINE_AUTH", hostname)
+		_ = os.Setenv("KNOX_MACHINE_AUTH", hostname)
 	}
 
 	d := daemon{
@@ -90,7 +91,7 @@ func (d *daemon) loop(refresh time.Duration) {
 	if err != nil {
 		fatalf("Unable to watch files: %s", err.Error())
 	}
-	watcher.Add(d.registerFilename())
+	_ = watcher.Add(d.registerFilename())
 
 	for {
 		logf("Daemon updating all registered keys")
@@ -110,7 +111,13 @@ func (d *daemon) loop(refresh time.Duration) {
 			logf("Got file watcher event: %s on %s", event.Op.String(), event.Name)
 		case <-t.C:
 			// add random jitter to prevent a stampede
-			<-time.After(time.Duration(rand.Intn(10)) * time.Millisecond)
+			randomBytes := make([]byte, 1)
+			if _, err := rand.Read(randomBytes); err != nil {
+				// Fallback to deterministic value if crypto/rand fails
+				randomBytes = []byte{5}
+			}
+			jitter := time.Duration(randomBytes[0]%10) * time.Millisecond
+			<-time.After(jitter)
 			daemonReportMetrics(map[string]uint64{
 				"err":     d.updateErrCount,
 				"get_err": d.getKeyErrCount,
@@ -123,29 +130,29 @@ func (d *daemon) loop(refresh time.Duration) {
 func (d *daemon) initialize() error {
 	err := os.MkdirAll(d.dir, defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to initialize /var/lib/knox (run 'sudo mkdir /var/lib/knox'?): %s", err.Error())
+		return fmt.Errorf("failed to initialize /var/lib/knox (run 'sudo mkdir /var/lib/knox'?): %s", err.Error())
 	}
 
 	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.dir, defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up directory permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up directory permissions: %s", err.Error())
 	}
 	err = os.MkdirAll(d.keyDir(), defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to make key folders: %s", err.Error())
+		return fmt.Errorf("failed to make key folders: %s", err.Error())
 	}
 
 	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.keyDir(), defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up directory permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up directory permissions: %s", err.Error())
 	}
 	_, err = os.Stat(d.registerFilename())
 	if os.IsNotExist(err) {
 		err := os.WriteFile(d.registerFilename(), []byte{}, defaultFilePermission)
 		if err != nil {
-			return fmt.Errorf("Failed to initialize registered key file: %s", err.Error())
+			return fmt.Errorf("failed to initialize registered key file: %s", err.Error())
 		}
 	} else if err != nil {
 		return err
@@ -154,7 +161,7 @@ func (d *daemon) initialize() error {
 	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.registerFilename(), defaultFilePermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up register file permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up register file permissions: %s", err.Error())
 	}
 	d.registerKeyFile = NewKeysFile(d.registerFilename())
 	return nil
@@ -166,7 +173,7 @@ func (d *daemon) update() error {
 		return err
 	}
 	// defer this so that functions can update the register file.
-	defer d.registerKeyFile.Unlock()
+	defer func() { _ = d.registerKeyFile.Unlock() }()
 	keyIDs, err := d.registerKeyFile.Get()
 	if err != nil {
 		return err
@@ -197,13 +204,13 @@ func (d *daemon) update() error {
 				logf("error getting cache key: %s", err)
 				// Remove existing cached key with invalid format (saved with previous version clients)
 				if _, err = os.Stat(d.keyFilename(keyID)); err == nil {
-					d.deleteKey(keyID)
+					_ = d.deleteKey(keyID)
 				}
 			} else {
 				keyMap[keyID] = key.VersionHash
 			}
 		} else {
-			d.deleteKey(keyID)
+			_ = d.deleteKey(keyID)
 		}
 	}
 
@@ -268,43 +275,43 @@ func (d daemon) keyFilename(id string) string {
 func (d daemon) processKey(keyID string) error {
 	key, err := d.cli.NetworkGetKey(keyID)
 	if err != nil {
-		if err.Error() == "User or machine not authorized" || err.Error() == "Key identifer does not exist" {
+		if err.Error() == "User or machine not authorized" || err.Error() == "Key identifier does not exist" {
 			// This removes keys that do not exist or the machine is unauthorized to access
-			d.registerKeyFile.Remove([]string{keyID})
+			_ = d.registerKeyFile.Remove([]string{keyID})
 		}
-		return fmt.Errorf("Error getting key %s: %s", keyID, err.Error())
+		return fmt.Errorf("error getting key %s: %s", keyID, err.Error())
 	}
 	// Do not cache any new keys if they have invalid content
 	if key.ID == "" || key.ACL == nil || key.VersionList == nil || key.VersionHash == "" {
-		return fmt.Errorf("invalid key content returned")
+		return errors.New("invalid key content returned")
 	}
 
 	if strings.HasPrefix(keyID, tinkPrefix) {
 		keysetHandle, _, err := getTinkKeysetHandleFromKnoxVersionList(key.VersionList)
 		if err != nil {
-			return fmt.Errorf("Error fetching keyset handle for this tink key %s: %s", keyID, err.Error())
+			return fmt.Errorf("error fetching keyset handle for this tink key %s: %s", keyID, err.Error())
 		}
 		tinkKeyset, err := convertTinkKeysetHandleToBytes(keysetHandle)
 		if err != nil {
-			return fmt.Errorf("Error converting tink keyset handle to bytes %s: %s", keyID, err.Error())
+			return fmt.Errorf("error converting tink keyset handle to bytes %s: %s", keyID, err.Error())
 		}
 		key.TinkKeyset = base64.StdEncoding.EncodeToString(tinkKeyset)
 	}
 
 	b, err := json.Marshal(key)
 	if err != nil {
-		return fmt.Errorf("Error marshalling key %s: %s", keyID, err.Error())
+		return fmt.Errorf("error marshaling key %s: %s", keyID, err.Error())
 	}
 	// Write to tmpfile, mv to normal location. Close + rm on failures
 	tmpFile, err := os.CreateTemp(d.dir, fmt.Sprintf(".*.%s.tmp", keyID))
 	if err != nil {
-		return fmt.Errorf("Error opening tmp file for key %s: %s", keyID, err.Error())
+		return fmt.Errorf("error opening tmp file for key %s: %s", keyID, err.Error())
 	}
 	_, err = tmpFile.Write(b)
 	if err != nil {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())
-		return fmt.Errorf("Error writing key %s to file: %s", keyID, err.Error())
+		return fmt.Errorf("error writing key %s to file: %s", keyID, err.Error())
 	}
 	// Done writing
 	tmpFile.Close()
@@ -312,17 +319,17 @@ func (d daemon) processKey(keyID string) error {
 	err = os.Rename(tmpFile.Name(), d.keyFilename(keyID))
 	if err != nil {
 		os.Remove(tmpFile.Name())
-		return fmt.Errorf("Error renaming key %s temporary file: %s", keyID, err.Error())
+		return fmt.Errorf("error renaming key %s temporary file: %s", keyID, err.Error())
 	}
 
 	err = os.Chmod(d.keyFilename(keyID), defaultFilePermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up key file permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up key file permissions: %s", err.Error())
 	}
 	return nil
 }
 
-// Keys are an interface for storing a list of key ids (for use with the register file to provide locks)
+// Keys are an interface for storing a list of key ids (for use with the register file to provide locks).
 type Keys interface {
 	Get() ([]string, error)
 	Add([]string) error
@@ -338,7 +345,7 @@ type KeysFile struct {
 	*flock
 }
 
-// NewKeysFile takes in a filename and outputs an implementation of the Keys interface
+// NewKeysFile takes in a filename and outputs an implementation of the Keys interface.
 func NewKeysFile(fn string) Keys {
 	return &KeysFile{fn, newFlock()}
 }
@@ -349,7 +356,7 @@ func (k *KeysFile) Lock() error {
 
 	// Timeout means someone else is using our lock, which is unusual.
 	// Let's collect some extra debugging information to find out why.
-	if err == ErrTimeout && runtime.GOOS == "linux" {
+	if errors.Is(err, ErrTimeout) && runtime.GOOS == "linux" {
 		lockHolders, err := identifyLockHolders(k.fn)
 		if err != nil {
 			logf("hit timeout, found lock holder information:\n%s", lockHolders)
@@ -366,7 +373,6 @@ func (k *KeysFile) Lock() error {
 // Unlock performs the nonblocking syscall unlock and retries until the global timeout is met.
 func (k *KeysFile) Unlock() error {
 	err := k.unlock(k)
-
 	// Annotate error with path to file to make debugging easier
 	if err != nil {
 		return fmt.Errorf("unable to release lock on file '%s': %s", k.fn, err.Error())
@@ -387,11 +393,10 @@ func (k *KeysFile) Get() ([]string, error) {
 func (k *KeysFile) Remove(ks []string) error {
 	oldKeys, err := k.Get()
 	if err != nil {
-		if os.IsNotExist(err) {
-			oldKeys = []string{}
-		} else {
+		if !os.IsNotExist(err) {
 			return err
 		}
+		oldKeys = []string{}
 	}
 	// Use a map to remove any duplicates
 	newKeys := make(map[string]bool)
@@ -413,18 +418,17 @@ func (k *KeysFile) Remove(ks []string) error {
 		buffer.WriteString(k)
 		buffer.WriteByte('\n')
 	}
-	return os.WriteFile(k.fn, buffer.Bytes(), 0666)
+	return os.WriteFile(k.fn, buffer.Bytes(), 0o600)
 }
 
 // Add will add the key IDs to the list. It expects Lock to have been called.
 func (k *KeysFile) Add(ks []string) error {
 	oldKeys, err := k.Get()
 	if err != nil {
-		if os.IsNotExist(err) {
-			oldKeys = []string{}
-		} else {
+		if !os.IsNotExist(err) {
 			return err
 		}
+		oldKeys = []string{}
 	}
 	// Use a map to remove any duplicates
 	newKeys := make(map[string]bool)
@@ -444,7 +448,7 @@ func (k *KeysFile) Add(ks []string) error {
 		buffer.WriteString(k)
 		buffer.WriteByte('\n')
 	}
-	return os.WriteFile(k.fn, buffer.Bytes(), 0666)
+	return os.WriteFile(k.fn, buffer.Bytes(), 0o600)
 }
 
 // Overwrite deletes all existing values in the key list and writes the input.
@@ -461,7 +465,7 @@ func (k *KeysFile) Overwrite(ks []string) error {
 		buffer.WriteString(k)
 		buffer.WriteByte('\n')
 	}
-	return os.WriteFile(k.fn, buffer.Bytes(), 0666)
+	return os.WriteFile(k.fn, buffer.Bytes(), 0o600)
 }
 
 func identifyLockHolders(filename string) (string, error) {

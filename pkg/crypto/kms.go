@@ -3,8 +3,11 @@ package crypto
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -33,9 +36,18 @@ func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 		// Try loading from file
 		keyFile := os.Getenv("KNOX_MASTER_KEY_ENCRYPTED_FILE")
 		if keyFile == "" {
-			return nil, fmt.Errorf("no encrypted master key found: set KNOX_MASTER_KEY_ENCRYPTED or KNOX_MASTER_KEY_ENCRYPTED_FILE")
+			return nil, errors.New("no encrypted master key found: set KNOX_MASTER_KEY_ENCRYPTED or KNOX_MASTER_KEY_ENCRYPTED_FILE")
 		}
 
+		// Validate file path for security
+		if !filepath.IsAbs(keyFile) {
+			return nil, errors.New("KMS key file path must be absolute")
+		}
+		if strings.Contains(keyFile, "..") {
+			return nil, errors.New("KMS key file path cannot contain parent directory references")
+		}
+
+		// #nosec G304 -- keyFile path is strictly validated above (absolute, no traversal)
 		data, err := os.ReadFile(keyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read encrypted key file: %w", err)
@@ -68,7 +80,7 @@ func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 // EncryptMasterKeyWithKMS encrypts a master key for storage.
 func EncryptMasterKeyWithKMS(provider KMSProvider, masterKey []byte) (string, error) {
 	if len(masterKey) != 32 {
-		return "", fmt.Errorf("master key must be 32 bytes")
+		return "", errors.New("master key must be 32 bytes")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -93,21 +105,25 @@ func NewMockKMSProvider() *MockKMSProvider {
 	return &MockKMSProvider{name: "mock"}
 }
 
+// Name returns the provider name.
 func (m *MockKMSProvider) Name() string {
 	return m.name
 }
 
-func (m *MockKMSProvider) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
+// Decrypt decrypts ciphertext using mock provider (no actual decryption).
+func (m *MockKMSProvider) Decrypt(_ context.Context, ciphertext []byte) ([]byte, error) {
 	// Mock: just return as-is (NO ACTUAL DECRYPTION)
 	return ciphertext, nil
 }
 
-func (m *MockKMSProvider) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
+// Encrypt encrypts plaintext using mock provider (no actual encryption).
+func (m *MockKMSProvider) Encrypt(_ context.Context, plaintext []byte) ([]byte, error) {
 	// Mock: just return as-is (NO ACTUAL ENCRYPTION)
 	return plaintext, nil
 }
 
-func (m *MockKMSProvider) GenerateDataKey(ctx context.Context, keySpec string) ([]byte, []byte, error) {
+// GenerateDataKey generates a data key using mock provider.
+func (m *MockKMSProvider) GenerateDataKey(_ context.Context, _ string) ([]byte, []byte, error) {
 	key := make([]byte, 32)
 	// In mock, plaintext and ciphertext are the same
 	return key, key, nil

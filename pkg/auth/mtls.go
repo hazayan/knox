@@ -3,7 +3,7 @@ package auth
 
 import (
 	"crypto/x509"
-	"fmt"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -29,15 +29,15 @@ func (p *MTLSProvider) Name() string {
 }
 
 // Authenticate authenticates a request using TLS client certificates.
-func (p *MTLSProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
+func (p *MTLSProvider) Authenticate(_ string, r *http.Request) (types.Principal, error) {
 	// Check if TLS is used
 	if r.TLS == nil {
-		return nil, fmt.Errorf("TLS not enabled")
+		return nil, errors.New("TLS not enabled")
 	}
 
 	// Check if client provided certificates
 	if len(r.TLS.PeerCertificates) == 0 {
-		return nil, fmt.Errorf("no client certificates provided")
+		return nil, errors.New("no client certificates provided")
 	}
 
 	// Get the client certificate (first in chain)
@@ -45,13 +45,13 @@ func (p *MTLSProvider) Authenticate(token string, r *http.Request) (types.Princi
 
 	// Verify the certificate was validated by TLS
 	if !r.TLS.HandshakeComplete {
-		return nil, fmt.Errorf("TLS handshake not complete")
+		return nil, errors.New("TLS handshake not complete")
 	}
 
 	// Extract identity from certificate
 	identity := extractIdentity(cert)
 	if identity == "" {
-		return nil, fmt.Errorf("cannot extract identity from certificate")
+		return nil, errors.New("cannot extract identity from certificate")
 	}
 
 	// Determine principal type
@@ -64,7 +64,7 @@ func (p *MTLSProvider) Authenticate(token string, r *http.Request) (types.Princi
 	case types.User:
 		return knoxauth.NewUser(identity, []string{}), nil
 	default:
-		return nil, fmt.Errorf("unknown principal type")
+		return nil, errors.New("unknown principal type")
 	}
 }
 
@@ -79,7 +79,7 @@ func (p *MTLSProvider) Type() byte {
 }
 
 // extractIdentity extracts the identity from a certificate.
-// Priority: SAN DNS > SAN URI > CN
+// Priority: SAN DNS > SAN URI > CN.
 func extractIdentity(cert *x509.Certificate) string {
 	// Try DNS SANs first (for machines)
 	if len(cert.DNSNames) > 0 {
@@ -123,5 +123,5 @@ func determinePrincipalType(cert *x509.Certificate) types.PrincipalType {
 	return types.User
 }
 
-// Verify interface compliance
+// Verify interface compliance.
 var _ knoxauth.Provider = (*MTLSProvider)(nil)

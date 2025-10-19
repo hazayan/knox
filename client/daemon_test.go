@@ -18,8 +18,10 @@ import (
 	"github.com/hazayan/knox/pkg/types"
 )
 
-var registeredFile = ".registered"
-var keysDir = "/keys/"
+var (
+	registeredFile = ".registered"
+	keysDir        = "/keys/"
+)
 
 // buildDaemonServer returns a server. Call Close when finished.
 func buildDaemonServer(d *returnParameters) *httptest.Server {
@@ -29,11 +31,11 @@ func buildDaemonServer(d *returnParameters) *httptest.Server {
 		defer d.Unlock()
 		w.WriteHeader(d.statusCode)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(d.data)
+		_, _ = w.Write(d.data)
 	}))
 }
 
-func setGoodResponse(params *returnParameters, data interface{}) error {
+func setGoodResponse(params *returnParameters, data any) error {
 	resp := &types.Response{
 		Status:    "ok",
 		Code:      types.OKCode,
@@ -83,10 +85,7 @@ func setUpTest(t *testing.T) (*returnParameters, string, daemon) {
 	if err := setGoodResponse(&params, ""); err != nil {
 		t.Fatal("failed to initialize response params: " + err.Error())
 	}
-	dir, err := os.MkdirTemp("", "knox-test")
-	if err != nil {
-		t.Fatal("Failed to create temp directory: " + err.Error())
-	}
+	dir := t.TempDir()
 	cli := MockClient(addr, "")
 	cli.KeyFolder = dir + keysDir
 	d := daemon{
@@ -120,9 +119,9 @@ func TestProcessKey(t *testing.T) {
 	params.setFunc(func(r *http.Request) {
 		switch r.URL.Path {
 		case "/v0/keys/":
-			setGoodResponse(params, []string{expected.ID})
+			_ = setGoodResponse(params, []string{expected.ID})
 		case "/v0/keys/" + expected.ID + "/":
-			setGoodResponse(params, expected)
+			_ = setGoodResponse(params, expected)
 		default:
 			t.Fatal("Unexpected path:" + r.URL.Path)
 		}
@@ -201,9 +200,9 @@ func TestProcessTinkKey(t *testing.T) {
 	params.setFunc(func(r *http.Request) {
 		switch r.URL.Path {
 		case "/v0/keys/":
-			setGoodResponse(params, []string{expected.ID})
+			_ = setGoodResponse(params, []string{expected.ID})
 		case "/v0/keys/" + expected.ID + "/":
-			setGoodResponse(params, expected)
+			_ = setGoodResponse(params, expected)
 		default:
 			t.Fatal("Unexpected path:" + r.URL.Path)
 		}
@@ -240,10 +239,10 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 	keys, err := d.registerKeyFile.Get()
-	err = d.registerKeyFile.Unlock()
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
+	err = d.registerKeyFile.Unlock()
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -260,9 +259,13 @@ func TestUpdate(t *testing.T) {
 			if r.URL.RawQuery != expected.ID+"=" {
 				t.Fatalf("%s does not equal %s", r.URL.RawQuery, expected.ID+"=")
 			}
-			setGoodResponse(params, []string{expected.ID})
+			if err := setGoodResponse(params, []string{expected.ID}); err != nil {
+				t.Fatalf("failed to set good response: %v", err)
+			}
 		case "/v0/keys/" + expected.ID + "/":
-			setGoodResponse(params, expected)
+			if err := setGoodResponse(params, expected); err != nil {
+				t.Fatalf("failed to set good response: %v", err)
+			}
 		default:
 			t.Fatal("Unexpected path:" + r.URL.Path)
 		}
@@ -310,9 +313,11 @@ func TestUpdate(t *testing.T) {
 			if r.URL.RawQuery != expected.ID+"="+expected.VersionHash {
 				t.Fatalf("%s does not equal %s", r.URL.RawQuery, expected.ID+"="+expected.VersionHash)
 			}
-			setGoodResponse(params, []string{})
+			if err := setGoodResponse(params, []string{}); err != nil {
+				t.Fatalf("failed to set good response: %v", err)
+			}
 		case "/v0/keys/" + expected.ID + "/":
-			t.Fatalf("Should not call for a key again")
+			t.Fatal("Should not call for a key again")
 		default:
 			t.Fatal("Unexpected path:" + r.URL.Path)
 		}
@@ -355,9 +360,13 @@ func TestUpdate(t *testing.T) {
 			if r.URL.RawQuery != expected.ID+"="+expected.VersionHash {
 				t.Fatalf("%s does not equal %s", r.URL.RawQuery, expected.ID+"="+expected.VersionHash)
 			}
-			setGoodResponse(params, []string{expected.ID})
+			if err := setGoodResponse(params, []string{expected.ID}); err != nil {
+				t.Fatalf("failed to set good response: %v", err)
+			}
 		case "/v0/keys/" + expected.ID + "/":
-			setGoodResponse(params, newExpected)
+			if err := setGoodResponse(params, newExpected); err != nil {
+				t.Fatalf("failed to set good response: %v", err)
+			}
 		default:
 			t.Fatal("Unexpected path:" + r.URL.Path)
 		}
@@ -400,24 +409,21 @@ func TestUpdate(t *testing.T) {
 }
 
 func addRegisteredKey(k, reg string) error {
-	f, err := os.OpenFile(reg, os.O_APPEND|os.O_WRONLY, 0666)
-	defer f.Close()
+	f, err := os.OpenFile(reg, os.O_APPEND|os.O_WRONLY, 0o666)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	_, err = f.WriteString(k + "\n")
 	return err
 }
 
 func TestCreateGet(t *testing.T) {
-	dir, err := os.MkdirTemp("", "knox-test")
-	if err != nil {
-		t.Fatal("Failed to create temp directory: " + err.Error())
-	}
+	dir := t.TempDir()
 	defer TearDownTest(dir)
 
 	k := NewKeysFile(dir + "/TestCreateGet")
-	_, err = k.Get()
+	_, err := k.Get()
 	if err == nil {
 		t.Fatal("error is nil for a bad key")
 	}
@@ -440,15 +446,12 @@ func TestCreateGet(t *testing.T) {
 }
 
 func TestDuplicateAdd(t *testing.T) {
-	dir, err := os.MkdirTemp("", "knox-test")
-	if err != nil {
-		t.Fatal("Failed to create temp directory: " + err.Error())
-	}
+	dir := t.TempDir()
 	defer TearDownTest(dir)
 
 	k := NewKeysFile(dir + "/TestDuplicateAdd")
 
-	err = k.Add([]string{"a"})
+	err := k.Add([]string{"a"})
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -482,15 +485,12 @@ func TestDuplicateAdd(t *testing.T) {
 }
 
 func TestAddRemove(t *testing.T) {
-	dir, err := os.MkdirTemp("", "knox-test")
-	if err != nil {
-		t.Fatal("Failed to create temp directory: " + err.Error())
-	}
+	dir := t.TempDir()
 	defer TearDownTest(dir)
 
 	k := NewKeysFile(dir + "/TestAddRemove")
 
-	err = k.Add([]string{"a"})
+	err := k.Add([]string{"a"})
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -521,14 +521,12 @@ func TestAddRemove(t *testing.T) {
 }
 
 func TestOverwrite(t *testing.T) {
-	dir, err := os.MkdirTemp("", "knox-test")
-	if err != nil {
-		t.Fatal("Failed to create temp directory: " + err.Error())
-	}
+	dir := t.TempDir()
 	defer TearDownTest(dir)
+
 	k := NewKeysFile(dir + "/TestOverwrite")
 
-	err = k.Add([]string{"a"})
+	err := k.Add([]string{"a"})
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -562,14 +560,11 @@ func TestOverwrite(t *testing.T) {
 }
 
 func TestBackwardsCompat(t *testing.T) {
-	dir, err := os.MkdirTemp("", "knox-test")
-	if err != nil {
-		t.Fatal("Failed to create temp directory: " + err.Error())
-	}
+	dir := t.TempDir()
 	defer TearDownTest(dir)
 	fn := dir + "/TestBackwardsCompat"
 	k := NewKeysFile(fn)
-	err = os.WriteFile(fn, []byte{}, defaultFilePermission)
+	err := os.WriteFile(fn, []byte{}, defaultFilePermission)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -615,14 +610,10 @@ func TestLockTimeout(t *testing.T) {
 		t.Fatal("flock is not installed in path")
 	}
 
-	tmp, err := os.MkdirTemp("", "test-lock-timeout")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	lockFile := path.Join(tmp, "lock")
-	os.WriteFile(lockFile, []byte{}, 0600)
+	_ = os.WriteFile(lockFile, []byte{}, 0o600)
 
 	// Lock file in sub-process to create locking conflict
 	locker, stdout, stderr := lockFileInSeparateProcess(t, lockFile, "300")
@@ -630,13 +621,13 @@ func TestLockTimeout(t *testing.T) {
 		if locker.Process != nil {
 			t.Log("Terminating locking subprocess...")
 
-			syscall.Kill(-locker.Process.Pid, syscall.SIGKILL)
+			_ = syscall.Kill(-locker.Process.Pid, syscall.SIGKILL)
 
 			// Print stdout/stderr from locking process for debugging
-			allStdout, err := io.ReadAll(stdout)
-			allStderr, err := io.ReadAll(stderr)
-			t.Log(string(allStdout), err)
-			t.Log(string(allStderr), err)
+			allStdout, _ := io.ReadAll(stdout)
+			allStderr, _ := io.ReadAll(stderr)
+			t.Log(string(allStdout))
+			t.Log(string(allStderr))
 		}
 	}()
 

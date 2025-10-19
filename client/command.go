@@ -43,24 +43,24 @@ import (
 	"unicode/utf8"
 )
 
-const defaultTokenFileLocation = ".knox_user_auth"
-
 var cli APIClient
 
-// VisibilityParams exposes functions for the knox client to provide information
+// VisibilityParams exposes functions for the knox client to provide information.
 type VisibilityParams struct {
-	Logf           func(string, ...interface{})
-	Errorf         func(string, ...interface{})
+	Logf           func(string, ...any)
+	Errorf         func(string, ...any)
 	SummaryMetrics func(map[string]uint64)
 	InvokeMetrics  func(map[string]string)
 	GetKeyMetrics  func(map[string]string)
 }
 
-var logf = func(string, ...interface{}) {}
-var errorf = func(string, ...interface{}) {}
-var daemonReportMetrics = func(map[string]uint64) {}
-var clientInvokeMetrics = func(map[string]string) {}
-var clientGetKeyMetrics = func(map[string]string) {}
+var (
+	logf                = func(string, ...any) {}
+	errorf              = func(string, ...any) {}
+	daemonReportMetrics = func(map[string]uint64) {}
+	clientInvokeMetrics = func(map[string]string) {}
+	clientGetKeyMetrics = func(map[string]string) {}
+)
 
 // Run is how to execute commands. It uses global variables and isn't safe to call in parallel.
 func Run(
@@ -68,7 +68,6 @@ func Run(
 	p *VisibilityParams,
 	loginCommand *Command,
 ) {
-
 	cli = client
 	if p != nil {
 		if p.Logf != nil {
@@ -110,7 +109,7 @@ func Run(
 			if cmd.CustomFlags {
 				args = args[1:]
 			} else {
-				cmd.Flag.Parse(args[1:])
+				_ = cmd.Flag.Parse(args[1:])
 				args = cmd.Flag.Args()
 			}
 			errorStatus := cmd.Run(cmd, args)
@@ -193,7 +192,7 @@ type Command struct {
 	CustomFlags bool
 }
 
-// ErrorStatus wraps the error status of knox client command execution
+// ErrorStatus wraps the error status of knox client command execution.
 type ErrorStatus struct {
 	error
 	serverError bool
@@ -222,8 +221,10 @@ func (c *Command) Runnable() bool {
 	return c.Run != nil
 }
 
-var exitStatus = 0
-var exitMu sync.Mutex
+var (
+	exitStatus = 0
+	exitMu     sync.Mutex
+)
 
 func setExitStatus(n int) {
 	exitMu.Lock()
@@ -234,7 +235,7 @@ func setExitStatus(n int) {
 }
 
 // tmpl executes the given template text on data, writing the result to w.
-func tmpl(w io.Writer, text string, data interface{}) {
+func tmpl(w io.Writer, text string, data any) {
 	t := template.New("top")
 	t.Funcs(template.FuncMap{"trim": strings.TrimSpace, "capitalize": capitalize})
 	template.Must(t.Parse(text))
@@ -269,7 +270,7 @@ func exit() {
 	os.Exit(exitStatus)
 }
 
-func fatalf(format string, args ...interface{}) {
+func fatalf(format string, args ...any) {
 	errorf(format, args...)
 	setExitStatus(1)
 	exit()
