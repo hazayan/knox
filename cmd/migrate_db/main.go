@@ -57,7 +57,9 @@ func generateTestDBWithKeys(crypt keydb.Cryptor) keydb.DB {
 		panic(err)
 	}
 
-	source.Add(dbkey, dbkey2)
+	if err := source.Add(dbkey, dbkey2); err != nil {
+		panic(err)
+	}
 	return source
 }
 

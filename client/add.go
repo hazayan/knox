@@ -18,7 +18,7 @@ var cmdAdd = &Command{
 Add will add a new key version to an existing key in knox. Key data of new version should be sent to stdin unless a key-template is specified.
 
 First way: key data of new version is sent to stdin.
-Please run "knox add <key_identifier>". 
+Please run "knox add <key_identifier>".
 
 Second way: the key-template option can be used to specify a template to generate the new key version, instead of stdin. For available key templates, run "knox key-templates".
 Please run "knox add --key-template <template_name> <key_identifier>".
@@ -58,7 +58,7 @@ func runAdd(cmd *Command, args []string) *ErrorStatus {
 }
 
 // getDataWithTemplate returns the data for a new version of a knox identifier that stores Tink keyset.
-func getDataWithTemplate(templateName string, keyID string) ([]byte, error) {
+func getDataWithTemplate(templateName, keyID string) ([]byte, error) {
 	err := obeyNamingRule(templateName, keyID)
 	if err != nil {
 		return nil, err

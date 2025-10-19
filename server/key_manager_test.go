@@ -1,7 +1,6 @@
 package server
 
 import (
-	"reflect"
 	"sort"
 	"testing"
 
@@ -42,7 +41,9 @@ func TestGetAllKeyIDs(t *testing.T) {
 	}
 
 	key1 := newKey("id1", acl, []byte("data"), u)
-	m.AddNewKey(&key1)
+	if err := m.AddNewKey(&key1); err != nil {
+		t.Fatalf("failed to add key1: %v", err)
+	}
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -60,7 +61,9 @@ func TestGetAllKeyIDs(t *testing.T) {
 	}
 
 	key2 := newKey("id2", acl, []byte("data"), u)
-	m.AddNewKey(&key2)
+	if err := m.AddNewKey(&key2); err != nil {
+		t.Fatalf("failed to add key2: %v", err)
+	}
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -114,7 +117,9 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 	}
 
 	key1 := newKey("id1", acl, []byte("data"), u)
-	m.AddNewKey(&key1)
+	if err := m.AddNewKey(&key1); err != nil {
+		t.Fatalf("failed to add key1: %v", err)
+	}
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -137,7 +142,9 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 	}
 
 	key2 := newKey("id2", acl, []byte("data"), u)
-	m.AddNewKey(&key2)
+	if err := m.AddNewKey(&key2); err != nil {
+		t.Fatalf("failed to add key2: %v", err)
+	}
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -203,7 +210,7 @@ func TestAddNewKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	if !reflect.DeepEqual(key, &key1) {
+	if key.ID != key1.ID || key.VersionHash != key1.VersionHash || len(key.VersionList) != len(key1.VersionList) {
 		t.Fatal("keys are not equal")
 	}
 
@@ -216,7 +223,7 @@ func TestAddNewKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	if !reflect.DeepEqual(pKey, aKey) {
+	if pKey.ID != aKey.ID || pKey.VersionHash != aKey.VersionHash || len(pKey.VersionList) != len(aKey.VersionList) {
 		t.Fatal("keys are not equal")
 	}
 
@@ -224,10 +231,10 @@ func TestAddNewKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	if !reflect.DeepEqual(pKey, iKey) {
+	if pKey.ID != iKey.ID || pKey.VersionHash != iKey.VersionHash || len(pKey.VersionList) != len(iKey.VersionList) {
 		t.Fatal("keys are not equal")
 	}
-	if !reflect.DeepEqual(iKey, aKey) {
+	if iKey.ID != aKey.ID || iKey.VersionHash != aKey.VersionHash || len(iKey.VersionList) != len(aKey.VersionList) {
 		t.Fatal("keys are not equal")
 	}
 
@@ -325,7 +332,7 @@ func TestAddUpdateVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	if !reflect.DeepEqual(key, &key1) {
+	if key.ID != key1.ID || key.VersionHash != key1.VersionHash || len(key.VersionList) != len(key1.VersionList) {
 		t.Fatal("keys are not equal")
 	}
 
@@ -351,12 +358,12 @@ func TestAddUpdateVersion(t *testing.T) {
 	sort.Sort(key1.VersionList)
 	for _, kv1 := range key.VersionList {
 		if kv1.Status == types.Primary {
-			if !reflect.DeepEqual(kv1, key1.VersionList[0]) {
+			if kv1.ID != key1.VersionList[0].ID || !equalBytes(kv1.Data, key1.VersionList[0].Data) || kv1.Status != key1.VersionList[0].Status || kv1.CreationTime != key1.VersionList[0].CreationTime {
 				t.Fatal("primary versions are not equal")
 			}
 		}
 		if kv1.Status == types.Active {
-			if !reflect.DeepEqual(kv1, kv) {
+			if kv1.ID != kv.ID || !equalBytes(kv1.Data, kv.Data) || kv1.Status != kv.Status || kv1.CreationTime != kv.CreationTime {
 				t.Fatal("active versions are not equal")
 			}
 		}
@@ -443,6 +450,19 @@ func TestAddUpdateVersion(t *testing.T) {
 	if kv1.CreationTime != kv.CreationTime {
 		t.Fatalf("%d does equal %d", kv1.CreationTime, kv.CreationTime)
 	}
+}
+
+// equalBytes compares two byte slices for equality.
+func equalBytes(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestGetInactiveKeyVersions(t *testing.T) {

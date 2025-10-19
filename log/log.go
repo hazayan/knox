@@ -40,10 +40,10 @@
 package log
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"runtime"
 	"sync"
@@ -104,7 +104,7 @@ var std = New(os.Stderr, "", LstdFlags)
 
 // Cheap integer to fixed-width decimal ASCII.  Give a negative width to avoid zero-padding.
 // Knows the buffer has capacity.
-func itoa(buf *[]byte, i int, wid int) {
+func itoa(buf *[]byte, i, wid int) {
 	u := uint(i)
 	if u == 0 && wid <= 1 {
 		*buf = append(*buf, '0')
@@ -189,17 +189,22 @@ type LogMessage struct {
 	// Version is the git version currently deployed.
 	Version string `json:"version,omitempty"`
 	// Payload is the message being sent by the logger. Type is specified by the PayloadEncoding.
-	Payload interface{} `json:"payload"`
+	Payload any `json:"payload"`
 	// PayloadEncoding specifies the format of the log file: string, JSON, or base64.
 	PayloadEncoding payloadEncoding `json:"payload_encoding"`
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-func (l *Logger) newMessage(payload interface{}, now time.Time) ([]byte, error) {
+func (l *Logger) newMessage(payload any, now time.Time) ([]byte, error) {
 	b := make([]rune, 20)
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		randomBytes := make([]byte, 1)
+		if _, err := rand.Read(randomBytes); err != nil {
+			// Fallback to deterministic value if crypto/rand fails
+			randomBytes = []byte{byte(i % len(letters))}
+		}
+		b[i] = letters[int(randomBytes[0])%len(letters)]
 	}
 	id := string(b)
 	message := &LogMessage{
@@ -260,7 +265,7 @@ func (l *Logger) Output(calldepth int, s string) error {
 }
 
 // OutputJSON sends a json log message to the logger ignoring all logging prefixes.
-func (l *Logger) OutputJSON(j interface{}) error {
+func (l *Logger) OutputJSON(j any) error {
 	now := time.Now() // get this early.
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -289,54 +294,85 @@ func (l *Logger) OutputBinary(b []byte) error {
 
 // Printf calls l.Output to print to the logger.
 // Arguments are handled in the manner of fmt.Printf.
-func (l *Logger) Printf(format string, v ...interface{}) {
-	l.Output(2, fmt.Sprintf(format, v...))
+func (l *Logger) Printf(format string, v ...any) {
+	if err := l.Output(2, fmt.Sprintf(format, v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 }
 
 // Print calls l.Output to print to the logger.
 // Arguments are handled in the manner of fmt.Print.
-func (l *Logger) Print(v ...interface{}) { l.Output(2, fmt.Sprint(v...)) }
+func (l *Logger) Print(v ...any) {
+	if err := l.Output(2, fmt.Sprint(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
+}
 
 // Println calls l.Output to print to the logger.
 // Arguments are handled in the manner of fmt.Println.
-func (l *Logger) Println(v ...interface{}) { l.Output(2, fmt.Sprintln(v...)) }
+func (l *Logger) Println(v ...any) {
+	if err := l.Output(2, fmt.Sprintln(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
+}
 
 // Fatal is equivalent to l.Print() followed by a call to os.Exit(1).
-func (l *Logger) Fatal(v ...interface{}) {
-	l.Output(2, fmt.Sprint(v...))
+func (l *Logger) Fatal(v ...any) {
+	if err := l.Output(2, fmt.Sprint(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	os.Exit(1)
 }
 
 // Fatalf is equivalent to l.Printf() followed by a call to os.Exit(1).
-func (l *Logger) Fatalf(format string, v ...interface{}) {
-	l.Output(2, fmt.Sprintf(format, v...))
+func (l *Logger) Fatalf(format string, v ...any) {
+	if err := l.Output(2, fmt.Sprintf(format, v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	os.Exit(1)
 }
 
 // Fatalln is equivalent to l.Println() followed by a call to os.Exit(1).
-func (l *Logger) Fatalln(v ...interface{}) {
-	l.Output(2, fmt.Sprintln(v...))
+func (l *Logger) Fatalln(v ...any) {
+	if err := l.Output(2, fmt.Sprintln(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	os.Exit(1)
 }
 
 // Panic is equivalent to l.Print() followed by a call to panic().
-func (l *Logger) Panic(v ...interface{}) {
+func (l *Logger) Panic(v ...any) {
 	s := fmt.Sprint(v...)
-	l.Output(2, s)
+	if err := l.Output(2, s); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	panic(s)
 }
 
 // Panicf is equivalent to l.Printf() followed by a call to panic().
-func (l *Logger) Panicf(format string, v ...interface{}) {
+func (l *Logger) Panicf(format string, v ...any) {
 	s := fmt.Sprintf(format, v...)
-	l.Output(2, s)
+	if err := l.Output(2, s); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	panic(s)
 }
 
 // Panicln is equivalent to l.Println() followed by a call to panic().
-func (l *Logger) Panicln(v ...interface{}) {
+func (l *Logger) Panicln(v ...any) {
 	s := fmt.Sprintln(v...)
-	l.Output(2, s)
+	if err := l.Output(2, s); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	panic(s)
 }
 
@@ -399,58 +435,85 @@ func SetPrefix(prefix string) {
 
 // Print calls Output to print to the standard logger.
 // Arguments are handled in the manner of fmt.Print.
-func Print(v ...interface{}) {
-	std.Output(2, fmt.Sprint(v...))
+func Print(v ...any) {
+	if err := std.Output(2, fmt.Sprint(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 }
 
 // Printf calls Output to print to the standard logger.
 // Arguments are handled in the manner of fmt.Printf.
-func Printf(format string, v ...interface{}) {
-	std.Output(2, fmt.Sprintf(format, v...))
+func Printf(format string, v ...any) {
+	if err := std.Output(2, fmt.Sprintf(format, v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 }
 
 // Println calls Output to print to the standard logger.
 // Arguments are handled in the manner of fmt.Println.
-func Println(v ...interface{}) {
-	std.Output(2, fmt.Sprintln(v...))
+func Println(v ...any) {
+	if err := std.Output(2, fmt.Sprintln(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 }
 
 // Fatal is equivalent to Print() followed by a call to os.Exit(1).
-func Fatal(v ...interface{}) {
-	std.Output(2, fmt.Sprint(v...))
+func Fatal(v ...any) {
+	if err := std.Output(2, fmt.Sprint(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	os.Exit(1)
 }
 
 // Fatalf is equivalent to Printf() followed by a call to os.Exit(1).
-func Fatalf(format string, v ...interface{}) {
-	std.Output(2, fmt.Sprintf(format, v...))
+func Fatalf(format string, v ...any) {
+	if err := std.Output(2, fmt.Sprintf(format, v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	os.Exit(1)
 }
 
 // Fatalln is equivalent to Println() followed by a call to os.Exit(1).
-func Fatalln(v ...interface{}) {
-	std.Output(2, fmt.Sprintln(v...))
+func Fatalln(v ...any) {
+	if err := std.Output(2, fmt.Sprintln(v...)); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	os.Exit(1)
 }
 
 // Panic is equivalent to Print() followed by a call to panic().
-func Panic(v ...interface{}) {
+func Panic(v ...any) {
 	s := fmt.Sprint(v...)
-	std.Output(2, s)
+	if err := std.Output(2, s); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	panic(s)
 }
 
 // Panicf is equivalent to Printf() followed by a call to panic().
-func Panicf(format string, v ...interface{}) {
+func Panicf(format string, v ...any) {
 	s := fmt.Sprintf(format, v...)
-	std.Output(2, s)
+	if err := std.Output(2, s); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	panic(s)
 }
 
 // Panicln is equivalent to Println() followed by a call to panic().
-func Panicln(v ...interface{}) {
+func Panicln(v ...any) {
 	s := fmt.Sprintln(v...)
-	std.Output(2, s)
+	if err := std.Output(2, s); err != nil {
+		// Logging error - we can't log the error through the logger itself
+		fmt.Fprintf(os.Stderr, "logging error: %v\n", err)
+	}
 	panic(s)
 }
 

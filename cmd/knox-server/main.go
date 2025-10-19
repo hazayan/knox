@@ -54,7 +54,7 @@ func main() {
 	}
 }
 
-func runServer(cmd *cobra.Command, args []string) error {
+func runServer(_ *cobra.Command, args []string) error {
 	// Load configuration
 	cfg, err := config.LoadServerConfig(cfgFile)
 	if err != nil {
@@ -296,7 +296,7 @@ func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next(wrapped, r)
 
 		duration := time.Since(start)
-		logging.WithFields(map[string]interface{}{
+		logging.WithFields(map[string]any{
 			"method":      r.Method,
 			"path":        r.URL.Path,
 			"status":      wrapped.statusCode,
@@ -333,7 +333,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				logging.Warn("Request missing Authorization header")
-				logging.AuditAuthAttempt("", "", "", "denied_no_token", map[string]interface{}{
+				logging.AuditAuthAttempt("", "", "", "denied_no_token", map[string]any{
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 				})
@@ -356,7 +356,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 
 			if principal == nil || err != nil {
 				logging.Warnf("Authentication failed: %v", err)
-				logging.AuditAuthAttempt("", "", providerName, "denied_invalid_token", map[string]interface{}{
+				logging.AuditAuthAttempt("", "", providerName, "denied_invalid_token", map[string]any{
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 					"error":       err.Error(),
@@ -371,7 +371,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 				principal.Type(),
 				providerName,
 				"success",
-				map[string]interface{}{
+				map[string]any{
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 				},

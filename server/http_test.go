@@ -24,7 +24,7 @@ import (
 
 var router *mux.Router
 
-func getHTTPData(method string, path string, body url.Values, data interface{}) (string, error) {
+func getHTTPData(method, path string, body url.Values, data any) (string, error) {
 	r, reqErr := http.NewRequest(method, path, bytes.NewBufferString(body.Encode()))
 	r.Header.Set("Authorization", "0u"+"testuser")
 	if reqErr != nil {

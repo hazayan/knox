@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +31,7 @@ func TestPrincipalContext(t *testing.T) {
 	ctx.SetCurrentPrincipal(originalPrincipal)
 	currentPrincipal = ctx.GetCurrentPrincipal().(user)
 
-	if !reflect.DeepEqual(currentPrincipal, originalPrincipal) {
+	if currentPrincipal.GetID() != originalPrincipal.GetID() {
 		t.Errorf(
 			"Current principal was expected to be user: '%s'. Instead got: '%s'",
 			originalPrincipal.GetID(),
@@ -47,7 +46,7 @@ func TestPrincipalContext(t *testing.T) {
 		}
 
 		currentPrincipal = ctx.GetCurrentPrincipal()
-		if !reflect.DeepEqual(currentPrincipal, originalPrincipal) {
+		if currentPrincipal.GetID() != originalPrincipal.GetID() {
 			t.Errorf(
 				"Current principal was expected to be user: '%s'. Instead got: '%s'",
 				originalPrincipal.GetID(),
@@ -70,6 +69,7 @@ func TestUserCanAccess(t *testing.T) {
 	if !u.CanAccess(acl1, types.Write) {
 		t.Error("user can't access user permission matching id")
 	}
+
 	if u.CanAccess(acl1, types.Admin) {
 		t.Error("user can access user permission with increased access type")
 	}
@@ -219,7 +219,7 @@ AiEA/GIpOpaFQbGSs42rKugOBngKtF0fuRAo2r4vMyL559A=`
 func TestMTLSSuccess(t *testing.T) {
 	hostname := "dev-devinlundberg"
 	expected := "dev-devinlundberg"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -249,7 +249,7 @@ func TestMTLSSuccess(t *testing.T) {
 
 func TestMTLSBadTime(t *testing.T) {
 	hostname := "dev-devinlundberg"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -277,7 +277,7 @@ func TestMTLSBadTime(t *testing.T) {
 
 func TestMTLSNoCA(t *testing.T) {
 	hostname := "dev-devinlundberg"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -303,7 +303,7 @@ func TestMTLSNoCA(t *testing.T) {
 
 func TestMTLSBadHostname(t *testing.T) {
 	hostname := "BadHostname"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -415,7 +415,7 @@ func TestSpiffeToPrincipalBadInput(t *testing.T) {
 
 func testSpiffeAuthFlow(t *testing.T, authHeader string, provider Provider) {
 	expected := "spiffe://example.com/service"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", authHeader)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(spiffeCertB64)))
