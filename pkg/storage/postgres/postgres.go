@@ -462,16 +462,16 @@ func (t *Transaction) DeleteKey(ctx context.Context, keyID string) error {
 
 // Commit applies all operations in the transaction atomically.
 func (t *Transaction) Commit() error {
-	if t.commited {
+	if t.committed {
 		return errors.New("transaction already committed")
 	}
-	t.commited = true
+	t.committed = true
 	return t.tx.Commit()
 }
 
 // Rollback aborts all operations in the transaction.
 func (t *Transaction) Rollback() error {
-	if t.commited {
+	if t.committed {
 		return nil // Already committed, nothing to rollback
 	}
 	return t.tx.Rollback()
