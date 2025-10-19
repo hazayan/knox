@@ -15,29 +15,29 @@ import (
 )
 
 var (
-	ErrACLDuplicateEntries = errors.New("Duplicate entries in ACL")
+	ErrACLDuplicateEntries = errors.New("duplicate entries in ACL")
 	ErrACLContainsNone     = errors.New("ACL contains None access")
-	ErrACLEmptyPrincipal   = errors.New("Principals of type user, user group, machine, or machine prefix may not be empty.")
+	ErrACLEmptyPrincipal   = errors.New("principals of type user, user group, machine, or machine prefix may not be empty")
 
-	ErrACLInvalidService               = errors.New("Service is invalid, must conform to 'spiffe://<domain>/<path>' format.")
-	ErrACLInvalidServicePrefixURL      = errors.New("Service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format.")
-	ErrACLInvalidServicePrefixNoSlash  = errors.New("Service prefix had no trailing slash, must conform to 'spiffe://<domain>/<path>/' format.")
-	ErrACLInvalidServicePrefixTooShort = errors.New("Service prefix too short, path of namespace for prefix needs to be longer.")
+	ErrACLInvalidService               = errors.New("service is invalid, must conform to 'spiffe://<domain>/<path>' format")
+	ErrACLInvalidServicePrefixURL      = errors.New("service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format")
+	ErrACLInvalidServicePrefixNoSlash  = errors.New("service prefix had no trailing slash, must conform to 'spiffe://<domain>/<path>/' format")
+	ErrACLInvalidServicePrefixTooShort = errors.New("service prefix too short, path of namespace for prefix needs to be longer")
 
-	ErrInvalidKeyID       = errors.New("KeyID can only contain alphanumeric characters, colons, and underscores.")
-	ErrInvalidVersionHash = errors.New("Hash does not match")
+	ErrInvalidKeyID       = errors.New("key ID can only contain alphanumeric characters, colons, and underscores")
+	ErrInvalidVersionHash = errors.New("hash does not match")
 
-	ErrInactiveToPrimary = errors.New("Version must be Active to promote to Primary")
-	ErrPrimaryToActive   = errors.New("Primary Key can not be demoted. Specify Active key to promote.")
-	ErrPrimaryToInactive = errors.New("Version must be Active to demote to Inactive")
+	ErrInactiveToPrimary = errors.New("version must be active to promote to primary")
+	ErrPrimaryToActive   = errors.New("primary key cannot be demoted, specify active key to promote")
+	ErrPrimaryToInactive = errors.New("version must be active to demote to inactive")
 
-	ErrMulitplePrimary = errors.New("More than one Primary key")
-	ErrSameVersionID   = errors.New("Repeated Version ID")
+	ErrMulitplePrimary = errors.New("more than one primary key")
+	ErrSameVersionID   = errors.New("repeated version ID")
 
-	ErrInvalidStatus      = errors.New("Invalid Status")
-	ErrKeyVersionNotFound = errors.New("Key version not found")
-	ErrKeyIDNotFound      = errors.New("KeyID not found")
-	ErrKeyExists          = errors.New("Key Exists")
+	ErrInvalidStatus      = errors.New("invalid status")
+	ErrKeyVersionNotFound = errors.New("key version not found")
+	ErrKeyIDNotFound      = errors.New("key ID not found")
+	ErrKeyExists          = errors.New("key exists")
 )
 
 const (

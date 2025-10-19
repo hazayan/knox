@@ -63,7 +63,3 @@ func makeCollectionPath(name string) dbus.ObjectPath {
 func makeItemPath(collection, itemID string) dbus.ObjectPath {
 	return dbus.ObjectPath(CollectionPrefix + collection + "/" + itemID)
 }
-
-func makeAliasPath(alias string) dbus.ObjectPath {
-	return dbus.ObjectPath(AliasPrefix + alias)
-}

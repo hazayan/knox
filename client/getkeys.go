@@ -21,14 +21,14 @@ See also: knox get, knox create, knox daemon
 	`,
 }
 
-func runGetKeys(cmd *Command, args []string) *ErrorStatus {
+func runGetKeys(_ *Command, args []string) *ErrorStatus {
 	m := map[string]string{}
 	for _, s := range args {
 		m[s] = "NONE"
 	}
 	l, err := cli.GetKeys(m)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error getting keys: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error getting keys: %s", err.Error()), true}
 	}
 	for _, k := range l {
 		fmt.Println(k)

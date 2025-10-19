@@ -30,7 +30,7 @@ func additionalMockRoute() Route {
 		Method:     "GET",
 		Path:       "/v0/custom/",
 		Handler:    additionalMockHandler,
-		Id:         "a-custom-route",
+		ID:         "a-custom-route",
 		Parameters: []Parameter{},
 	}
 }
@@ -262,7 +262,7 @@ func TestDuplicateRouteId(t *testing.T) {
 	additionalRoutes := []Route{
 		{
 			Method:  "POST",
-			Id:      "getkeys",
+			ID:      "getkeys",
 			Path:    "/v3/foobar/",
 			Handler: getKeysHandler,
 			Parameters: []Parameter{
@@ -293,7 +293,7 @@ func TestDuplicateMethodAndPath(t *testing.T) {
 	additionalRoutes := []Route{
 		{
 			Method:  "GET",
-			Id:      "a-unique-id",
+			ID:      "a-unique-id",
 			Path:    "/v0/keys/",
 			Handler: getKeysHandler,
 			Parameters: []Parameter{

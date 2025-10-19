@@ -28,7 +28,7 @@ func main() {
 Knox provides secure storage and rotation of credentials with fine-grained
 access control and comprehensive audit logging.`,
 		Version: version,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Skip config loading for config, version, and completion commands
 			cmdName := cmd.Name()
 			if cmdName == "config" || cmdName == "version" || cmdName == "completion" || cmdName == "help" {

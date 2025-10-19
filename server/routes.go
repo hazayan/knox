@@ -16,7 +16,7 @@ import (
 var routes = [...]Route{
 	{
 		Method:  "GET",
-		Id:      "getkeys",
+		ID:      "getkeys",
 		Path:    "/v0/keys/",
 		Handler: getKeysHandler,
 		Parameters: []Parameter{
@@ -25,7 +25,7 @@ var routes = [...]Route{
 	},
 	{
 		Method:  "POST",
-		Id:      "postkeys",
+		ID:      "postkeys",
 		Path:    "/v0/keys/",
 		Handler: postKeysHandler,
 		Parameters: []Parameter{
@@ -37,61 +37,61 @@ var routes = [...]Route{
 
 	{
 		Method:  "GET",
-		Id:      "getkey",
+		ID:      "getkey",
 		Path:    "/v0/keys/{keyID}/",
 		Handler: getKeyHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 			QueryParameter("status"),
 		},
 	},
 	{
 		Method:  "DELETE",
-		Id:      "deletekey",
+		ID:      "deletekey",
 		Path:    "/v0/keys/{keyID}/",
 		Handler: deleteKeyHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 		},
 	},
 	{
 		Method:  "GET",
-		Id:      "getaccess",
+		ID:      "getaccess",
 		Path:    "/v0/keys/{keyID}/access/",
 		Handler: getAccessHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 		},
 	},
 	{
 		Method:  "PUT",
-		Id:      "putaccess",
+		ID:      "putaccess",
 		Path:    "/v0/keys/{keyID}/access/",
 		Handler: putAccessHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 			PostParameter("access"),
 			PostParameter("acl"),
 		},
 	},
 	{
 		Method:  "POST",
-		Id:      "postversion",
+		ID:      "postversion",
 		Path:    "/v0/keys/{keyID}/versions/",
 		Handler: postVersionHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 			PostParameter("data"),
 		},
 	},
 	{
 		Method:  "PUT",
-		Id:      "putversion",
+		ID:      "putversion",
 		Path:    "/v0/keys/{keyID}/versions/{versionID}/",
 		Handler: putVersionsHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
-			UrlParameter("versionID"),
+			URLParameter("keyID"),
+			URLParameter("versionID"),
 			PostParameter("status"),
 		},
 	},
@@ -106,7 +106,7 @@ var routes = [...]Route{
 // REST so that fix will be postponed until this actually is a problem.
 // The route for this handler is GET /v0/keys/
 // There are no authorization constraints on this route.
-func getKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
+func getKeysHandler(m KeyManager, _ types.Principal, parameters map[string]string) (any, *HTTPError) {
 	queryString := parameters["queryString"]
 
 	// Can't throw error since direct from a http request
@@ -260,7 +260,7 @@ func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[st
 
 // getAccessHandler gets the ACL for a specific Key.
 // The route for this handler is GET /v0/keys/<key_id>/access/.
-func getAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
+func getAccessHandler(m KeyManager, _ types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	// Get the key
@@ -474,7 +474,7 @@ func authorizeRequest(key *types.Key, principal types.Principal, access types.Ac
 		if r := recover(); r != nil {
 			log.Printf("Recovered from panic in access callback: %v", r)
 
-			err = fmt.Errorf("Recovered from panic in access callback: %v", r)
+			err = fmt.Errorf("recovered from panic in access callback: %v", r)
 		}
 	}()
 
