@@ -18,18 +18,6 @@ func GetMocks() (KeyManager, types.Principal, types.ACL) {
 	return m, u, acl
 }
 
-type mockPrincipal struct {
-	ID string
-}
-
-func (p mockPrincipal) CanAccess(a types.ACL, t types.AccessType) bool {
-	return true
-}
-
-func (p mockPrincipal) GetID() string {
-	return p.ID
-}
-
 func TestGetAllKeyIDs(t *testing.T) {
 	m, u, acl := GetMocks()
 	keys, err := m.GetAllKeyIDs()
@@ -161,7 +149,7 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 		t.Fatal("Unexpected # of keys in get all keys response")
 	}
 
-	keys, err = m.GetUpdatedKeyIDs(map[string]string{key2.ID: "NOT_THE_HASH", key1.ID: "NOT_THE_HASH"})
+	keys, _ = m.GetUpdatedKeyIDs(map[string]string{key2.ID: "NOT_THE_HASH", key1.ID: "NOT_THE_HASH"})
 	if len(keys) != 2 {
 		t.Fatalf("Expect 2 keys not %d", len(keys))
 	}
@@ -178,7 +166,7 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 		t.Fatal("Unexpected key ID returned")
 	}
 
-	keys, err = m.GetUpdatedKeyIDs(map[string]string{key2.ID: key2.VersionHash, key1.ID: "NOT_THE_HASH"})
+	keys, _ = m.GetUpdatedKeyIDs(map[string]string{key2.ID: key2.VersionHash, key1.ID: "NOT_THE_HASH"})
 	if len(keys) != 1 {
 		t.Fatalf("Expect 1 key not %d", len(keys))
 	}
@@ -186,7 +174,7 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 		t.Fatalf("%s does not match %s", keys[0], key1.ID)
 	}
 
-	keys, err = m.GetUpdatedKeyIDs(map[string]string{key2.ID: key2.VersionHash, key1.ID: key1.VersionHash})
+	keys, _ = m.GetUpdatedKeyIDs(map[string]string{key2.ID: key2.VersionHash, key1.ID: key1.VersionHash})
 	if len(keys) != 0 {
 		t.Fatal("expected no keys")
 	}
@@ -196,7 +184,7 @@ func TestAddNewKey(t *testing.T) {
 	m, u, acl := GetMocks()
 	key1 := newKey("id1", acl, []byte("data"), u)
 
-	key, err := m.GetKey(key1.ID, types.Active)
+	_, err := m.GetKey(key1.ID, types.Active)
 	if err == nil {
 		t.Fatal("Should be an error")
 	}
@@ -206,7 +194,7 @@ func TestAddNewKey(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, types.Active)
+	key, err := m.GetKey(key1.ID, types.Active)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -243,7 +231,7 @@ func TestAddNewKey(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 
-	key, err = m.GetKey(key1.ID, types.Active)
+	_, err = m.GetKey(key1.ID, types.Active)
 	if err == nil {
 		t.Fatal("Should be an error")
 	}
@@ -507,7 +495,7 @@ func TestGetInactiveKeyVersions(t *testing.T) {
 		t.Fatalf("Wanted one key version, got: %d", len(key.VersionList))
 	}
 	if key.VersionList[0].ID != kvID0 {
-		t.Fatalf("Inactive key id was listed as ctive")
+		t.Fatal("Inactive key id was listed as ctive")
 	}
 
 	// Reading active/inactive key versions should now list both
@@ -517,6 +505,6 @@ func TestGetInactiveKeyVersions(t *testing.T) {
 	}
 
 	if len(key.VersionList) != 2 {
-		t.Fatalf("Wanted two key versions, got: %d", len(key.VersionList))
+		t.Fatal("Wanted two key versions, got: ", len(key.VersionList))
 	}
 }

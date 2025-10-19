@@ -43,8 +43,6 @@ import (
 	"unicode/utf8"
 )
 
-const defaultTokenFileLocation = ".knox_token"
-
 var cli APIClient
 
 // VisibilityParams exposes functions for the knox client to provide information.

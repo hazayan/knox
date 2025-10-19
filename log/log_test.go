@@ -90,11 +90,11 @@ func testPrint(t *testing.T, flag int, prefix, pattern string, useFormat bool) {
 		t.Errorf("Unexpected error decoding log JSON: %q", err.Error())
 	}
 	if m.ID == "" {
-		t.Errorf("ID should be set to random value and not empty")
+		t.Error("ID should be set to random value and not empty")
 	}
 	payload, ok := m.Payload.(string)
 	if !ok {
-		t.Errorf("Payload is not of string type")
+		t.Error("Payload is not of string type")
 	}
 	matched, err4 := regexp.MatchString(pattern, payload)
 	if err4 != nil {
@@ -124,11 +124,11 @@ func TestOutput(t *testing.T) {
 		t.Errorf("Unexpected error decoding log JSON: %q", err.Error())
 	}
 	if m.ID == "" {
-		t.Errorf("ID should be set to random value and not empty")
+		t.Error("ID should be set to random value and not empty")
 	}
 	payload, ok := m.Payload.(string)
 	if !ok {
-		t.Errorf("Payload is not of string type")
+		t.Error("Payload is not of string type")
 	}
 
 	if expect := testString; payload != expect {
@@ -278,7 +278,7 @@ func TestFlagAndPrefixSetting(t *testing.T) {
 	}
 	payload, ok := m.Payload.(string)
 	if !ok {
-		t.Errorf("Payload is not of string type")
+		t.Error("Payload is not of string type")
 	}
 	matched, err := regexp.Match(pattern, []byte(payload))
 	if err != nil {

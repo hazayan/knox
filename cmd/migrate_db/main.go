@@ -1,3 +1,4 @@
+// Package main provides a migration utility for Knox database keys and encryption.
 package main
 
 import (

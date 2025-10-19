@@ -47,7 +47,7 @@ allowing desktop applications (Firefox, Chrome, SSH, etc.) to store secrets in K
 	}
 }
 
-func runDaemon(cmd *cobra.Command, args []string) error {
+func runDaemon(_ *cobra.Command, _ []string) error {
 	// Load configuration
 	cfg, err := config.LoadDBusConfig(cfgFile)
 	if err != nil {

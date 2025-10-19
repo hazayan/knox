@@ -117,16 +117,16 @@ type ClientProfile struct {
 
 // ClientTLSConfig holds client TLS configuration.
 type ClientTLSConfig struct {
-	CACert     string `mapstructure:"ca_cert"`
-	ClientCert string `mapstructure:"client_cert"`
-	ClientKey  string `mapstructure:"client_key"`
+	CACert     string `mapstructure:"ca_cert" json:"ca_cert"`
+	ClientCert string `mapstructure:"client_cert" json:"client_cert"`
+	ClientKey  string `mapstructure:"client_key" json:"client_key"`
 }
 
 // CacheConfig holds cache configuration.
 type CacheConfig struct {
-	Enabled   bool   `mapstructure:"enabled"`
-	Directory string `mapstructure:"directory"`
-	TTL       string `mapstructure:"ttl"`
+	Enabled   bool   `mapstructure:"enabled" json:"enabled"`
+	Directory string `mapstructure:"directory" json:"directory"`
+	TTL       string `mapstructure:"ttl" json:"ttl"`
 }
 
 // DBusConfig holds configuration for the D-Bus bridge.

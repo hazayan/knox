@@ -54,7 +54,7 @@ func main() {
 	}
 }
 
-func runServer(_ *cobra.Command, args []string) error {
+func runServer(_ *cobra.Command, _ []string) error {
 	// Load configuration
 	cfg, err := config.LoadServerConfig(cfgFile)
 	if err != nil {

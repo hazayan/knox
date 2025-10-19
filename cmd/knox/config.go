@@ -46,7 +46,7 @@ Examples:
   knox config init
   knox config init --server knox.example.com:9000
   knox config init --server localhost:9000 --force`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Check if config already exists
 			if !force {
 				if _, err := os.Stat(cfgFile); err == nil {
@@ -84,7 +84,7 @@ Examples:
 			}
 
 			fmt.Printf("✓ Configuration initialized: %s\n", cfgFile)
-			fmt.Printf("  Profile: default\n")
+			fmt.Print("  Profile: default\n")
 			fmt.Printf("  Server: %s\n", server)
 			fmt.Printf("  Cache: %s\n", cacheDir)
 
@@ -110,7 +110,7 @@ func newConfigShowCmd() *cobra.Command {
 Examples:
   knox config show
   knox config show --json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Load config without the PersistentPreRun check
 			localCfg, err := config.LoadClientConfig(cfgFile)
 			if err != nil {
@@ -192,7 +192,7 @@ Examples:
   knox config profile add production --server knox.prod.example.com:9000
   knox config profile add staging --server knox.staging.example.com:9000`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
 
 			// Load existing config
@@ -262,7 +262,7 @@ func newConfigProfileRemoveCmd() *cobra.Command {
 Examples:
   knox config profile remove staging`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
 
 			// Load existing config
@@ -307,7 +307,7 @@ Examples:
   knox config profile use production
   knox config profile use default`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
 
 			// Load existing config
@@ -346,7 +346,7 @@ func newConfigProfileListCmd() *cobra.Command {
 Examples:
   knox config profile list
   knox config profile list --json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// Load config
 			localCfg, err := config.LoadClientConfig(cfgFile)
 			if err != nil {
