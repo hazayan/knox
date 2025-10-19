@@ -1,11 +1,12 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -37,7 +38,7 @@ var createTinkKeyset = cmdCreate.Flag.String("key-template", "", "name of a knox
 
 func runCreate(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("create takes exactly one argument. See 'knox help create'"), false}
+		return &ErrorStatus{errors.New("create takes exactly one argument. See 'knox help create'"), false}
 	}
 	keyID := args[0]
 	var data []byte

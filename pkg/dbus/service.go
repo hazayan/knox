@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -52,7 +53,7 @@ func (b *Bridge) Start() error {
 		return fmt.Errorf("failed to request name: %w", err)
 	}
 	if reply != dbus.RequestNameReplyPrimaryOwner {
-		return fmt.Errorf("name already taken")
+		return errors.New("name already taken")
 	}
 
 	// Create properties
@@ -221,7 +222,7 @@ func (b *Bridge) CreateCollection(properties map[string]dbus.Variant, alias stri
 
 	// Check if collection exists
 	if _, ok := b.collections[name]; ok {
-		return "/", "/", dbus.MakeFailedError(fmt.Errorf("collection already exists"))
+		return "/", "/", dbus.MakeFailedError(errors.New("collection already exists"))
 	}
 
 	// Create collection
@@ -461,7 +462,7 @@ func hasPrefix(s, prefix string) bool {
 func splitPath(path string) []string {
 	var parts []string
 	start := 0
-	for i := 0; i < len(path); i++ {
+	for i := range len(path) {
 		if path[i] == '/' {
 			if i > start {
 				parts = append(parts, path[start:i])

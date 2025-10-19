@@ -1,9 +1,10 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
+	"errors"
 	"fmt"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var cmdDeactivate = &Command{
@@ -27,7 +28,7 @@ See also: knox reactivate, knox promote
 
 func runDeactivate(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 2 {
-		return &ErrorStatus{fmt.Errorf("deactivate takes exactly two argument. See 'knox help deactivate'"), false}
+		return &ErrorStatus{errors.New("deactivate takes exactly two argument. See 'knox help deactivate'"), false}
 	}
 	keyID := args[0]
 	keyVersion := args[1]

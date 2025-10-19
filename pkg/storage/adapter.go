@@ -5,6 +5,7 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -55,7 +56,7 @@ func (a *DBAdapter) Get(keyID string) (*keydb.DBKey, error) {
 	// The wrapper's VersionList[0].Data contains serialized encrypted DBKey
 	wrapper, err := a.backend.GetKey(ctx, keyID)
 	if err != nil {
-		if err == ErrKeyNotFound {
+		if errors.Is(err, ErrKeyNotFound) {
 			return nil, nil // Knox convention: nil for not found
 		}
 		return nil, fmt.Errorf("backend get failed: %w", err)
@@ -63,7 +64,7 @@ func (a *DBAdapter) Get(keyID string) (*keydb.DBKey, error) {
 
 	// Deserialize the encrypted DBKey from the wrapper
 	if len(wrapper.VersionList) == 0 {
-		return nil, fmt.Errorf("invalid stored key: no versions")
+		return nil, errors.New("invalid stored key: no versions")
 	}
 
 	var dbKey keydb.DBKey
@@ -150,7 +151,7 @@ func (a *DBAdapter) Add(keys ...*keydb.DBKey) error {
 		if err == nil {
 			return fmt.Errorf("key already exists: %s", dbKey.ID)
 		}
-		if err != ErrKeyNotFound {
+		if !errors.Is(err, ErrKeyNotFound) {
 			return fmt.Errorf("backend check failed: %w", err)
 		}
 
@@ -187,7 +188,7 @@ func (a *DBAdapter) Remove(keyID string) error {
 	defer cancel()
 
 	err := a.backend.DeleteKey(ctx, keyID)
-	if err == ErrKeyNotFound {
+	if errors.Is(err, ErrKeyNotFound) {
 		// Key not found is not an error for delete
 		return nil
 	}
@@ -252,5 +253,5 @@ func (a *DBAdapter) cleanupCacheLocked() {
 	}
 }
 
-// Verify interface compliance at compile time
+// Verify interface compliance at compile time.
 var _ keydb.DB = (*DBAdapter)(nil)

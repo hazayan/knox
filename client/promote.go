@@ -1,9 +1,10 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
+	"errors"
 	"fmt"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var cmdPromote = &Command{
@@ -23,7 +24,7 @@ See also: knox reactivate, knox deactivate
 
 func runPromote(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 2 {
-		return &ErrorStatus{fmt.Errorf("promote takes exactly two argument. See 'knox help promote'"), false}
+		return &ErrorStatus{errors.New("promote takes exactly two argument. See 'knox help promote'"), false}
 	}
 	keyID := args[0]
 	versionID := args[1]

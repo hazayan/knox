@@ -1,6 +1,7 @@
 package dbus
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -17,7 +18,7 @@ const (
 // validateLabel validates a collection or item label.
 func validateLabel(label string) error {
 	if !utf8.ValidString(label) {
-		return fmt.Errorf("label contains invalid UTF-8")
+		return errors.New("label contains invalid UTF-8")
 	}
 
 	if len(label) > maxLabelLength {
@@ -26,7 +27,7 @@ func validateLabel(label string) error {
 
 	// Check for null bytes
 	if strings.Contains(label, "\x00") {
-		return fmt.Errorf("label contains null bytes")
+		return errors.New("label contains null bytes")
 	}
 
 	return nil
@@ -40,10 +41,10 @@ func validateAttributes(attributes map[string]string) error {
 
 	for key, value := range attributes {
 		if !utf8.ValidString(key) {
-			return fmt.Errorf("attribute key contains invalid UTF-8")
+			return errors.New("attribute key contains invalid UTF-8")
 		}
 		if !utf8.ValidString(value) {
-			return fmt.Errorf("attribute value contains invalid UTF-8")
+			return errors.New("attribute value contains invalid UTF-8")
 		}
 
 		if len(key) > maxAttributeLength {
@@ -55,7 +56,7 @@ func validateAttributes(attributes map[string]string) error {
 
 		// Check for null bytes
 		if strings.Contains(key, "\x00") || strings.Contains(value, "\x00") {
-			return fmt.Errorf("attribute contains null bytes")
+			return errors.New("attribute contains null bytes")
 		}
 	}
 
@@ -73,7 +74,7 @@ func validateSecretData(data []byte) error {
 // validateCollectionName validates a collection name.
 func validateCollectionName(name string) error {
 	if !utf8.ValidString(name) {
-		return fmt.Errorf("collection name contains invalid UTF-8")
+		return errors.New("collection name contains invalid UTF-8")
 	}
 
 	if len(name) > maxCollectionName {
@@ -81,17 +82,17 @@ func validateCollectionName(name string) error {
 	}
 
 	if len(name) == 0 {
-		return fmt.Errorf("collection name cannot be empty")
+		return errors.New("collection name cannot be empty")
 	}
 
 	// Check for null bytes
 	if strings.Contains(name, "\x00") {
-		return fmt.Errorf("collection name contains null bytes")
+		return errors.New("collection name contains null bytes")
 	}
 
 	// Prevent path traversal
 	if strings.Contains(name, "..") || strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("collection name contains invalid characters")
+		return errors.New("collection name contains invalid characters")
 	}
 
 	return nil

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -19,7 +20,7 @@ See also: knox create
 
 func runDelete(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("create takes exactly one argument. See 'knox help delete'"), false}
+		return &ErrorStatus{errors.New("create takes exactly one argument. See 'knox help delete'"), false}
 	}
 
 	err := cli.DeleteKey(args[0])

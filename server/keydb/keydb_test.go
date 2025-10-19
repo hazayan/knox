@@ -1,7 +1,7 @@
 package keydb
 
 import (
-	"fmt"
+	"errors"
 	"math/rand"
 	"testing"
 	"time"
@@ -69,12 +69,11 @@ func TestDBCopy(t *testing.T) {
 	if r.VersionList[0].ID == b.VersionList[0].ID {
 		t.Error("VersionList[0].ID are equal after copy")
 	}
-
 }
 
 func TestTempErrs(t *testing.T) {
 	db := &TempDB{}
-	err := fmt.Errorf("Does not compute... EXTERMINATE! EXTERMINATE!")
+	err := errors.New("Does not compute... EXTERMINATE! EXTERMINATE!")
 	db.SetError(err)
 	TesterErrs(t, db, err)
 }
@@ -83,31 +82,31 @@ func TesterErrs(t *testing.T, db DB, expErr error) {
 	k := newDBKey("TesterErrs1", []byte("ab"), 0)
 	go func() {
 		_, err := db.GetAll()
-		if err != expErr {
+		if !errors.Is(err, expErr) {
 			t.Errorf("%s does not equal %s", err, expErr)
 		}
 	}()
 	go func() {
 		err := db.Add(&k)
-		if err != expErr {
+		if !errors.Is(err, expErr) {
 			t.Errorf("%s does not equal %s", err, expErr)
 		}
 	}()
 	go func() {
 		err := db.Remove(k.ID)
-		if err != expErr {
+		if !errors.Is(err, expErr) {
 			t.Errorf("%s does not equal %s", err, expErr)
 		}
 	}()
 	go func() {
 		err := db.Update(&k)
-		if err != expErr {
+		if !errors.Is(err, expErr) {
 			t.Errorf("%s does not equal %s", err, expErr)
 		}
 	}()
 	go func() {
 		_, err := db.Get(k.ID)
-		if err != expErr {
+		if !errors.Is(err, expErr) {
 			t.Errorf("%s does not equal %s", err, expErr)
 		}
 	}()
@@ -142,7 +141,7 @@ func TesterAddGet(t *testing.T, db DB, timeout time.Duration) {
 					t.Fatalf("%c does not equal %c", newK.VersionList[0].EncData[0], k.VersionList[0].EncData[0])
 				}
 				complete = true
-			} else if err != types.ErrKeyIDNotFound {
+			} else if !errors.Is(err, types.ErrKeyIDNotFound) {
 				t.Fatal(err)
 			}
 		}
@@ -156,7 +155,7 @@ func TesterAddGet(t *testing.T, db DB, timeout time.Duration) {
 	}
 
 	err = db.Add(&k)
-	if err != types.ErrKeyExists {
+	if !errors.Is(err, types.ErrKeyExists) {
 		t.Fatalf("%s does not equal %s", err, types.ErrKeyExists)
 	}
 }
@@ -168,7 +167,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 	}
 	k := newDBKey("TesterAddUpdate1", []byte("a"), 0)
 	err = db.Update(&k)
-	if err != types.ErrKeyIDNotFound {
+	if !errors.Is(err, types.ErrKeyIDNotFound) {
 		t.Fatalf("%s does not equal %s", err, types.ErrKeyIDNotFound)
 	}
 	err = db.Add(&k)
@@ -187,7 +186,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 			if err == nil {
 				version = newK.DBVersion
 				complete = true
-			} else if err != types.ErrKeyIDNotFound {
+			} else if !errors.Is(err, types.ErrKeyIDNotFound) {
 				t.Fatal(err)
 			}
 		}
@@ -196,7 +195,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 		t.Fatal("version number did not initialize to non zero value")
 	}
 	err = db.Update(&k)
-	if err != ErrDBVersion {
+	if !errors.Is(err, ErrDBVersion) {
 		t.Fatalf("%s does not equal %s", err, ErrDBVersion)
 	}
 
@@ -248,7 +247,7 @@ func TesterAddRemove(t *testing.T, db DB, timeout time.Duration) {
 	}
 	k := newDBKey("TesterAddRemove1", []byte("a"), 0)
 	err = db.Remove(k.ID)
-	if err != types.ErrKeyIDNotFound {
+	if !errors.Is(err, types.ErrKeyIDNotFound) {
 		t.Fatalf("%s does not equal %s", err, types.ErrKeyIDNotFound)
 	}
 	err = db.Add(&k)
@@ -265,7 +264,7 @@ func TesterAddRemove(t *testing.T, db DB, timeout time.Duration) {
 			_, err := db.Get(k.ID)
 			if err == nil {
 				complete = true
-			} else if err != types.ErrKeyIDNotFound {
+			} else if !errors.Is(err, types.ErrKeyIDNotFound) {
 				t.Fatal(err)
 			}
 		}
@@ -282,9 +281,9 @@ func TesterAddRemove(t *testing.T, db DB, timeout time.Duration) {
 			t.Fatal("Timed out waiting TestAddGet1 to get added")
 		case <-time.Tick(1 * time.Millisecond):
 			_, err := db.Get(k.ID)
-			if err == types.ErrKeyIDNotFound {
+			if errors.Is(err, types.ErrKeyIDNotFound) {
 				complete = true
-			} else if err != types.ErrKeyIDNotFound && err != nil {
+			} else if !errors.Is(err, types.ErrKeyIDNotFound) && err != nil {
 				t.Fatal(err)
 			}
 		}

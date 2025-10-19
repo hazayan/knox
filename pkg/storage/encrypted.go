@@ -4,11 +4,12 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/pkg/observability/logging"
+	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server/keydb"
 )
 
@@ -33,7 +34,7 @@ func (e *EncryptedBackend) Get(keyID string) (*keydb.DBKey, error) {
 	// Backend stores types.Key, but we'll serialize DBKey to its Data field
 	wrapper, err := e.backend.GetKey(ctx, keyID)
 	if err != nil {
-		if err == ErrKeyNotFound {
+		if errors.Is(err, ErrKeyNotFound) {
 			return nil, nil // Knox convention: nil for not found
 		}
 		return nil, fmt.Errorf("backend get failed: %w", err)
@@ -130,11 +131,11 @@ func (e *EncryptedBackend) Remove(keyID string) error {
 	defer cancel()
 
 	err := e.backend.DeleteKey(ctx, keyID)
-	if err == ErrKeyNotFound {
+	if errors.Is(err, ErrKeyNotFound) {
 		return nil // Not an error
 	}
 	return err
 }
 
-// Verify interface compliance
+// Verify interface compliance.
 var _ keydb.DB = (*EncryptedBackend)(nil)

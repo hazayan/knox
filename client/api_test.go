@@ -37,7 +37,9 @@ func TestMockClient(t *testing.T) {
 	a := []string{"active1", "active2"}
 	k0 := types.Key{
 		VersionList: []types.KeyVersion{
-			{Data: []byte(p), Status: types.Primary}, {Data: []byte(a[0]), Status: types.Active}, {Data: []byte(a[1]), Status: types.Active}}}
+			{Data: []byte(p), Status: types.Primary}, {Data: []byte(a[0]), Status: types.Active}, {Data: []byte(a[1]), Status: types.Active},
+		},
+	}
 
 	m := NewMock(p, a)
 	p1 := m.GetPrimary()
@@ -57,7 +59,6 @@ func TestMockClient(t *testing.T) {
 	if !reflect.DeepEqual(k0, k1) {
 		t.Fatalf("Got %v, Want %v", k1, k0)
 	}
-
 }
 
 func buildGoodResponse(data interface{}) ([]byte, error) {
@@ -70,7 +71,6 @@ func buildGoodResponse(data interface{}) ([]byte, error) {
 		Data:      data,
 	}
 	return json.Marshal(resp)
-
 }
 
 func buildErrorResponse(code int, data interface{}) ([]byte, error) {
@@ -83,7 +83,6 @@ func buildErrorResponse(code int, data interface{}) ([]byte, error) {
 		Data:      data,
 	}
 	return json.Marshal(resp)
-
 }
 
 // buildServer returns a server. Call Close when finished.
@@ -166,7 +165,7 @@ func TestGetKey(t *testing.T) {
 	}
 }
 
-// TestGetKeyWithMultipleAuth tests getting keys with multiple auth methods
+// TestGetKeyWithMultipleAuth tests getting keys with multiple auth methods.
 func TestGetKeyWithMultipleAuth(t *testing.T) {
 	expected := types.Key{
 		ID:          "testkey",
@@ -186,17 +185,18 @@ func TestGetKeyWithMultipleAuth(t *testing.T) {
 		atomic.AddUint64(&ops, 1)
 		var resp []byte
 		var err error
-		if ops == 1 {
+		switch ops {
+		case 1:
 			resp, err = buildErrorResponse(types.UnauthorizedCode, nil)
 			if err != nil {
 				t.Fatalf("%s is not nil", err)
 			}
-		} else if ops == 2 {
+		case 2:
 			resp, err = buildGoodResponse(expected)
 			if err != nil {
 				t.Fatalf("%s is not nil", err)
 			}
-		} else {
+		default:
 			t.Fatalf("Unexpected number of requests: %d", ops)
 		}
 		return resp
@@ -254,7 +254,7 @@ func TestGetKeyWithMultipleAuth(t *testing.T) {
 	}
 }
 
-// TestNoAuthPrincipals tests the case where no auth handlers are available
+// TestNoAuthPrincipals tests the case where no auth handlers are available.
 func TestNoAuthPrincipals(t *testing.T) {
 	// Create a test server - won't be used since auth fails before request is made
 	resp, err := buildErrorResponse(types.UnauthenticatedCode, nil)
@@ -292,7 +292,7 @@ func TestNoAuthPrincipals(t *testing.T) {
 	}
 }
 
-// TestOnlyUnauthPrincipals tests the case where a principal is provided but it is unauthorized
+// TestOnlyUnauthPrincipals tests the case where a principal is provided but it is unauthorized.
 func TestOnlyUnauthPrincipals(t *testing.T) {
 	// Create a test server which returns an unauthorized error
 	resp, err := buildErrorResponse(types.UnauthorizedCode, nil)
@@ -663,11 +663,11 @@ func TestGetInvalidKeys(t *testing.T) {
 
 	bytes, err := json.Marshal(expected)
 	if err != nil {
-		t.Fatalf("Error marshalling key %s", err)
+		t.Fatalf("Error marshaling key %s", err)
 	}
 
 	tempDir := t.TempDir()
-	err = os.WriteFile(path.Join(tempDir, "testkey"), bytes, 0600)
+	err = os.WriteFile(path.Join(tempDir, "testkey"), bytes, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write invalid test key: %s", err)
 	}

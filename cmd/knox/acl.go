@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -106,7 +107,7 @@ Examples:
 			}
 
 			if len(acl) != 1 {
-				return fmt.Errorf("expected exactly one ACL entry")
+				return errors.New("expected exactly one ACL entry")
 			}
 
 			client, err := getAPIClient()
@@ -162,7 +163,7 @@ Examples:
 			}
 
 			if len(acl) != 1 {
-				return fmt.Errorf("expected exactly one ACL entry")
+				return errors.New("expected exactly one ACL entry")
 			}
 
 			client, err := getAPIClient()

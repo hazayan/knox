@@ -3,6 +3,7 @@ package types_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	. "github.com/hazayan/knox/pkg/types"
@@ -100,7 +101,7 @@ func TestKeyVersionListUpdate(t *testing.T) {
 	}
 
 	_, dneErr := kvl.Update(2387498237, Active)
-	if dneErr != ErrKeyVersionNotFound {
+	if !errors.Is(dneErr, ErrKeyVersionNotFound) {
 		t.Error("Expected version to not exist")
 	}
 }
@@ -115,6 +116,7 @@ func marshalUnmarshal(t *testing.T, in json.Marshaler, out json.Unmarshaler) {
 		t.Error(uErr)
 	}
 }
+
 func TestAccessTypeMarshaling(t *testing.T) {
 	for _, in := range []AccessType{Read, Write, Admin, None} {
 		var out AccessType
@@ -123,8 +125,7 @@ func TestAccessTypeMarshaling(t *testing.T) {
 			t.Error("Unmarshaled not same as input ", in, out)
 		}
 	}
-	var invalid AccessType
-	invalid = 12938798732 // This is not currently an AccessType
+	var invalid AccessType = 12938798732 // This is not currently an AccessType
 	_, marshalErr := invalid.MarshalJSON()
 	if marshalErr == nil {
 		t.Error("Marshaled invalid enum")
@@ -134,6 +135,7 @@ func TestAccessTypeMarshaling(t *testing.T) {
 		t.Error("Unmarshaled invalid string")
 	}
 }
+
 func TestPrincipalTypeMarshaling(t *testing.T) {
 	for _, in := range []PrincipalType{User, UserGroup, Machine, MachinePrefix, Service, ServicePrefix} {
 		var out PrincipalType
@@ -141,10 +143,8 @@ func TestPrincipalTypeMarshaling(t *testing.T) {
 		if in != out {
 			t.Error("Unmarshaled not same as input ", in, out)
 		}
-
 	}
-	var invalid PrincipalType
-	invalid = 12938798732 // This is not currently an PrincipalType
+	var invalid PrincipalType = 12938798732 // This is not currently an PrincipalType
 	_, marshalErr := invalid.MarshalJSON()
 	if marshalErr == nil {
 		t.Error("Marshaled invalid enum")
@@ -154,10 +154,10 @@ func TestPrincipalTypeMarshaling(t *testing.T) {
 		t.Error("Did not unmarshal invalid string")
 	}
 	if invalid != -1 {
-		t.Error("Unmarshalling invalid Principal type should result in -1")
+		t.Error("Unmarshaling invalid Principal type should result in -1")
 	}
-
 }
+
 func TestVersionStatusMarshaling(t *testing.T) {
 	for _, in := range []VersionStatus{Primary, Active, Inactive} {
 		var out VersionStatus
@@ -165,10 +165,8 @@ func TestVersionStatusMarshaling(t *testing.T) {
 		if in != out {
 			t.Error("Unmarshaled not same as input ", in, out)
 		}
-
 	}
-	var invalid VersionStatus
-	invalid = 12938798732 // This is not currently an VersionStatus
+	var invalid VersionStatus = 12938798732 // This is not currently an VersionStatus
 	_, marshalErr := invalid.MarshalJSON()
 	if marshalErr == nil {
 		t.Error("Marshaled invalid enum")
@@ -178,6 +176,7 @@ func TestVersionStatusMarshaling(t *testing.T) {
 		t.Error("Unmarshaled invalid string")
 	}
 }
+
 func TestKeyPathMarhaling(t *testing.T) {
 	key := Key{
 		ID:          "test",
@@ -246,7 +245,6 @@ func TestACLAddMultiple(t *testing.T) {
 	if len(acl4) != 1 {
 		t.Error("Unexpected ACL length")
 	}
-
 }
 
 func TestACLAdd(t *testing.T) {
@@ -267,8 +265,8 @@ func TestACLAdd(t *testing.T) {
 	if len(acl3) != 2 {
 		t.Error("Unexpected ACL for adding access")
 	}
-
 }
+
 func TestAccessTypeCanAccess(t *testing.T) {
 	if Read.CanAccess(Admin) || Read.CanAccess(Write) || !Read.CanAccess(Read) || !Read.CanAccess(None) {
 		t.Error("Read has incorrect access")
@@ -328,7 +326,6 @@ func TestKeyValidate(t *testing.T) {
 	if invalidKey4.Validate() == nil {
 		t.Error("Invalid Version Hash should fail to validate successfully")
 	}
-
 }
 
 func TestKeyVersionListValidate(t *testing.T) {

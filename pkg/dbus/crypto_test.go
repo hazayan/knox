@@ -1,11 +1,12 @@
 package dbus
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 )
 
-// TestDHSubgroupValidation verifies that small subgroup attacks are prevented
+// TestDHSubgroupValidation verifies that small subgroup attacks are prevented.
 func TestDHSubgroupValidation(t *testing.T) {
 	dh, err := NewDHKeyExchange()
 	if err != nil {
@@ -99,7 +100,7 @@ func TestDHSubgroupValidation(t *testing.T) {
 	})
 }
 
-// TestPKCS7ConstantTime verifies padding validation is constant-time
+// TestPKCS7ConstantTime verifies padding validation is constant-time.
 func TestPKCS7ConstantTime(t *testing.T) {
 	blockSize := 16
 
@@ -143,7 +144,7 @@ func TestPKCS7ConstantTime(t *testing.T) {
 				firstError = err
 			} else {
 				// All errors should be the exact same error instance
-				if err != firstError {
+				if !errors.Is(err, firstError) {
 					t.Errorf("%s: Different error returned: %v vs %v", tc.name, err, firstError)
 				}
 			}
@@ -151,7 +152,7 @@ func TestPKCS7ConstantTime(t *testing.T) {
 	})
 }
 
-// TestDHParameterSize verifies we're using 2048-bit parameters
+// TestDHParameterSize verifies we're using 2048-bit parameters.
 func TestDHParameterSize(t *testing.T) {
 	bitSize := dhPrime.BitLen()
 	if bitSize != 2048 {

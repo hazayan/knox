@@ -16,8 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -45,13 +45,13 @@ type Backend struct {
 // The baseDir directory will be created if it doesn't exist.
 func New(baseDir string) (*Backend, error) {
 	// Ensure the directory exists
-	if err := os.MkdirAll(baseDir, 0700); err != nil {
+	if err := os.MkdirAll(baseDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
 	// Verify we can write to the directory
 	testFile := filepath.Join(baseDir, ".knox-test")
-	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 		return nil, fmt.Errorf("storage directory is not writable: %w", err)
 	}
 	os.Remove(testFile)
@@ -113,7 +113,7 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 
 	// Write atomically using a temporary file + rename
 	tempPath := path + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+	if err := os.WriteFile(tempPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write key file: %w", err)
 	}
 
@@ -177,7 +177,6 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to list keys: %w", err)
 	}
@@ -232,7 +231,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 		}
 
 		tempPath := path + ".tmp"
-		if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		if err := os.WriteFile(tempPath, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write updated key: %w", err)
 		}
 
@@ -259,7 +258,7 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 	// Try to write a test file
 	testPath := filepath.Join(b.baseDir, ".knox-health")
-	if err := os.WriteFile(testPath, []byte("health-check"), 0600); err != nil {
+	if err := os.WriteFile(testPath, []byte("health-check"), 0o600); err != nil {
 		return storage.ErrStorageUnavailable
 	}
 	os.Remove(testPath)
@@ -290,7 +289,6 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate stats: %w", err)
 	}
@@ -385,5 +383,7 @@ func (b *Backend) incrementOp(op string) {
 }
 
 // Verify that Backend implements the required interfaces at compile time.
-var _ storage.Backend = (*Backend)(nil)
-var _ storage.StatsProvider = (*Backend)(nil)
+var (
+	_ storage.Backend       = (*Backend)(nil)
+	_ storage.StatsProvider = (*Backend)(nil)
+)

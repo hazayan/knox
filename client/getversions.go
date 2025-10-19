@@ -1,11 +1,12 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -28,12 +29,15 @@ For more about knox, see https://github.com/hazayan/knox.
 See also: knox keys, knox get
 	`,
 }
-var getVersionsState = cmdGetVersions.Flag.String("s", "active", "")
-var verboseOutput = cmdGetVersions.Flag.Bool("v", false, "verbose")
+
+var (
+	getVersionsState = cmdGetVersions.Flag.String("s", "active", "")
+	verboseOutput    = cmdGetVersions.Flag.Bool("v", false, "verbose")
+)
 
 func runGetVersions(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("get takes only one argument. See 'knox help versions'"), false}
+		return &ErrorStatus{errors.New("get takes only one argument. See 'knox help versions'"), false}
 	}
 
 	var status types.VersionStatus

@@ -23,16 +23,18 @@ import (
 const refresh = 10 * time.Second
 
 // For linear random backoff on write requests.
-const baseBackoff = 50 * time.Millisecond
-const maxBackoff = 3 * time.Second
-const maxRetryAttempts = 3
+const (
+	baseBackoff      = 50 * time.Millisecond
+	maxBackoff       = 3 * time.Second
+	maxRetryAttempts = 3
+)
 
 var (
 	errNoAuth           = errors.New("No authentication data given. Use 'knox login' or set KNOX_USER_AUTH or KNOX_MACHINE_AUTH")
 	errUnsuccessfulAuth = errors.New("Unsuccessful authorization. No attempted principals were able to perform the requested operation")
 )
 
-// Client is an interface for interacting with a specific knox key
+// Client is an interface for interacting with a specific knox key.
 type Client interface {
 	// GetPrimary returns the primary key version for the knox key.
 	// This should be used for sending relationships like signing, encrypting, or api secrets
@@ -123,7 +125,7 @@ func NewFileClient(keyID string) (Client, error) {
 	return c, nil
 }
 
-// NewMockKeyVersion creates a Knox types.KeyVersion to be used for testing
+// NewMockKeyVersion creates a Knox types.KeyVersion to be used for testing.
 func NewMockKeyVersion(keydata []byte, status types.VersionStatus) types.KeyVersion {
 	return types.KeyVersion{Data: keydata, Status: status}
 }
@@ -154,10 +156,10 @@ func Register(keyID string) ([]byte, error) {
 	if err != nil {
 		errorMsg := fmt.Sprintf("error getting knox key %s. error: %v", keyID, err)
 		if stdout.Len() > 0 {
-			errorMsg += ", stdout: '" + string(stdout.Bytes()) + "'"
+			errorMsg += ", stdout: '" + stdout.String() + "'"
 		}
 		if stderr.Len() > 0 {
-			errorMsg += ", stderr: '" + string(stderr.Bytes()) + "'"
+			errorMsg += ", stderr: '" + stderr.String() + "'"
 		}
 		return nil, errors.New(errorMsg)
 	}
@@ -223,7 +225,7 @@ func NewClient(host string, client HTTP, authHandlers []AuthHandler, keyFolder, 
 // CacheGetKey gets the key from file system cache.
 func (c *HTTPClient) CacheGetKey(keyID string) (*types.Key, error) {
 	if c.KeyFolder == "" {
-		return nil, fmt.Errorf("no folder set for cached key")
+		return nil, errors.New("no folder set for cached key")
 	}
 	path := path.Join(c.KeyFolder, keyID)
 	b, err := os.ReadFile(path)
@@ -238,7 +240,7 @@ func (c *HTTPClient) CacheGetKey(keyID string) (*types.Key, error) {
 
 	// do not return the invalid format cached keys
 	if k.ID == "" || k.ACL == nil || k.VersionList == nil || k.VersionHash == "" {
-		return nil, fmt.Errorf("invalid key content for the cached key")
+		return nil, errors.New("invalid key content for the cached key")
 	}
 
 	return &k, nil
@@ -261,7 +263,7 @@ func (c *HTTPClient) GetKey(keyID string) (*types.Key, error) {
 // CacheGetKeyWithStatus gets the key with status from file system cache.
 func (c *HTTPClient) CacheGetKeyWithStatus(keyID string, status types.VersionStatus) (*types.Key, error) {
 	if c.KeyFolder == "" {
-		return nil, fmt.Errorf("no folder set for cached key")
+		return nil, errors.New("no folder set for cached key")
 	}
 	st, err := status.MarshalJSON()
 	if err != nil {
@@ -345,7 +347,7 @@ func (c *HTTPClient) getHTTPData(method string, path string, body url.Values, da
 type UncachedHTTPClient struct {
 	// Host is used as the host for http connections
 	Host string
-	//AuthHandlers contains a list of auth handlers which return the authorization string for authenticating to knox. Users should be prefixed by 0u, machines by 0m. On fail, return empty string.
+	// AuthHandlers contains a list of auth handlers which return the authorization string for authenticating to knox. Users should be prefixed by 0u, machines by 0m. On fail, return empty string.
 	AuthHandlers []AuthHandler
 	// DefaultClient is the http client for making network calls
 	DefaultClient HTTP
@@ -374,7 +376,7 @@ func (c *UncachedHTTPClient) NetworkGetKey(keyID string) (*types.Key, error) {
 
 	// do not return the invalid format remote keys
 	if key.ID == "" || key.ACL == nil || key.VersionList == nil || key.VersionHash == "" {
-		return nil, fmt.Errorf("invalid key content for the remote key")
+		return nil, errors.New("invalid key content for the remote key")
 	}
 
 	return key, err

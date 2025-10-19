@@ -74,7 +74,7 @@ func InitializeAudit(cfg AuditConfig) error {
 	if cfg.Output == "stdout" || cfg.Output == "" {
 		AuditLogger.SetOutput(os.Stdout)
 	} else {
-		file, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+		file, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 		if err != nil {
 			return err
 		}
@@ -254,7 +254,7 @@ func SanitizeDatabaseURL(dbURL string) string {
 	return u.String()
 }
 
-// sanitizeSimpleFormat handles non-URL formats like "user:pass@host/db"
+// sanitizeSimpleFormat handles non-URL formats like "user:pass@host/db".
 func sanitizeSimpleFormat(dbURL string) string {
 	// Find @ symbol
 	atIndex := strings.LastIndex(dbURL, "@")

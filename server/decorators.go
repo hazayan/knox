@@ -1,13 +1,13 @@
 package server
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"net/url"
 
 	"github.com/gorilla/context"
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/log"
+	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server/auth"
 )
 
@@ -33,7 +33,7 @@ func setAPIError(r *http.Request, val *HTTPError) {
 	context.Set(r, apiErrorContext, val)
 }
 
-// GetPrincipal gets the principal authenticated through the authentication decorator
+// GetPrincipal gets the principal authenticated through the authentication decorator.
 func GetPrincipal(r *http.Request) types.Principal {
 	ctx := getOrInitializePrincipalContext(r)
 	return ctx.GetCurrentPrincipal()
@@ -91,7 +91,7 @@ func setRouteID(r *http.Request, val string) {
 	context.Set(r, idContext, val)
 }
 
-// AddHeader adds a HTTP header to the response
+// AddHeader adds a HTTP header to the response.
 func AddHeader(k, v string) func(http.HandlerFunc) http.HandlerFunc {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +221,7 @@ func Authentication(providers []auth.Provider, matcher ProviderMatcher) func(htt
 		return func(w http.ResponseWriter, r *http.Request) {
 			var defaultPrincipal types.Principal
 			allPrincipals := map[string]types.Principal{}
-			errReturned := fmt.Errorf("No matching authentication providers found")
+			errReturned := errors.New("No matching authentication providers found")
 
 			for _, p := range providers {
 				if match, payload := matcher(p, r); match {
@@ -264,7 +264,7 @@ func providerMatch(provider auth.Provider, request *http.Request) (providerSuppo
 func parseParams(parameters []Parameter) func(http.HandlerFunc) http.HandlerFunc {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			var ps = make(map[string]string)
+			ps := make(map[string]string)
 			for _, p := range parameters {
 				if s, ok := p.Get(r); ok {
 					ps[p.Name()] = s

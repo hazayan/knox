@@ -1,7 +1,6 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"bytes"
 	"encoding/json"
 	"strings"
@@ -12,9 +11,9 @@ import (
 	"github.com/google/tink/go/insecurecleartextkeyset"
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/mac"
-	"github.com/google/tink/go/testkeyset"
-
 	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
+	"github.com/google/tink/go/testkeyset"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func TestNameOfSupportedTinkKeyTemplates(t *testing.T) {
@@ -43,14 +42,14 @@ func TestObeyNamingRule(t *testing.T) {
 		illegalKnoxIdentifier := "wrongKnoxIdentifier"
 		err := obeyNamingRule(k, illegalKnoxIdentifier)
 		if err == nil {
-			t.Fatalf("cannot identify illegal knox identifer for template '%s'", k)
+			t.Fatalf("cannot identify illegal knox identifier for template '%s'", k)
 		}
 	}
 	for k, v := range tinkKeyTemplates {
 		legalKnoxIdentifier := v.knoxIDPrefix + "test"
 		err := obeyNamingRule(k, legalKnoxIdentifier)
 		if err != nil {
-			t.Fatalf("cannot accept legal knox identifer for template '%s'", k)
+			t.Fatalf("cannot accept legal knox identifier for template '%s'", k)
 		}
 	}
 }
@@ -130,7 +129,7 @@ func getDummyKnoxVersionList(
 	var dummyVersionList types.KeyVersionList
 	tinkKeyIDToKnoxVersionID := make(map[uint32]uint64)
 	// counts decide how many versions this dummy version list will have
-	for i := 0; i < counts; i++ {
+	for i := range counts {
 		// get a tink keyset handle that contains a fresh single key and the keyID is not duplicated
 		var keysetHandle *keyset.Handle
 		var err error

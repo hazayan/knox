@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -29,7 +30,7 @@ var getACLJSON = cmdGetACL.Flag.Bool("json", false, "")
 
 func runGetACL(cmd *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("acl takes only one argument. See 'knox help acl'"), false}
+		return &ErrorStatus{errors.New("acl takes only one argument. See 'knox help acl'"), false}
 	}
 
 	keyID := args[0]

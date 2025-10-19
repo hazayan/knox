@@ -16,7 +16,7 @@ Prints the current version of the Knox client.
 `,
 }
 
-// GetVersion exposes the current client version
+// GetVersion exposes the current client version.
 func GetVersion() string {
 	return Version
 }

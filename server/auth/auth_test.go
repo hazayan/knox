@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-	"time"
-
 	"testing"
+	"time"
 
 	"github.com/hazayan/knox/pkg/types"
 )
@@ -95,6 +94,7 @@ func TestUserCanAccess(t *testing.T) {
 		t.Error("user can access empty ACL")
 	}
 }
+
 func TestMachineCanAccess(t *testing.T) {
 	u := machine("test001")
 	a1 := types.Access{ID: "test001", AccessType: types.Write, Type: types.Machine}
@@ -132,8 +132,10 @@ func TestMachineCanAccess(t *testing.T) {
 
 func TestServiceCanAccess(t *testing.T) {
 	s := NewService("example.com", "serviceA")
-	a1 := types.Access{ID: "spiffe://example.com/serviceA", AccessType: types.Read,
-		Type: types.Service}
+	a1 := types.Access{
+		ID: "spiffe://example.com/serviceA", AccessType: types.Read,
+		Type: types.Service,
+	}
 
 	acl1 := types.ACL([]types.Access{a1})
 	if s.CanAccess(acl1, types.Admin) {
@@ -198,7 +200,7 @@ aV+BuROvrG4wCgYIKoZIzj0EAwIDSAAwRQIgZpgo1bmCAdSaVCqJKDmMKfui2dT/
 3ucYcCZi9dUZjtMCIQC/d1se0XhhZ8eRfqzf0Uj0jHvan4opB0aD5CgSVlct0w==
 -----END CERTIFICATE-----`
 
-// clientCertB64 is a base64 encoded cert (inner contents of a CERTIFICATE pem block)
+// clientCertB64 is a base64 encoded cert (inner contents of a CERTIFICATE pem block).
 const clientCertB64 = `MIICjzCCAjSgAwIBAgIUUOdxnpGiNZhsB0AySQMJ+Lx5WqEwCgYIKoZIzj0EAwIw
 aTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh
 biBGcmFuY2lzY28xHzAdBgNVBAoTFkludGVybmV0IFdpZGdldHMsIEluYy4xDDAK
@@ -237,7 +239,6 @@ func TestMTLSSuccess(t *testing.T) {
 		time: func() time.Time { return time.Date(2016, time.April, 22, 11, 0, 0, 0, time.UTC) },
 	}
 	p, err := a.Authenticate(hostname, req)
-
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -324,7 +325,6 @@ func TestMTLSBadHostname(t *testing.T) {
 	if err == nil {
 		t.Fatal("hostname should not match")
 	}
-
 }
 
 func TestGetUser(t *testing.T) {

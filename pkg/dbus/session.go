@@ -3,6 +3,7 @@ package dbus
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -73,7 +74,7 @@ func (s *Session) Encrypt(data []byte) ([]byte, []byte, error) {
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return nil, nil, fmt.Errorf("session is closed")
+		return nil, nil, errors.New("session is closed")
 	}
 
 	// Update last used timestamp
@@ -85,12 +86,12 @@ func (s *Session) Encrypt(data []byte) ([]byte, []byte, error) {
 		return []byte{}, data, nil
 	case AlgorithmDHAES:
 		if s.dh == nil {
-			return nil, nil, fmt.Errorf("DH key exchange not completed")
+			return nil, nil, errors.New("DH key exchange not completed")
 		}
 
 		key := s.dh.GetSharedKey()
 		if key == nil {
-			return nil, nil, fmt.Errorf("shared key not established")
+			return nil, nil, errors.New("shared key not established")
 		}
 
 		// Encrypt using AES-128-CBC
@@ -112,7 +113,7 @@ func (s *Session) Decrypt(parameters, value []byte) ([]byte, error) {
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return nil, fmt.Errorf("session is closed")
+		return nil, errors.New("session is closed")
 	}
 
 	// Update last used timestamp
@@ -124,12 +125,12 @@ func (s *Session) Decrypt(parameters, value []byte) ([]byte, error) {
 		return value, nil
 	case AlgorithmDHAES:
 		if s.dh == nil {
-			return nil, fmt.Errorf("DH key exchange not completed")
+			return nil, errors.New("DH key exchange not completed")
 		}
 
 		key := s.dh.GetSharedKey()
 		if key == nil {
-			return nil, fmt.Errorf("shared key not established")
+			return nil, errors.New("shared key not established")
 		}
 
 		// Decrypt using AES-128-CBC
@@ -151,11 +152,11 @@ func (s *Session) CompleteKeyExchange(clientPublicKey []byte) error {
 	defer s.mu.Unlock()
 
 	if s.algorithm != AlgorithmDHAES {
-		return fmt.Errorf("key exchange only applicable for DH-AES algorithm")
+		return errors.New("key exchange only applicable for DH-AES algorithm")
 	}
 
 	if s.dh == nil {
-		return fmt.Errorf("DH not initialized")
+		return errors.New("DH not initialized")
 	}
 
 	// Compute shared key using client's public key

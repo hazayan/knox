@@ -2,6 +2,7 @@ package dbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -157,14 +158,14 @@ func (c *Collection) loadItems(conn *dbus.Conn) error {
 	return nil
 }
 
-// Property callbacks
+// Property callbacks.
 func (c *Collection) onLabelChanged(change *prop.Change) *dbus.Error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	label, ok := change.Value.(string)
 	if !ok {
-		return dbus.MakeFailedError(fmt.Errorf("invalid label type"))
+		return dbus.MakeFailedError(errors.New("invalid label type"))
 	}
 
 	c.label = label
@@ -225,7 +226,7 @@ func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secre
 	// Check if item exists
 	if existing, ok := c.items[itemID]; ok {
 		if !replace {
-			return "/", "/", dbus.MakeFailedError(fmt.Errorf("item already exists"))
+			return "/", "/", dbus.MakeFailedError(errors.New("item already exists"))
 		}
 		// Delete existing item
 		c.bridge.knoxClient.DeleteKey(existing.keyID)

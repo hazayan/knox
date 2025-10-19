@@ -2,6 +2,7 @@ package dbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -54,14 +55,14 @@ func (i *Item) Unexport(conn *dbus.Conn) {
 	conn.Export(nil, i.path, ItemInterface)
 }
 
-// Property change callbacks
+// Property change callbacks.
 func (i *Item) onLabelChanged(c *prop.Change) *dbus.Error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	label, ok := c.Value.(string)
 	if !ok {
-		return dbus.MakeFailedError(fmt.Errorf("invalid label type"))
+		return dbus.MakeFailedError(errors.New("invalid label type"))
 	}
 
 	i.label = label
@@ -78,7 +79,7 @@ func (i *Item) onAttributesChanged(c *prop.Change) *dbus.Error {
 
 	attrs, ok := c.Value.(map[string]string)
 	if !ok {
-		return dbus.MakeFailedError(fmt.Errorf("invalid attributes type"))
+		return dbus.MakeFailedError(errors.New("invalid attributes type"))
 	}
 
 	i.attributes = attrs
@@ -124,7 +125,7 @@ func (i *Item) GetSecret(sessionPath dbus.ObjectPath) (Secret, *dbus.Error) {
 	// Get primary version
 	primary := key.VersionList.GetPrimary()
 	if primary == nil {
-		return Secret{}, dbus.MakeFailedError(fmt.Errorf("no primary version"))
+		return Secret{}, dbus.MakeFailedError(errors.New("no primary version"))
 	}
 
 	// Encrypt the secret

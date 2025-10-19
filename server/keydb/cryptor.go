@@ -6,14 +6,14 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
+	"errors"
 
 	"github.com/hazayan/knox/pkg/types"
 )
 
-var ErrCryptorVersion = fmt.Errorf("Cryptor version does not match")
+var ErrCryptorVersion = errors.New("Cryptor version does not match")
 
-// Cryptor is an interface for converting a knox Key to a DB Key
+// Cryptor is an interface for converting a knox Key to a DB Key.
 type Cryptor interface {
 	Decrypt(*DBKey) (*types.Key, error)
 	Encrypt(*types.Key) (*DBKey, error)
@@ -56,7 +56,7 @@ func (c *aesGCMCryptor) EncryptVersion(k *types.Key, v *types.KeyVersion) (*EncK
 	}, nil
 }
 
-// generateAD generates the data to be signed with key version versionid|creationtime|keyid
+// generateAD generates the data to be signed with key version versionid|creationtime|keyid.
 func (c *aesGCMCryptor) generateAD(kid string, vid uint64, creation int64) []byte {
 	idBytes := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(idBytes, vid)

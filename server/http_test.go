@@ -17,10 +17,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/hazayan/knox/pkg/types"
+	. "github.com/hazayan/knox/server"
 	"github.com/hazayan/knox/server/auth"
 	"github.com/hazayan/knox/server/keydb"
-
-	. "github.com/hazayan/knox/server"
 )
 
 var router *mux.Router
@@ -53,7 +52,7 @@ func getRouter() *mux.Router {
 	return router
 }
 
-// setup reinitialized the router with a fresh keydb for every test
+// setup reinitialized the router with a fresh keydb for every test.
 func setup() {
 	cryptor := keydb.NewAESGCMCryptor(0, []byte("testtesttesttest"))
 	db := keydb.NewTempDB()
@@ -234,7 +233,7 @@ func TestAddKeys(t *testing.T) {
 		t.Fatal("Key ID's do not match")
 	}
 	if !bytes.Equal(key.VersionList[0].Data, data) {
-		t.Fatal("Data is not consistant")
+		t.Fatal("Data is not consistent")
 	}
 }
 
@@ -260,7 +259,7 @@ func TestConcurrentAddKeys(t *testing.T) {
 			t.Error("Key ID's do not match")
 		}
 		if !bytes.Equal(key.VersionList[0].Data, data) {
-			t.Error("Data is not consistant")
+			t.Error("Data is not consistent")
 		}
 	}()
 	wg.Add(1)
@@ -279,7 +278,7 @@ func TestConcurrentAddKeys(t *testing.T) {
 		putVersion(t, keyID, keyVersionID2, types.Primary)
 		getKey(t, keyID)
 	}()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

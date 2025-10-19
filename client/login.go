@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,9 +15,10 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const DefaultUsageLine = "login [username]"
-const DefaultShortDescription = "login as user and save authentication data"
-const DefaultLongDescriptionFormat = `
+const (
+	DefaultUsageLine             = "login [username]"
+	DefaultShortDescription      = "login as user and save authentication data"
+	DefaultLongDescriptionFormat = `
 Will authenticate user via OAuth2 password grant flow if available. Requires user to enter username and password. The authentication data is saved in "%v".
 
 The optional username argument can specify the user that to log in as otherwise it uses the current os user.
@@ -25,6 +27,7 @@ For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox help auth
 	`
+)
 const DefaultTokenFileLocation = ".knox_user_auth"
 
 func NewLoginCommand(
@@ -33,8 +36,8 @@ func NewLoginCommand(
 	tokenFileLocation string,
 	usageLine string,
 	shortDescription string,
-	longDescription string) *Command {
-
+	longDescription string,
+) *Command {
 	runLoginAugmented := func(cmd *Command, args []string) *ErrorStatus {
 		return runLogin(cmd, oauthClientID, tokenFileLocation, oauthTokenEndpoint, args)
 	}
@@ -79,7 +82,8 @@ func runLogin(
 	oauthClientID string,
 	tokenFileLocation string,
 	oauthTokenEndpoint string,
-	args []string) *ErrorStatus {
+	args []string,
+) *ErrorStatus {
 	var username string
 	u, err := user.Current()
 	if err != nil {
@@ -91,7 +95,7 @@ func runLogin(
 	case 1:
 		username = args[0]
 	default:
-		return &ErrorStatus{fmt.Errorf("Invalid arguments. See 'knox login -h'"), false}
+		return &ErrorStatus{errors.New("Invalid arguments. See 'knox login -h'"), false}
 	}
 
 	fmt.Println("Please enter your password:")
@@ -124,7 +128,7 @@ func runLogin(
 		return &ErrorStatus{fmt.Errorf("Fail to authenticate: %q", authResp.Error), false}
 	}
 
-	err = os.WriteFile(tokenFileLocation, data, 0600)
+	err = os.WriteFile(tokenFileLocation, data, 0o600)
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("Failed to write auth data to file: %s", err.Error()), false}
 	}
