@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,10 +10,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/spf13/cobra"
-
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/types"
+	"github.com/spf13/cobra"
 )
 
 func newKeyCmd() *cobra.Command {
@@ -53,7 +53,7 @@ Examples:
   knox key create myapp:api_key --data-file secret.txt
   knox key create myapp:api_key --data "secret" --acl "User:alice@example.com:Read"`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			// Get data from various sources
@@ -61,7 +61,10 @@ Examples:
 			var err error
 
 			if dataFile != "" {
-				keyData, err = os.ReadFile(dataFile)
+				homeDir, _ := os.UserHomeDir()
+				allowedDirs := []string{homeDir, "."}
+				allowedExts := []string{".txt", ".json", ".pem"}
+				keyData, err = validateAndReadFile(dataFile, allowedDirs, allowedExts)
 				if err != nil {
 					return fmt.Errorf("failed to read data file: %w", err)
 				}
@@ -76,7 +79,7 @@ Examples:
 			}
 
 			if len(keyData) == 0 {
-				return fmt.Errorf("no data provided")
+				return errors.New("no data provided")
 			}
 
 			// Parse ACL entries
@@ -98,7 +101,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id":     keyID,
 					"version_id": versionID,
 					"status":     "created",
@@ -135,7 +138,7 @@ Examples:
   knox key get myapp:api_key --all
   knox key get myapp:api_key --status Primary`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			client, err := getAPIClient()
@@ -193,7 +196,7 @@ Examples:
   knox key list myapp:
   knox key list --json`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				prefix = args[0]
 			}
@@ -221,7 +224,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"keys":  keys,
 					"count": len(keys),
 				})
@@ -258,13 +261,16 @@ Examples:
   knox key delete myapp:api_key
   knox key delete myapp:api_key --force`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			if !force {
 				fmt.Printf("Are you sure you want to delete key '%s'? (y/N): ", keyID)
 				var response string
-				fmt.Scanln(&response)
+				_, err := fmt.Scanln(&response)
+				if err != nil {
+					return fmt.Errorf("failed to read user input: %w", err)
+				}
 				if strings.ToLower(response) != "y" {
 					fmt.Println("Deletion cancelled")
 					return nil
@@ -281,7 +287,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id": keyID,
 					"status": "deleted",
 				})
@@ -315,7 +321,7 @@ Examples:
   knox key rotate myapp:api_key --data "newsecret123"
   echo "newsecret123" | knox key rotate myapp:api_key`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			// Get data
@@ -323,7 +329,10 @@ Examples:
 			var err error
 
 			if dataFile != "" {
-				keyData, err = os.ReadFile(dataFile)
+				homeDir, _ := os.UserHomeDir()
+				allowedDirs := []string{homeDir, "."}
+				allowedExts := []string{".txt", ".json", ".pem"}
+				keyData, err = validateAndReadFile(dataFile, allowedDirs, allowedExts)
 				if err != nil {
 					return fmt.Errorf("failed to read data file: %w", err)
 				}
@@ -337,7 +346,7 @@ Examples:
 			}
 
 			if len(keyData) == 0 {
-				return fmt.Errorf("no data provided")
+				return errors.New("no data provided")
 			}
 
 			client, err := getAPIClient()
@@ -351,7 +360,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id":     keyID,
 					"version_id": versionID,
 					"status":     "added",
@@ -380,7 +389,7 @@ Examples:
   knox key versions myapp:api_key
   knox key versions myapp:api_key --json`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			client, err := getAPIClient()
@@ -405,16 +414,19 @@ Examples:
 
 			for _, v := range key.VersionList {
 				status := "Active"
-				if v.Status == types.Primary {
+				switch v.Status {
+				case types.Primary:
 					status = "Primary"
-				} else if v.Status == types.Inactive {
+				case types.Inactive:
 					status = "Inactive"
 				}
 
 				fmt.Fprintf(w, "%d\t%s\t%d\n", v.ID, status, v.CreationTime)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
@@ -440,11 +452,10 @@ func displayKey(key *types.Key, showAll bool) error {
 		}
 	} else {
 		primary := key.VersionList.GetPrimary()
-		if primary != nil {
-			fmt.Println(string(primary.Data))
-		} else {
-			return fmt.Errorf("no primary version found")
+		if primary == nil {
+			return errors.New("no primary version found")
 		}
+		fmt.Println(string(primary.Data))
 	}
 
 	return nil
@@ -526,7 +537,9 @@ func getAPIClient() (client.APIClient, error) {
 			cacheFolder = filepath.Join(home, cacheFolder[2:])
 		}
 		// Create cache directory if it doesn't exist
-		os.MkdirAll(cacheFolder, 0700)
+		if err := os.MkdirAll(cacheFolder, 0o700); err != nil {
+			return nil, fmt.Errorf("failed to create cache directory: %w", err)
+		}
 	}
 
 	knoxClient := client.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)

@@ -1,7 +1,9 @@
 package dbus
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -52,11 +54,11 @@ func (b *Bridge) Start() error {
 		return fmt.Errorf("failed to request name: %w", err)
 	}
 	if reply != dbus.RequestNameReplyPrimaryOwner {
-		return fmt.Errorf("name already taken")
+		return errors.New("name already taken")
 	}
 
 	// Create properties
-	b.props = prop.New(b.conn, ServicePath, map[string]map[string]*prop.Prop{
+	b.props, _ = prop.Export(b.conn, ServicePath, map[string]map[string]*prop.Prop{
 		ServiceInterface: {
 			"Collections": {
 				Value:    []dbus.ObjectPath{},
@@ -111,7 +113,10 @@ func (b *Bridge) Stop() error {
 	}
 
 	// Unexport service
-	b.conn.Export(nil, ServicePath, ServiceInterface)
+	if err := b.conn.Export(nil, ServicePath, ServiceInterface); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to unexport service: %v", err)
+	}
 
 	// Close connection
 	if err := b.conn.Close(); err != nil {
@@ -221,7 +226,7 @@ func (b *Bridge) CreateCollection(properties map[string]dbus.Variant, alias stri
 
 	// Check if collection exists
 	if _, ok := b.collections[name]; ok {
-		return "/", "/", dbus.MakeFailedError(fmt.Errorf("collection already exists"))
+		return "/", "/", dbus.MakeFailedError(errors.New("collection already exists"))
 	}
 
 	// Create collection
@@ -274,7 +279,7 @@ func (b *Bridge) Unlock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.Obje
 }
 
 // Lock locks objects (no-op in our implementation).
-func (b *Bridge) Lock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+func (b *Bridge) Lock(_ []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
 	// We don't support locking
 	return []dbus.ObjectPath{}, "/", nil
 }
@@ -308,7 +313,6 @@ func (b *Bridge) GetSecrets(items []dbus.ObjectPath, sessionPath dbus.ObjectPath
 		}
 
 		collectionName := parts[0]
-		// itemID := parts[1]
 
 		// Find collection
 		collection, ok := b.collections[collectionName]
@@ -362,7 +366,7 @@ func (b *Bridge) ReadAlias(name string) (dbus.ObjectPath, *dbus.Error) {
 }
 
 // SetAlias sets an alias for a collection.
-func (b *Bridge) SetAlias(name string, collection dbus.ObjectPath) *dbus.Error {
+func (b *Bridge) SetAlias(_ string, _ dbus.ObjectPath) *dbus.Error {
 	// TODO: Implement alias support
 	return nil
 }
@@ -461,7 +465,7 @@ func hasPrefix(s, prefix string) bool {
 func splitPath(path string) []string {
 	var parts []string
 	start := 0
-	for i := 0; i < len(path); i++ {
+	for i := range len(path) {
 		if path[i] == '/' {
 			if i > start {
 				parts = append(parts, path[start:i])

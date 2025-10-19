@@ -1,11 +1,12 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -42,42 +43,46 @@ See also: knox create, knox get
 
 var updateAccessACL = cmdUpdateAccess.Flag.String("acl", "", "")
 
-var updateAccessNone = cmdUpdateAccess.Flag.Bool("n", false, "")
-var updateAccessRead = cmdUpdateAccess.Flag.Bool("r", false, "")
-var updateAccessWrite = cmdUpdateAccess.Flag.Bool("w", false, "")
-var updateAccessAdmin = cmdUpdateAccess.Flag.Bool("a", false, "")
+var (
+	updateAccessNone  = cmdUpdateAccess.Flag.Bool("n", false, "")
+	updateAccessRead  = cmdUpdateAccess.Flag.Bool("r", false, "")
+	updateAccessWrite = cmdUpdateAccess.Flag.Bool("w", false, "")
+	updateAccessAdmin = cmdUpdateAccess.Flag.Bool("a", false, "")
+)
 
-var updateAccessMachine = cmdUpdateAccess.Flag.Bool("M", false, "")
-var updateAccessUser = cmdUpdateAccess.Flag.Bool("U", false, "")
-var updateAccessGroup = cmdUpdateAccess.Flag.Bool("G", false, "")
-var updateAccessPrefix = cmdUpdateAccess.Flag.Bool("P", false, "")
-var updateAccessService = cmdUpdateAccess.Flag.Bool("S", false, "")
-var updateAccessServicePrefix = cmdUpdateAccess.Flag.Bool("N", false, "")
+var (
+	updateAccessMachine       = cmdUpdateAccess.Flag.Bool("M", false, "")
+	updateAccessUser          = cmdUpdateAccess.Flag.Bool("U", false, "")
+	updateAccessGroup         = cmdUpdateAccess.Flag.Bool("G", false, "")
+	updateAccessPrefix        = cmdUpdateAccess.Flag.Bool("P", false, "")
+	updateAccessService       = cmdUpdateAccess.Flag.Bool("S", false, "")
+	updateAccessServicePrefix = cmdUpdateAccess.Flag.Bool("N", false, "")
+)
 
-func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
+func runUpdateAccess(_ *Command, args []string) *ErrorStatus {
 	if *updateAccessACL != "" {
 		if len(args) != 1 {
-			return &ErrorStatus{fmt.Errorf("access takes one argument when used with --acl. See 'knox help access'"), false}
+			return &ErrorStatus{errors.New("access takes one argument when used with --acl. See 'knox help access'"), false}
 		}
 		keyID := args[0]
 		b, err := os.ReadFile(*updateAccessACL)
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("Could not read acl file: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("could not read acl file: %s", err.Error()), false}
 		}
 		acl := []types.Access{}
 		err = json.Unmarshal(b, &acl)
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("Could not decode access list properly: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("could not decode access list properly: %s", err.Error()), false}
 		}
 		err = cli.PutAccess(keyID, acl...)
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("Failed to update access: %s", err.Error()), true}
+			return &ErrorStatus{fmt.Errorf("failed to update access: %s", err.Error()), true}
 		}
 		fmt.Println("Successfully updated Access")
 		return nil
 	}
 	if len(args) != 2 {
-		return &ErrorStatus{fmt.Errorf("access takes exactly two arguments. See 'knox help access'"), false}
+		return &ErrorStatus{errors.New("access takes exactly two arguments. See 'knox help access'"), false}
 	}
 	keyID := args[0]
 	principal := args[1]
@@ -93,7 +98,7 @@ func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
 	case *updateAccessAdmin:
 		access.AccessType = types.Admin
 	default:
-		return &ErrorStatus{fmt.Errorf("access requires {-n,-r,-w,-a}. See 'knox help access'"), false}
+		return &ErrorStatus{errors.New("access requires {-n,-r,-w,-a}. See 'knox help access'"), false}
 	}
 	switch {
 	case *updateAccessMachine:
@@ -109,11 +114,11 @@ func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
 	case *updateAccessServicePrefix:
 		access.Type = types.ServicePrefix
 	default:
-		return &ErrorStatus{fmt.Errorf("access requires {-M|-U|-G|-P|-S|-N}. See 'knox help access'"), false}
+		return &ErrorStatus{errors.New("access requires {-M|-U|-G|-P|-S|-N}. See 'knox help access'"), false}
 	}
 	err := cli.PutAccess(keyID, access)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Failed to update access: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("failed to update access: %s", err.Error()), true}
 	}
 	fmt.Println("Successfully updated Access")
 	return nil

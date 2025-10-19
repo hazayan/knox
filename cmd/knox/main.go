@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func main() {
 Knox provides secure storage and rotation of credentials with fine-grained
 access control and comprehensive audit logging.`,
 		Version: version,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Skip config loading for config, version, and completion commands
 			cmdName := cmd.Name()
 			if cmdName == "config" || cmdName == "version" || cmdName == "completion" || cmdName == "help" {
@@ -83,7 +84,7 @@ func loadConfig() error {
 
 func getCurrentProfile() (*config.ClientProfile, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("configuration not loaded")
+		return nil, errors.New("configuration not loaded")
 	}
 
 	prof, ok := cfg.Profiles[cfg.CurrentProfile]

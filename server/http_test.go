@@ -1,5 +1,5 @@
 // This is for testing routes in api from a black box perspective
-package server_test
+package server
 
 import (
 	"bytes"
@@ -19,13 +19,11 @@ import (
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server/auth"
 	"github.com/hazayan/knox/server/keydb"
-
-	. "github.com/hazayan/knox/server"
 )
 
 var router *mux.Router
 
-func getHTTPData(method string, path string, body url.Values, data interface{}) (string, error) {
+func getHTTPData(method, path string, body url.Values, data any) (string, error) {
 	r, reqErr := http.NewRequest(method, path, bytes.NewBufferString(body.Encode()))
 	r.Header.Set("Authorization", "0u"+"testuser")
 	if reqErr != nil {
@@ -53,7 +51,7 @@ func getRouter() *mux.Router {
 	return router
 }
 
-// setup reinitialized the router with a fresh keydb for every test
+// setup reinitialized the router with a fresh keydb for every test.
 func setup() {
 	cryptor := keydb.NewAESGCMCryptor(0, []byte("testtesttesttest"))
 	db := keydb.NewTempDB()
@@ -114,19 +112,6 @@ func getKey(t *testing.T, id string) types.Key {
 	return key
 }
 
-func deleteKey(t *testing.T, id string) {
-	path := "/v0/keys/" + id + "/"
-	message, err := getHTTPData("DELETE", path, nil, nil)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
-	if message != "" {
-		t.Fatal(message)
-	}
-	return
-}
-
 func getAccess(t *testing.T, id string) types.ACL {
 	path := "/v0/keys/" + id + "/access/"
 	var acl types.ACL
@@ -155,7 +140,6 @@ func putAccess(t *testing.T, id string, a *types.Access) {
 	if message != "" {
 		t.Fatalf("Code not ok for PUT of %s on %s: %s", urlData, path, message)
 	}
-	return
 }
 
 func putAccessExpectedFailure(t *testing.T, id string, a *types.Access, expectedMessage string) {
@@ -176,7 +160,6 @@ func putAccessExpectedFailure(t *testing.T, id string, a *types.Access, expected
 	if !strings.Contains(message, expectedMessage) {
 		t.Fatal("Access update failed, but with unexpected message:", message)
 	}
-	return
 }
 
 func postVersion(t *testing.T, id string, data []byte) uint64 {
@@ -210,7 +193,6 @@ func putVersion(t *testing.T, id string, versionID uint64, s types.VersionStatus
 	if message != "" {
 		t.Fatal("Code not ok for "+path, message)
 	}
-	return
 }
 
 func TestAddKeys(t *testing.T) {
@@ -234,7 +216,7 @@ func TestAddKeys(t *testing.T) {
 		t.Fatal("Key ID's do not match")
 	}
 	if !bytes.Equal(key.VersionList[0].Data, data) {
-		t.Fatal("Data is not consistant")
+		t.Fatal("Data is not consistent")
 	}
 }
 
@@ -260,7 +242,7 @@ func TestConcurrentAddKeys(t *testing.T) {
 			t.Error("Key ID's do not match")
 		}
 		if !bytes.Equal(key.VersionList[0].Data, data) {
-			t.Error("Data is not consistant")
+			t.Error("Data is not consistent")
 		}
 	}()
 	wg.Add(1)
@@ -279,7 +261,7 @@ func TestConcurrentAddKeys(t *testing.T) {
 		putVersion(t, keyID, keyVersionID2, types.Primary)
 		getKey(t, keyID)
 	}()
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -450,7 +432,7 @@ func TestKeyAccessUpdatesWithPrincipalValidation(t *testing.T) {
 
 	customValidator := func(pt types.PrincipalType, id string) error {
 		if pt == types.User && id == invalidPrincipalID {
-			return fmt.Errorf("Invalid user: %s", id)
+			return fmt.Errorf("invalid user: %s", id)
 		}
 		return nil
 	}

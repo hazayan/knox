@@ -72,8 +72,8 @@ var tests = []tester{
 	{Ldate | Ltime | Lmicroseconds | Lshortfile, "XXX", "XXX" + Rdate + " " + Rtime + Rmicroseconds + " " + Rshortfile + " "},
 }
 
-// Test using Println("hello", 23, "world") or using Printf("hello %d world", 23)
-func testPrint(t *testing.T, flag int, prefix string, pattern string, useFormat bool) {
+// Test using Println("hello", 23, "world") or using Printf("hello %d world", 23).
+func testPrint(t *testing.T, flag int, prefix, pattern string, useFormat bool) {
 	var m LogMessage
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
@@ -90,11 +90,11 @@ func testPrint(t *testing.T, flag int, prefix string, pattern string, useFormat 
 		t.Errorf("Unexpected error decoding log JSON: %q", err.Error())
 	}
 	if m.ID == "" {
-		t.Errorf("ID should be set to random value and not empty")
+		t.Error("ID should be set to random value and not empty")
 	}
 	payload, ok := m.Payload.(string)
 	if !ok {
-		t.Errorf("Payload is not of string type")
+		t.Error("Payload is not of string type")
 	}
 	matched, err4 := regexp.MatchString(pattern, payload)
 	if err4 != nil {
@@ -124,11 +124,11 @@ func TestOutput(t *testing.T) {
 		t.Errorf("Unexpected error decoding log JSON: %q", err.Error())
 	}
 	if m.ID == "" {
-		t.Errorf("ID should be set to random value and not empty")
+		t.Error("ID should be set to random value and not empty")
 	}
 	payload, ok := m.Payload.(string)
 	if !ok {
-		t.Errorf("Payload is not of string type")
+		t.Error("Payload is not of string type")
 	}
 
 	if expect := testString; payload != expect {
@@ -214,7 +214,9 @@ func TestOutputJSON(t *testing.T) {
 	var m LogMessage
 	var b bytes.Buffer
 	l := New(&b, "", LstdFlags)
-	l.OutputJSON(data)
+	if err := l.OutputJSON(data); err != nil {
+		t.Fatalf("OutputJSON failed: %v", err)
+	}
 	d := struct {
 		Title  string
 		Number int
@@ -236,7 +238,9 @@ func TestOutputBinary(t *testing.T) {
 	var m LogMessage
 	var b bytes.Buffer
 	l := New(&b, "", LstdFlags)
-	l.OutputBinary([]byte(""))
+	if err := l.OutputBinary([]byte("")); err != nil {
+		t.Fatalf("OutputBinary failed: %v", err)
+	}
 	err := json.NewDecoder(&b).Decode(&m)
 	if err != nil {
 		t.Errorf("Unexpected error decoding log JSON: %q", err.Error())
@@ -274,7 +278,7 @@ func TestFlagAndPrefixSetting(t *testing.T) {
 	}
 	payload, ok := m.Payload.(string)
 	if !ok {
-		t.Errorf("Payload is not of string type")
+		t.Error("Payload is not of string type")
 	}
 	matched, err := regexp.Match(pattern, []byte(payload))
 	if err != nil {

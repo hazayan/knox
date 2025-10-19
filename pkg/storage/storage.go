@@ -9,16 +9,16 @@ import (
 )
 
 var (
-	// ErrKeyNotFound is returned when a key does not exist in storage
+	// ErrKeyNotFound is returned when a key does not exist in storage.
 	ErrKeyNotFound = errors.New("key not found")
 
-	// ErrKeyExists is returned when attempting to create a key that already exists
+	// ErrKeyExists is returned when attempting to create a key that already exists.
 	ErrKeyExists = errors.New("key already exists")
 
-	// ErrTransactionNotSupported is returned when a backend doesn't support transactions
+	// ErrTransactionNotSupported is returned when a backend doesn't support transactions.
 	ErrTransactionNotSupported = errors.New("transactions not supported by this backend")
 
-	// ErrStorageUnavailable is returned when the storage backend is unavailable
+	// ErrStorageUnavailable is returned when the storage backend is unavailable.
 	ErrStorageUnavailable = errors.New("storage backend unavailable")
 )
 
@@ -139,7 +139,7 @@ type Stats struct {
 	OperationCounts map[string]int64
 
 	// Backend-specific metrics
-	BackendSpecific map[string]interface{}
+	BackendSpecific map[string]any
 }
 
 // StatsProvider is an optional interface that backends can implement

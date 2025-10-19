@@ -2,7 +2,9 @@ package dbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -45,48 +47,16 @@ func (i *Item) Path() dbus.ObjectPath {
 }
 
 // Export exports the item to D-Bus.
-func (i *Item) Export(conn *dbus.Conn, props *prop.Properties) error {
+func (i *Item) Export(conn *dbus.Conn, _ *prop.Properties) error {
 	return conn.Export(i, i.path, ItemInterface)
 }
 
 // Unexport removes the item from D-Bus.
 func (i *Item) Unexport(conn *dbus.Conn) {
-	conn.Export(nil, i.path, ItemInterface)
-}
-
-// Property change callbacks
-func (i *Item) onLabelChanged(c *prop.Change) *dbus.Error {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	label, ok := c.Value.(string)
-	if !ok {
-		return dbus.MakeFailedError(fmt.Errorf("invalid label type"))
+	if err := conn.Export(nil, i.path, ItemInterface); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to unexport item: %v", err)
 	}
-
-	i.label = label
-	i.modified = time.Now().Unix()
-
-	// TODO: Update Knox key metadata
-
-	return nil
-}
-
-func (i *Item) onAttributesChanged(c *prop.Change) *dbus.Error {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	attrs, ok := c.Value.(map[string]string)
-	if !ok {
-		return dbus.MakeFailedError(fmt.Errorf("invalid attributes type"))
-	}
-
-	i.attributes = attrs
-	i.modified = time.Now().Unix()
-
-	// TODO: Update Knox key metadata
-
-	return nil
 }
 
 // D-Bus methods
@@ -124,7 +94,7 @@ func (i *Item) GetSecret(sessionPath dbus.ObjectPath) (Secret, *dbus.Error) {
 	// Get primary version
 	primary := key.VersionList.GetPrimary()
 	if primary == nil {
-		return Secret{}, dbus.MakeFailedError(fmt.Errorf("no primary version"))
+		return Secret{}, dbus.MakeFailedError(errors.New("no primary version"))
 	}
 
 	// Encrypt the secret
@@ -244,7 +214,7 @@ func (i *Item) GetAttributes() map[string]string {
 }
 
 // createItemFromKnoxKey creates an item from a Knox key.
-func createItemFromKnoxKey(collection *Collection, key *types.Key) (*Item, error) {
+func createItemFromKnoxKey(collection *Collection, key *types.Key) *Item {
 	// Extract item ID from key ID (remove collection prefix)
 	itemID := key.ID[len(collection.prefix):]
 
@@ -264,11 +234,11 @@ func createItemFromKnoxKey(collection *Collection, key *types.Key) (*Item, error
 	item := NewItem(collection, itemID, label, attributes)
 	item.created = created
 
-	return item, nil
+	return item
 }
 
 // saveItemToKnox saves an item to Knox as a new key.
-func saveItemToKnox(ctx context.Context, item *Item, data []byte, acl types.ACL) error {
+func saveItemToKnox(_ context.Context, item *Item, data []byte, acl types.ACL) error {
 	client := item.collection.bridge.knoxClient
 
 	// Create the key in Knox

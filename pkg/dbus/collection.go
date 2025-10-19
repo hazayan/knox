@@ -2,7 +2,9 @@ package dbus
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -49,7 +51,8 @@ func (c *Collection) makeKeyID(itemID string) string {
 // Export exports the collection to D-Bus.
 func (c *Collection) Export(conn *dbus.Conn) error {
 	// Create properties handler
-	c.props = prop.New(conn, c.path, map[string]map[string]*prop.Prop{
+	var err error
+	c.props, err = prop.Export(conn, c.path, map[string]map[string]*prop.Prop{
 		CollectionInterface: {
 			"Items": {
 				Value:    []dbus.ObjectPath{},
@@ -83,6 +86,9 @@ func (c *Collection) Export(conn *dbus.Conn) error {
 			},
 		},
 	})
+	if err != nil {
+		return err
+	}
 
 	// Export the collection
 	if err := conn.Export(c, c.path, CollectionInterface); err != nil {
@@ -107,7 +113,10 @@ func (c *Collection) Unexport(conn *dbus.Conn) {
 		item.Unexport(conn)
 	}
 
-	conn.Export(nil, c.path, CollectionInterface)
+	if err := conn.Export(nil, c.path, CollectionInterface); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to export collection: %v", err)
+	}
 }
 
 // loadItems loads items from Knox.
@@ -133,10 +142,7 @@ func (c *Collection) loadItems(conn *dbus.Conn) error {
 		}
 
 		// Create item
-		item, err := createItemFromKnoxKey(c, key)
-		if err != nil {
-			continue
-		}
+		item := createItemFromKnoxKey(c, key)
 
 		// Export item
 		if err := item.Export(conn, c.props); err != nil {
@@ -157,14 +163,14 @@ func (c *Collection) loadItems(conn *dbus.Conn) error {
 	return nil
 }
 
-// Property callbacks
+// Property callbacks.
 func (c *Collection) onLabelChanged(change *prop.Change) *dbus.Error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	label, ok := change.Value.(string)
 	if !ok {
-		return dbus.MakeFailedError(fmt.Errorf("invalid label type"))
+		return dbus.MakeFailedError(errors.New("invalid label type"))
 	}
 
 	c.label = label
@@ -180,7 +186,9 @@ func (c *Collection) Delete() (dbus.ObjectPath, *dbus.Error) {
 
 	// Delete all items
 	for _, item := range c.items {
-		c.bridge.knoxClient.DeleteKey(item.keyID)
+		if err := c.bridge.knoxClient.DeleteKey(item.keyID); err != nil {
+			return "/", dbus.MakeFailedError(fmt.Errorf("failed to delete key %s: %w", item.keyID, err))
+		}
 	}
 
 	// No prompt needed
@@ -225,10 +233,12 @@ func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secre
 	// Check if item exists
 	if existing, ok := c.items[itemID]; ok {
 		if !replace {
-			return "/", "/", dbus.MakeFailedError(fmt.Errorf("item already exists"))
+			return "/", "/", dbus.MakeFailedError(errors.New("item already exists"))
 		}
 		// Delete existing item
-		c.bridge.knoxClient.DeleteKey(existing.keyID)
+		if err := c.bridge.knoxClient.DeleteKey(existing.keyID); err != nil {
+			return "/", "/", dbus.MakeFailedError(fmt.Errorf("failed to delete key %s: %w", existing.keyID, err))
+		}
 	}
 
 	// Create new item
