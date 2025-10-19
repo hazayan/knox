@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"reflect"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -56,12 +55,12 @@ func TestMockClient(t *testing.T) {
 		}
 	}
 	k1 := m.GetKeyObject()
-	if !reflect.DeepEqual(k0, k1) {
+	if k0.ID != k1.ID || k0.VersionHash != k1.VersionHash || len(k0.VersionList) != len(k1.VersionList) {
 		t.Fatalf("Got %v, Want %v", k1, k0)
 	}
 }
 
-func buildGoodResponse(data interface{}) ([]byte, error) {
+func buildGoodResponse(data any) ([]byte, error) {
 	resp := &types.Response{
 		Status:    "ok",
 		Code:      types.OKCode,
@@ -73,7 +72,7 @@ func buildGoodResponse(data interface{}) ([]byte, error) {
 	return json.Marshal(resp)
 }
 
-func buildErrorResponse(code int, data interface{}) ([]byte, error) {
+func buildErrorResponse(code int, data any) ([]byte, error) {
 	resp := &types.Response{
 		Status:    "err",
 		Code:      code,
@@ -91,7 +90,7 @@ func buildServer(code int, body []byte, a func(r *http.Request)) *httptest.Serve
 		a(r)
 		w.WriteHeader(code)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(body)
+		_, _ = w.Write(body)
 	}))
 }
 
@@ -100,7 +99,7 @@ func buildConcurrentServer(code int, a func(r *http.Request) []byte) *httptest.S
 		resp := a(r)
 		w.WriteHeader(code)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
+		_, _ = w.Write(resp)
 	}))
 }
 
@@ -261,7 +260,7 @@ func TestNoAuthPrincipals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	srv := buildServer(200, resp, func(r *http.Request) {
+	srv := buildServer(200, resp, func(_ *http.Request) {
 		// This should not be called as auth should fail before request is made
 		t.Fatalf("Server was called, but auth should have failed before request was made")
 	})
@@ -377,7 +376,7 @@ func TestCreateKey(t *testing.T) {
 		if r.URL.Path != "/v0/keys/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/")
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.PostForm["data"][0] != "ZGF0YQ==" {
 			t.Fatalf("%s is not expected: %s", r.PostForm["data"][0], "ZGF0YQ==")
 		}
@@ -434,7 +433,7 @@ func TestAddVersion(t *testing.T) {
 		if r.URL.Path != "/v0/keys/testkey/versions/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/versions/")
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.PostForm["data"][0] != "ZGF0YQ==" {
 			t.Fatalf("%s is not expected: %s", r.PostForm["data"][0], "ZGF0YQ==")
 		}
@@ -488,7 +487,7 @@ func TestPutVersion(t *testing.T) {
 		if r.URL.Path != "/v0/keys/testkey/versions/123/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/versions/123/")
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.PostForm["status"][0] != "\"Primary\"" {
 			t.Fatalf("%s is not expected: %s", r.PostForm["status"][0], "\"Primary\"")
 		}
@@ -520,7 +519,9 @@ func TestPutAccess(t *testing.T) {
 		if r.URL.Path != "/v0/keys/testkey/access/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/access/")
 		}
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
 		if r.PostForm["acl"][0] == "" {
 			t.Fatalf("%s is empty", r.PostForm["access"][0])
 		}

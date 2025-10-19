@@ -78,7 +78,9 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 		}
 		err = k.Overwrite([]string{})
 		if err != nil {
-			k.Unlock()
+			if err := k.Unlock(); err != nil {
+				return &ErrorStatus{fmt.Errorf("Failed to unlock after overwrite: %s", err.Error()), false}
+			}
 			return &ErrorStatus{fmt.Errorf("Failed to unregister all keys: %s", err.Error()), false}
 		}
 		err = k.Unlock()
@@ -113,7 +115,9 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 		err = k.Add(ks)
 	}
 	if err != nil {
-		k.Unlock()
+		if err := k.Unlock(); err != nil {
+			return &ErrorStatus{fmt.Errorf("Failed to unlock after registration: %s", err.Error()), false}
+		}
 		return &ErrorStatus{fmt.Errorf("There was an error registering keys %v: %s", ks, err.Error()), false}
 	}
 	err = k.Unlock()

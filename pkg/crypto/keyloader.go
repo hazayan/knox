@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -71,6 +72,15 @@ func loadMasterKeyFromFile(path string) ([]byte, error) {
 		return nil, fmt.Errorf("key file has insecure permissions %o (should be 0600)", mode)
 	}
 
+	// Validate file path for security
+	if !filepath.IsAbs(path) {
+		return nil, errors.New("key file path must be absolute")
+	}
+	if strings.Contains(path, "..") {
+		return nil, errors.New("key file path cannot contain parent directory references")
+	}
+
+	// #nosec G304 -- path is strictly validated above (absolute, no traversal, permissions checked)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key file: %w", err)

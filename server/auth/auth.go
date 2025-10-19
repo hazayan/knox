@@ -289,7 +289,7 @@ func (p *GitHubProvider) Authenticate(token string, r *http.Request) (types.Prin
 	return NewUser(user.Name, groups), nil
 }
 
-func (p *GitHubProvider) getAPI(url, token string, v interface{}) error {
+func (p *GitHubProvider) getAPI(url, token string, v any) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -364,7 +364,7 @@ func NewMachine(id string) types.Principal {
 }
 
 // NewService creates a service principal with the given auth Provider.
-func NewService(domain string, path string) types.Principal {
+func NewService(domain, path string) types.Principal {
 	return service{domain, path}
 }
 

@@ -72,7 +72,8 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) 
 
 	path := b.keyPath(keyID)
 
-	data, err := os.ReadFile(path)
+	// Path is sanitized by keyPath method - see sanitizeKeyID function
+	data, err := os.ReadFile(path) //nolint:gosec // Path sanitization prevents directory traversal
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, storage.ErrKeyNotFound
@@ -195,7 +196,8 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 	// Get current key (or nil if it doesn't exist)
 	var currentKey *types.Key
 	path := b.keyPath(keyID)
-	data, err := os.ReadFile(path)
+	// Path is sanitized by keyPath method - see sanitizeKeyID function
+	data, err := os.ReadFile(path) //nolint:gosec // Path sanitization prevents directory traversal
 	if err == nil {
 		var key types.Key
 		if err := json.Unmarshal(data, &key); err != nil {
@@ -295,7 +297,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 
 	// Collect operation counts
 	opCounts := make(map[string]int64)
-	b.opCounts.Range(func(key, value interface{}) bool {
+	b.opCounts.Range(func(key, value any) bool {
 		opCounts[key.(string)] = atomic.LoadInt64(value.(*int64))
 		return true
 	})
@@ -304,7 +306,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 		TotalKeys:       totalKeys,
 		StorageSize:     totalSize,
 		OperationCounts: opCounts,
-		BackendSpecific: map[string]interface{}{
+		BackendSpecific: map[string]any{
 			"backend":  "filesystem",
 			"base_dir": b.baseDir,
 		},

@@ -43,22 +43,22 @@ import (
 	"unicode/utf8"
 )
 
-const defaultTokenFileLocation = ".knox_user_auth"
+const defaultTokenFileLocation = ".knox_token"
 
 var cli APIClient
 
 // VisibilityParams exposes functions for the knox client to provide information.
 type VisibilityParams struct {
-	Logf           func(string, ...interface{})
-	Errorf         func(string, ...interface{})
+	Logf           func(string, ...any)
+	Errorf         func(string, ...any)
 	SummaryMetrics func(map[string]uint64)
 	InvokeMetrics  func(map[string]string)
 	GetKeyMetrics  func(map[string]string)
 }
 
 var (
-	logf                = func(string, ...interface{}) {}
-	errorf              = func(string, ...interface{}) {}
+	logf                = func(string, ...any) {}
+	errorf              = func(string, ...any) {}
 	daemonReportMetrics = func(map[string]uint64) {}
 	clientInvokeMetrics = func(map[string]string) {}
 	clientGetKeyMetrics = func(map[string]string) {}
@@ -111,7 +111,7 @@ func Run(
 			if cmd.CustomFlags {
 				args = args[1:]
 			} else {
-				cmd.Flag.Parse(args[1:])
+				_ = cmd.Flag.Parse(args[1:])
 				args = cmd.Flag.Args()
 			}
 			errorStatus := cmd.Run(cmd, args)
@@ -237,7 +237,7 @@ func setExitStatus(n int) {
 }
 
 // tmpl executes the given template text on data, writing the result to w.
-func tmpl(w io.Writer, text string, data interface{}) {
+func tmpl(w io.Writer, text string, data any) {
 	t := template.New("top")
 	t.Funcs(template.FuncMap{"trim": strings.TrimSpace, "capitalize": capitalize})
 	template.Must(t.Parse(text))
@@ -272,7 +272,7 @@ func exit() {
 	os.Exit(exitStatus)
 }
 
-func fatalf(format string, args ...interface{}) {
+func fatalf(format string, args ...any) {
 	errorf(format, args...)
 	setExitStatus(1)
 	exit()
