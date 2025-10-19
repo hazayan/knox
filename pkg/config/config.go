@@ -104,15 +104,15 @@ type LimitsConfig struct {
 
 // ClientConfig holds configuration for the Knox CLI client.
 type ClientConfig struct {
-	CurrentProfile string                   `mapstructure:"current_profile"`
-	Profiles       map[string]ClientProfile `mapstructure:"profiles"`
+	CurrentProfile string                   `mapstructure:"current_profile" json:"current_profile"`
+	Profiles       map[string]ClientProfile `mapstructure:"profiles" json:"profiles"`
 }
 
 // ClientProfile represents a client connection profile.
 type ClientProfile struct {
-	Server string          `mapstructure:"server"`
-	TLS    ClientTLSConfig `mapstructure:"tls"`
-	Cache  CacheConfig     `mapstructure:"cache"`
+	Server string          `mapstructure:"server" json:"server"`
+	TLS    ClientTLSConfig `mapstructure:"tls" json:"tls"`
+	Cache  CacheConfig     `mapstructure:"cache" json:"cache"`
 }
 
 // ClientTLSConfig holds client TLS configuration.

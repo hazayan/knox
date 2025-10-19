@@ -187,7 +187,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 		TotalKeys:       int64(len(b.data)),
 		StorageSize:     totalSize,
 		OperationCounts: opCounts,
-		BackendSpecific: map[string]interface{}{
+		BackendSpecific: map[string]any{
 			"backend": "memory",
 		},
 	}, nil

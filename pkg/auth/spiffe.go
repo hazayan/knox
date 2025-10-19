@@ -119,7 +119,7 @@ func extractWorkloadIdentity(spiffeID *url.URL) string {
 }
 
 // ParseSPIFFEID parses a SPIFFE ID string into its components.
-func ParseSPIFFEID(spiffeIDStr string) (trustDomain string, path string, err error) {
+func ParseSPIFFEID(spiffeIDStr string) (trustDomain, path string, err error) {
 	u, err := url.Parse(spiffeIDStr)
 	if err != nil {
 		return "", "", fmt.Errorf("invalid SPIFFE ID: %w", err)

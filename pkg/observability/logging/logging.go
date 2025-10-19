@@ -90,57 +90,57 @@ func WithFields(fields logrus.Fields) *logrus.Entry {
 }
 
 // WithField creates a new log entry with a single field.
-func WithField(key string, value interface{}) *logrus.Entry {
+func WithField(key string, value any) *logrus.Entry {
 	return Logger.WithField(key, value)
 }
 
 // Debug logs a debug message.
-func Debug(args ...interface{}) {
+func Debug(args ...any) {
 	Logger.Debug(args...)
 }
 
 // Debugf logs a formatted debug message.
-func Debugf(format string, args ...interface{}) {
+func Debugf(format string, args ...any) {
 	Logger.Debugf(format, args...)
 }
 
 // Info logs an info message.
-func Info(args ...interface{}) {
+func Info(args ...any) {
 	Logger.Info(args...)
 }
 
 // Infof logs a formatted info message.
-func Infof(format string, args ...interface{}) {
+func Infof(format string, args ...any) {
 	Logger.Infof(format, args...)
 }
 
 // Warn logs a warning message.
-func Warn(args ...interface{}) {
+func Warn(args ...any) {
 	Logger.Warn(args...)
 }
 
 // Warnf logs a formatted warning message.
-func Warnf(format string, args ...interface{}) {
+func Warnf(format string, args ...any) {
 	Logger.Warnf(format, args...)
 }
 
 // Error logs an error message.
-func Error(args ...interface{}) {
+func Error(args ...any) {
 	Logger.Error(args...)
 }
 
 // Errorf logs a formatted error message.
-func Errorf(format string, args ...interface{}) {
+func Errorf(format string, args ...any) {
 	Logger.Errorf(format, args...)
 }
 
 // Fatal logs a fatal message and exits.
-func Fatal(args ...interface{}) {
+func Fatal(args ...any) {
 	Logger.Fatal(args...)
 }
 
 // Fatalf logs a formatted fatal message and exits.
-func Fatalf(format string, args ...interface{}) {
+func Fatalf(format string, args ...any) {
 	Logger.Fatalf(format, args...)
 }
 
@@ -151,7 +151,7 @@ func Audit(event string, fields logrus.Fields) {
 }
 
 // AuditKeyAccess logs a key access audit event.
-func AuditKeyAccess(keyID, principalID, principalType, action, result string, metadata map[string]interface{}) {
+func AuditKeyAccess(keyID, principalID, principalType, action, result string, metadata map[string]any) {
 	fields := logrus.Fields{
 		"key_id":         keyID,
 		"principal_id":   principalID,
@@ -168,7 +168,7 @@ func AuditKeyAccess(keyID, principalID, principalType, action, result string, me
 }
 
 // AuditKeyCreate logs a key creation audit event.
-func AuditKeyCreate(keyID, principalID, principalType string, metadata map[string]interface{}) {
+func AuditKeyCreate(keyID, principalID, principalType string, metadata map[string]any) {
 	fields := logrus.Fields{
 		"key_id":         keyID,
 		"principal_id":   principalID,
@@ -183,7 +183,7 @@ func AuditKeyCreate(keyID, principalID, principalType string, metadata map[strin
 }
 
 // AuditKeyDelete logs a key deletion audit event.
-func AuditKeyDelete(keyID, principalID, principalType string, metadata map[string]interface{}) {
+func AuditKeyDelete(keyID, principalID, principalType string, metadata map[string]any) {
 	fields := logrus.Fields{
 		"key_id":         keyID,
 		"principal_id":   principalID,
@@ -198,7 +198,7 @@ func AuditKeyDelete(keyID, principalID, principalType string, metadata map[strin
 }
 
 // AuditACLChange logs an ACL change audit event.
-func AuditACLChange(keyID, principalID, principalType, operation string, metadata map[string]interface{}) {
+func AuditACLChange(keyID, principalID, principalType, operation string, metadata map[string]any) {
 	fields := logrus.Fields{
 		"key_id":         keyID,
 		"principal_id":   principalID,
@@ -214,7 +214,7 @@ func AuditACLChange(keyID, principalID, principalType, operation string, metadat
 }
 
 // AuditAuthAttempt logs an authentication attempt audit event.
-func AuditAuthAttempt(principalID, principalType, provider, result string, metadata map[string]interface{}) {
+func AuditAuthAttempt(principalID, principalType, provider, result string, metadata map[string]any) {
 	fields := logrus.Fields{
 		"principal_id":   principalID,
 		"principal_type": principalType,

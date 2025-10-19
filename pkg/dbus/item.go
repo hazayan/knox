@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -52,7 +53,10 @@ func (i *Item) Export(conn *dbus.Conn, props *prop.Properties) error {
 
 // Unexport removes the item from D-Bus.
 func (i *Item) Unexport(conn *dbus.Conn) {
-	conn.Export(nil, i.path, ItemInterface)
+	if err := conn.Export(nil, i.path, ItemInterface); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to unexport item: %v", err)
+	}
 }
 
 // Property change callbacks.

@@ -50,7 +50,7 @@ func nameOfSupportedTinkKeyTemplates() string {
 }
 
 // obeyNamingRule checks whether knox identifier start with "tink:<tink_primitive_short_name>:".
-func obeyNamingRule(templateName string, knoxIentifier string) error {
+func obeyNamingRule(templateName, knoxIentifier string) error {
 	templateInfo, ok := tinkKeyTemplates[templateName]
 	if !ok {
 		return errors.New("not supported Tink key template. See 'knox key-templates'")
@@ -165,7 +165,9 @@ func getTinkKeysetHandleFromKnoxVersionList(
 func convertCleartextTinkKeysetToHandle(cleartextTinkKeyset *tinkpb.Keyset) (*keyset.Handle, error) {
 	bytesBuffer := new(bytes.Buffer)
 	writer := keyset.NewBinaryWriter(bytesBuffer)
-	writer.Write(cleartextTinkKeyset)
+	if err := writer.Write(cleartextTinkKeyset); err != nil {
+		return nil, fmt.Errorf("failed to write cleartext Tink keyset: %w", err)
+	}
 	reader := keyset.NewBinaryReader(bytesBuffer)
 	// To get keyset handle from cleartext keyset, must use package "insecurecleartextkeyset"
 	keysetHandle, err := insecurecleartextkeyset.Read(reader)

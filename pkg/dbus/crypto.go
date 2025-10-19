@@ -133,7 +133,7 @@ func deriveKey(sharedSecret []byte) []byte {
 }
 
 // encryptAES128CBC encrypts data using AES-128-CBC with PKCS7 padding.
-func encryptAES128CBC(key, plaintext []byte) (iv []byte, ciphertext []byte, err error) {
+func encryptAES128CBC(key, plaintext []byte) (iv, ciphertext []byte, err error) {
 	if len(key) != 16 {
 		return nil, nil, errors.New("key must be 16 bytes for AES-128")
 	}

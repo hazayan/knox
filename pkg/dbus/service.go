@@ -3,6 +3,7 @@ package dbus
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/godbus/dbus/v5"
@@ -112,7 +113,10 @@ func (b *Bridge) Stop() error {
 	}
 
 	// Unexport service
-	b.conn.Export(nil, ServicePath, ServiceInterface)
+	if err := b.conn.Export(nil, ServicePath, ServiceInterface); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to unexport service: %v", err)
+	}
 
 	// Close connection
 	if err := b.conn.Close(); err != nil {
@@ -309,7 +313,6 @@ func (b *Bridge) GetSecrets(items []dbus.ObjectPath, sessionPath dbus.ObjectPath
 		}
 
 		collectionName := parts[0]
-		// itemID := parts[1]
 
 		// Find collection
 		collection, ok := b.collections[collectionName]
