@@ -3,6 +3,7 @@ package crypto
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -33,7 +34,7 @@ func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 		// Try loading from file
 		keyFile := os.Getenv("KNOX_MASTER_KEY_ENCRYPTED_FILE")
 		if keyFile == "" {
-			return nil, fmt.Errorf("no encrypted master key found: set KNOX_MASTER_KEY_ENCRYPTED or KNOX_MASTER_KEY_ENCRYPTED_FILE")
+			return nil, errors.New("no encrypted master key found: set KNOX_MASTER_KEY_ENCRYPTED or KNOX_MASTER_KEY_ENCRYPTED_FILE")
 		}
 
 		data, err := os.ReadFile(keyFile)
@@ -68,7 +69,7 @@ func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 // EncryptMasterKeyWithKMS encrypts a master key for storage.
 func EncryptMasterKeyWithKMS(provider KMSProvider, masterKey []byte) (string, error) {
 	if len(masterKey) != 32 {
-		return "", fmt.Errorf("master key must be 32 bytes")
+		return "", errors.New("master key must be 32 bytes")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

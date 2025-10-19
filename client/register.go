@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"strconv"
@@ -36,11 +37,13 @@ See also: knox unregister, knox daemon
 	`,
 }
 
-var registerRemove = cmdRegister.Flag.Bool("r", false, "")
-var registerKey = cmdRegister.Flag.String("k", "", "")
-var registerKeyFile = cmdRegister.Flag.String("f", "", "")
-var registerAndGet = cmdRegister.Flag.Bool("g", false, "")
-var registerTimeout = cmdRegister.Flag.String("t", "5s", "")
+var (
+	registerRemove  = cmdRegister.Flag.Bool("r", false, "")
+	registerKey     = cmdRegister.Flag.String("k", "", "")
+	registerKeyFile = cmdRegister.Flag.String("f", "", "")
+	registerAndGet  = cmdRegister.Flag.Bool("g", false, "")
+	registerTimeout = cmdRegister.Flag.String("t", "5s", "")
+)
 
 const registerRecheckTime = 10 * time.Millisecond
 
@@ -85,7 +88,7 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 		logf("Successfully unregistered all keys.")
 		return nil
 	} else if *registerKey == "" && *registerKeyFile == "" {
-		return &ErrorStatus{fmt.Errorf("You must include a key or key file to register. see 'knox help register'"), false}
+		return &ErrorStatus{errors.New("You must include a key or key file to register. see 'knox help register'"), false}
 	}
 	// Get the list of keys to add
 	var ks []string

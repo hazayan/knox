@@ -72,7 +72,7 @@ var tests = []tester{
 	{Ldate | Ltime | Lmicroseconds | Lshortfile, "XXX", "XXX" + Rdate + " " + Rtime + Rmicroseconds + " " + Rshortfile + " "},
 }
 
-// Test using Println("hello", 23, "world") or using Printf("hello %d world", 23)
+// Test using Println("hello", 23, "world") or using Printf("hello %d world", 23).
 func testPrint(t *testing.T, flag int, prefix string, pattern string, useFormat bool) {
 	var m LogMessage
 	buf := new(bytes.Buffer)

@@ -3,14 +3,14 @@ package keydb
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/hazayan/knox/pkg/types"
 )
 
-var ErrDBVersion = fmt.Errorf("DB version does not match")
+var ErrDBVersion = errors.New("DB version does not match")
 
 // DBKey is a struct for the json serialization of keys in the database.
 type DBKey struct {
@@ -37,7 +37,7 @@ func (k *DBKey) Copy() *DBKey {
 	}
 }
 
-// EncKeyVersion is a struct for encrypting key data
+// EncKeyVersion is a struct for encrypting key data.
 type EncKeyVersion struct {
 	ID             uint64              `json:"id"`
 	EncData        []byte              `json:"data"`
@@ -152,7 +152,6 @@ func (db *TempDB) Add(keys ...*DBKey) error {
 		db.keys = append(db.keys, *k)
 	}
 	return nil
-
 }
 
 // Remove will remove the key id from the database.

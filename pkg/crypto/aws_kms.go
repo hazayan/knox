@@ -2,7 +2,7 @@ package crypto
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 )
 
@@ -16,7 +16,7 @@ type AWSKMSProvider struct {
 // NewAWSKMSProvider creates a new AWS KMS provider.
 func NewAWSKMSProvider(keyID, region string) (*AWSKMSProvider, error) {
 	if keyID == "" {
-		return nil, fmt.Errorf("KMS key ID is required")
+		return nil, errors.New("KMS key ID is required")
 	}
 	if region == "" {
 		// Try to get region from environment
@@ -25,7 +25,7 @@ func NewAWSKMSProvider(keyID, region string) (*AWSKMSProvider, error) {
 			region = os.Getenv("AWS_DEFAULT_REGION")
 		}
 		if region == "" {
-			return nil, fmt.Errorf("AWS region is required")
+			return nil, errors.New("AWS region is required")
 		}
 	}
 
@@ -61,17 +61,17 @@ func (a *AWSKMSProvider) Decrypt(ctx context.Context, ciphertext []byte) ([]byte
 	// }
 	// return result.Plaintext, nil
 
-	return nil, fmt.Errorf("AWS KMS integration not yet implemented - add github.com/aws/aws-sdk-go-v2/service/kms")
+	return nil, errors.New("AWS KMS integration not yet implemented - add github.com/aws/aws-sdk-go-v2/service/kms")
 }
 
 func (a *AWSKMSProvider) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
 	// TODO: Implement actual AWS KMS integration
-	return nil, fmt.Errorf("AWS KMS integration not yet implemented")
+	return nil, errors.New("AWS KMS integration not yet implemented")
 }
 
 func (a *AWSKMSProvider) GenerateDataKey(ctx context.Context, keySpec string) ([]byte, []byte, error) {
 	// TODO: Implement actual AWS KMS integration
-	return nil, nil, fmt.Errorf("AWS KMS integration not yet implemented")
+	return nil, nil, errors.New("AWS KMS integration not yet implemented")
 }
 
 var _ KMSProvider = (*AWSKMSProvider)(nil)

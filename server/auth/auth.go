@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -72,10 +73,11 @@ type Provider interface {
 }
 
 func verifyCertificate(r *http.Request, cas *x509.CertPool,
-	timeFunc func() time.Time) (*x509.Certificate, error) {
+	timeFunc func() time.Time,
+) (*x509.Certificate, error) {
 	certs := r.TLS.PeerCertificates
 	if len(certs) == 0 {
-		return nil, fmt.Errorf("auth: No peer certs configured")
+		return nil, errors.New("auth: No peer certs configured")
 	}
 	opts := x509.VerifyOptions{
 		Roots:         cas,
@@ -93,12 +95,12 @@ func verifyCertificate(r *http.Request, cas *x509.CertPool,
 		return nil, fmt.Errorf("auth: failed to verify client's certificate: %w", err)
 	}
 	if len(chains) == 0 {
-		return nil, fmt.Errorf("auth: No cert chains could be verified")
+		return nil, errors.New("auth: No cert chains could be verified")
 	}
 	return certs[0], nil
 }
 
-// NewMTLSAuthProvider initializes a chain of trust with given CA certificates
+// NewMTLSAuthProvider initializes a chain of trust with given CA certificates.
 func NewMTLSAuthProvider(CAs *x509.CertPool) *MTLSAuthProvider {
 	return &MTLSAuthProvider{
 		CAs:  CAs,
@@ -106,28 +108,28 @@ func NewMTLSAuthProvider(CAs *x509.CertPool) *MTLSAuthProvider {
 	}
 }
 
-// MTLSAuthProvider does authentication by verifying TLS certs against a collection of root CAs
+// MTLSAuthProvider does authentication by verifying TLS certs against a collection of root CAs.
 type MTLSAuthProvider struct {
 	CAs  *x509.CertPool
 	time func() time.Time
 }
 
-// Version is set to 0 for MTLSAuthProvider
+// Version is set to 0 for MTLSAuthProvider.
 func (p *MTLSAuthProvider) Version() byte {
 	return '0'
 }
 
-// Name is the name of the provider for logging
+// Name is the name of the provider for logging.
 func (p *MTLSAuthProvider) Name() string {
 	return "mtls"
 }
 
-// Type is set to t for MTLSAuthProvider
+// Type is set to t for MTLSAuthProvider.
 func (p *MTLSAuthProvider) Type() byte {
 	return 't'
 }
 
-// Authenticate performs TLS based Authentication for the MTLSAuthProvider
+// Authenticate performs TLS based Authentication for the MTLSAuthProvider.
 func (p *MTLSAuthProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	cert, err := verifyCertificate(r, p.CAs, p.time)
 	if err != nil {
@@ -153,28 +155,28 @@ func NewSpiffeAuthProvider(CAs *x509.CertPool) *SpiffeProvider {
 	}
 }
 
-// SpiffeProvider does authentication by verifying TLS certs against a collection of root CAs
+// SpiffeProvider does authentication by verifying TLS certs against a collection of root CAs.
 type SpiffeProvider struct {
 	CAs  *x509.CertPool
 	time func() time.Time
 }
 
-// Version is set to 0 for SpiffeProvider
+// Version is set to 0 for SpiffeProvider.
 func (p *SpiffeProvider) Version() byte {
 	return '0'
 }
 
-// Name is the name of the provider for logging
+// Name is the name of the provider for logging.
 func (p *SpiffeProvider) Name() string {
 	return "spiffe"
 }
 
-// Type is set to s for SpiffeProvider
+// Type is set to s for SpiffeProvider.
 func (p *SpiffeProvider) Type() byte {
 	return 's'
 }
 
-// Authenticate performs TLS based Authentication and extracts the Spiffe URI extension
+// Authenticate performs TLS based Authentication and extracts the Spiffe URI extension.
 func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	cert, err := verifyCertificate(r, p.CAs, p.time)
 	if err != nil {
@@ -192,19 +194,19 @@ func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (types.Prin
 
 func spiffeToPrincipal(spiffeURIs []string) (types.Principal, error) {
 	if len(spiffeURIs) == 0 {
-		return nil, fmt.Errorf("auth: no spiffe identity in certificate")
+		return nil, errors.New("auth: no spiffe identity in certificate")
 	}
 	if len(spiffeURIs) > 1 {
-		return nil, fmt.Errorf("auth: more than one service identity specified in certificate")
+		return nil, errors.New("auth: more than one service identity specified in certificate")
 	}
 
 	uri := spiffeURIs[0]
 	if !strings.HasPrefix(uri, "spiffe://") {
-		return nil, fmt.Errorf("auth: service identity was not a valid SPIFFE ID (bad prefix)")
+		return nil, errors.New("auth: service identity was not a valid SPIFFE ID (bad prefix)")
 	}
 	splits := strings.SplitN(uri[9:], "/", 2)
 	if len(splits) != 2 {
-		return nil, fmt.Errorf("auth: service identity was not a valid SPIFFE ID (bad format)")
+		return nil, errors.New("auth: service identity was not a valid SPIFFE ID (bad format)")
 	}
 
 	return NewService(splits[0], splits[1]), nil
@@ -233,42 +235,42 @@ func NewSpiffeAuthFallbackProvider(CAs *x509.CertPool) *SpiffeFallbackProvider {
 	}
 }
 
-// Name is the name of the provider for logging
+// Name is the name of the provider for logging.
 func (p *SpiffeFallbackProvider) Name() string {
 	return "spiffe-fallback"
 }
 
-// Type is set to be identical to the Type of the MTLSAuthProvider
+// Type is set to be identical to the Type of the MTLSAuthProvider.
 func (s *SpiffeFallbackProvider) Type() byte {
 	return (&MTLSAuthProvider{}).Type()
 }
 
-// GitHubProvider implements user authentication through github.com
+// GitHubProvider implements user authentication through github.com.
 type GitHubProvider struct {
 	client httpClient
 }
 
-// NewGitHubProvider initializes GitHubProvider with an HTTP client with a timeout
+// NewGitHubProvider initializes GitHubProvider with an HTTP client with a timeout.
 func NewGitHubProvider(httpTimeout time.Duration) *GitHubProvider {
 	return &GitHubProvider{&http.Client{Timeout: httpTimeout}}
 }
 
-// Version is set to 0 for GitHubProvider
+// Version is set to 0 for GitHubProvider.
 func (p *GitHubProvider) Version() byte {
 	return '0'
 }
 
-// Name is the name of the provider for logging
+// Name is the name of the provider for logging.
 func (p *GitHubProvider) Name() string {
 	return "github"
 }
 
-// Type is set to u for GitHubProvider since it authenticates users
+// Type is set to u for GitHubProvider since it authenticates users.
 func (p *GitHubProvider) Type() byte {
 	return 'u'
 }
 
-// Authenticate uses the token to get user data from github.com
+// Authenticate uses the token to get user data from github.com.
 func (p *GitHubProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
 	user := &GitHubLoginFormat{}
 	if err := p.getAPI("https://api.github.com/user", token, user); err != nil {
@@ -344,7 +346,7 @@ func (s *stringSet) memberOf(e string) bool {
 }
 
 func setFromList(groups []string) *stringSet {
-	var t = stringSet(map[string]struct{}{})
+	t := stringSet(map[string]struct{}{})
 	for _, g := range groups {
 		t[g] = struct{}{}
 	}
@@ -366,7 +368,7 @@ func NewService(domain string, path string) types.Principal {
 	return service{domain, path}
 }
 
-// User represents an LDAP user and the AuthProvider to allow group information
+// User represents an LDAP user and the AuthProvider to allow group information.
 type user struct {
 	ID     string
 	groups stringSet
@@ -452,13 +454,13 @@ func (m machine) CanAccess(acl types.ACL, t types.AccessType) bool {
 	return false
 }
 
-// Service represents a given service from a trust domain
+// Service represents a given service from a trust domain.
 type service struct {
 	domain string
 	id     string
 }
 
-// GetID converts the internal representation into a SPIFFE id
+// GetID converts the internal representation into a SPIFFE id.
 func (s service) GetID() string {
 	return "spiffe://" + s.domain + "/" + s.id
 }
@@ -527,7 +529,6 @@ func (c *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 		resp.Status = "404 Not found"
 		return resp, nil
 	}
-
 }
 
 // MockGitHubProvider returns a mocked out authentication header with a simple mock "server".

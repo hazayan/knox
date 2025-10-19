@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -83,7 +84,7 @@ func loadConfig() error {
 
 func getCurrentProfile() (*config.ClientProfile, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("configuration not loaded")
+		return nil, errors.New("configuration not loaded")
 	}
 
 	prof, ok := cfg.Profiles[cfg.CurrentProfile]

@@ -105,7 +105,7 @@ var std = New(os.Stderr, "", LstdFlags)
 // Cheap integer to fixed-width decimal ASCII.  Give a negative width to avoid zero-padding.
 // Knows the buffer has capacity.
 func itoa(buf *[]byte, i int, wid int) {
-	var u uint = uint(i)
+	u := uint(i)
 	if u == 0 && wid <= 1 {
 		*buf = append(*buf, '0')
 		return

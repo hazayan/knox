@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -217,5 +217,7 @@ func (b *Backend) copyKey(key *types.Key) *types.Key {
 }
 
 // Verify that Backend implements the required interfaces at compile time.
-var _ storage.Backend = (*Backend)(nil)
-var _ storage.StatsProvider = (*Backend)(nil)
+var (
+	_ storage.Backend       = (*Backend)(nil)
+	_ storage.StatsProvider = (*Backend)(nil)
+)

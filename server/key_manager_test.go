@@ -70,15 +70,16 @@ func TestGetAllKeyIDs(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	if len(keys) == 2 {
-		if keys[0] == key1.ID {
+		switch keys[0] {
+		case key1.ID:
 			if keys[1] != key2.ID {
 				t.Fatalf("%s does not match %s", keys[1], key2.ID)
 			}
-		} else if keys[0] == key2.ID {
+		case key2.ID:
 			if keys[1] != key2.ID {
 				t.Fatalf("%s does not match %s", keys[1], key1.ID)
 			}
-		} else {
+		default:
 			t.Fatal("Unexpected key ID returned")
 		}
 	} else if len(keys) != 1 {
@@ -157,15 +158,16 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 	if len(keys) != 2 {
 		t.Fatalf("Expect 2 keys not %d", len(keys))
 	}
-	if keys[0] == key1.ID {
+	switch keys[0] {
+	case key1.ID:
 		if keys[1] != key2.ID {
 			t.Fatalf("%s does not match %s", keys[1], key2.ID)
 		}
-	} else if keys[0] == key2.ID {
+	case key2.ID:
 		if keys[1] != key1.ID {
 			t.Fatalf("%s does not match %s", keys[1], key1.ID)
 		}
-	} else {
+	default:
 		t.Fatal("Unexpected key ID returned")
 	}
 
@@ -181,7 +183,6 @@ func TestGetUpdatedKeyIDs(t *testing.T) {
 	if len(keys) != 0 {
 		t.Fatal("expected no keys")
 	}
-
 }
 
 func TestAddNewKey(t *testing.T) {

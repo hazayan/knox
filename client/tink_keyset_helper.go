@@ -1,7 +1,6 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -15,10 +14,10 @@ import (
 	"github.com/google/tink/go/insecurecleartextkeyset"
 	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/mac"
+	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
 	"github.com/google/tink/go/signature"
 	"github.com/google/tink/go/streamingaead"
-
-	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 // tinkKeyTemplateInfo represents the info for a supported tink keyset template.
@@ -27,7 +26,7 @@ type tinkKeyTemplateInfo struct {
 	templateFunc func() *tinkpb.KeyTemplate
 }
 
-// tinkKeyTemplates contains the supported tink key templates and the correcsponding naming rule for knox identifier
+// tinkKeyTemplates contains the supported tink key templates and the correcsponding naming rule for knox identifier.
 var tinkKeyTemplates = map[string]tinkKeyTemplateInfo{
 	"TINK_AEAD_AES256_GCM":                               {"tink:aead:", aead.AES256GCMKeyTemplate},
 	"TINK_AEAD_AES128_GCM":                               {"tink:aead:", aead.AES128GCMKeyTemplate},
@@ -81,7 +80,7 @@ func createNewTinkKeyset(templateFunc func() *tinkpb.KeyTemplate) ([]byte, error
 	return convertTinkKeysetHandleToBytes(keysetHandle)
 }
 
-// convertTinkKeysetHandleToBytes extracts keyset from tink keyset handle and converts it to bytes
+// convertTinkKeysetHandleToBytes extracts keyset from tink keyset handle and converts it to bytes.
 func convertTinkKeysetHandleToBytes(keysetHandle *keyset.Handle) ([]byte, error) {
 	bytesBuffer := new(bytes.Buffer)
 	writer := keyset.NewBinaryWriter(bytesBuffer)
@@ -162,7 +161,7 @@ func getTinkKeysetHandleFromKnoxVersionList(
 	return keysetHandle, tinkKeyIDToKnoxVersionID, nil
 }
 
-// convertCleartextTinkKeysetToHandle converts cleartext tink keyset to tink keyset handle
+// convertCleartextTinkKeysetToHandle converts cleartext tink keyset to tink keyset handle.
 func convertCleartextTinkKeysetToHandle(cleartextTinkKeyset *tinkpb.Keyset) (*keyset.Handle, error) {
 	bytesBuffer := new(bytes.Buffer)
 	writer := keyset.NewBinaryWriter(bytesBuffer)
