@@ -4,6 +4,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,12 +13,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/spf13/cobra"
-
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/dbus"
 	"github.com/hazayan/knox/pkg/observability/logging"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -141,7 +141,7 @@ func createHTTPClient(cfg *config.DBusConfig) (*http.Client, error) {
 
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to parse CA certificate")
+			return nil, errors.New("failed to parse CA certificate")
 		}
 
 		tlsConfig.RootCAs = caCertPool

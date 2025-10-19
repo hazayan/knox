@@ -7,23 +7,23 @@ import (
 )
 
 const (
-	// DBus service name
+	// DBus service name.
 	ServiceName = "org.freedesktop.secrets"
 
-	// Object paths
+	// Object paths.
 	ServicePath      = "/org/freedesktop/secrets"
 	SessionPrefix    = "/org/freedesktop/secrets/session/"
 	CollectionPrefix = "/org/freedesktop/secrets/collection/"
 	AliasPrefix      = "/org/freedesktop/secrets/aliases/"
 
-	// Interface names
+	// Interface names.
 	ServiceInterface    = "org.freedesktop.Secret.Service"
 	CollectionInterface = "org.freedesktop.Secret.Collection"
 	ItemInterface       = "org.freedesktop.Secret.Item"
 	SessionInterface    = "org.freedesktop.Secret.Session"
 	PromptInterface     = "org.freedesktop.Secret.Prompt"
 
-	// Special aliases
+	// Special aliases.
 	DefaultCollection = "default"
 	SessionCollection = "session"
 )
@@ -51,7 +51,7 @@ const (
 	AlgorithmDHAES EncryptionAlgorithm = "dh-ietf1024-sha256-aes128-cbc-pkcs7"
 )
 
-// ObjectPath helpers
+// ObjectPath helpers.
 func makeSessionPath(id string) dbus.ObjectPath {
 	return dbus.ObjectPath(SessionPrefix + id)
 }

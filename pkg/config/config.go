@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -196,7 +197,8 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 
 	// Try to read config, but don't fail if it doesn't exist
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
 			// Return default config
 			return &ClientConfig{
 				CurrentProfile: "default",
@@ -259,7 +261,7 @@ func SaveClientConfig(path string, cfg *ClientConfig) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 

@@ -18,8 +18,10 @@ import (
 	"github.com/hazayan/knox/pkg/types"
 )
 
-var registeredFile = ".registered"
-var keysDir = "/keys/"
+var (
+	registeredFile = ".registered"
+	keysDir        = "/keys/"
+)
 
 // buildDaemonServer returns a server. Call Close when finished.
 func buildDaemonServer(d *returnParameters) *httptest.Server {
@@ -400,7 +402,7 @@ func TestUpdate(t *testing.T) {
 }
 
 func addRegisteredKey(k, reg string) error {
-	f, err := os.OpenFile(reg, os.O_APPEND|os.O_WRONLY, 0666)
+	f, err := os.OpenFile(reg, os.O_APPEND|os.O_WRONLY, 0o666)
 	defer f.Close()
 	if err != nil {
 		return err
@@ -622,7 +624,7 @@ func TestLockTimeout(t *testing.T) {
 	defer os.RemoveAll(tmp)
 
 	lockFile := path.Join(tmp, "lock")
-	os.WriteFile(lockFile, []byte{}, 0600)
+	os.WriteFile(lockFile, []byte{}, 0o600)
 
 	// Lock file in sub-process to create locking conflict
 	locker, stdout, stderr := lockFileInSeparateProcess(t, lockFile, "300")

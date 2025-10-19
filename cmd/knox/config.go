@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -272,7 +273,7 @@ Examples:
 
 			// Don't allow removing the current profile
 			if localCfg.CurrentProfile == profileName {
-				return fmt.Errorf("cannot remove current profile (use 'knox config profile use' to switch first)")
+				return errors.New("cannot remove current profile (use 'knox config profile use' to switch first)")
 			}
 
 			// Remove profile

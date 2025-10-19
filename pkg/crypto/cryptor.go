@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 
@@ -38,7 +39,7 @@ func NewAESCryptor(masterKey []byte) (*AESCryptor, error) {
 func NewAESCryptorFromFile(path string) (*AESCryptor, error) {
 	// This would load from a secure key file
 	// For now, this is a placeholder - in production, integrate with KMS/HSM
-	return nil, fmt.Errorf("file-based key loading not yet implemented - use environment variable")
+	return nil, errors.New("file-based key loading not yet implemented - use environment variable")
 }
 
 // Encrypt encrypts a Knox key using envelope encryption.
@@ -206,7 +207,7 @@ func (c *AESCryptor) decryptWithKey(key, ciphertext []byte) ([]byte, error) {
 
 	nonceSize := gcm.NonceSize()
 	if len(ciphertext) < nonceSize {
-		return nil, fmt.Errorf("ciphertext too short")
+		return nil, errors.New("ciphertext too short")
 	}
 
 	// Extract nonce and ciphertext
@@ -224,7 +225,7 @@ func (c *AESCryptor) decryptWithKey(key, ciphertext []byte) ([]byte, error) {
 // DeriveKey derives a key from a password using HKDF.
 func DeriveKey(password []byte, salt []byte, info []byte) ([]byte, error) {
 	if len(salt) < 16 {
-		return nil, fmt.Errorf("salt must be at least 16 bytes")
+		return nil, errors.New("salt must be at least 16 bytes")
 	}
 
 	kdf := hkdf.New(sha256.New, password, salt, info)
