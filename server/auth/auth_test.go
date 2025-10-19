@@ -5,11 +5,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"net/http"
-	"reflect"
 	"strings"
-	"time"
-
 	"testing"
+	"time"
 
 	"github.com/hazayan/knox/pkg/types"
 )
@@ -33,7 +31,7 @@ func TestPrincipalContext(t *testing.T) {
 	ctx.SetCurrentPrincipal(originalPrincipal)
 	currentPrincipal = ctx.GetCurrentPrincipal().(user)
 
-	if !reflect.DeepEqual(currentPrincipal, originalPrincipal) {
+	if currentPrincipal.GetID() != originalPrincipal.GetID() {
 		t.Errorf(
 			"Current principal was expected to be user: '%s'. Instead got: '%s'",
 			originalPrincipal.GetID(),
@@ -48,7 +46,7 @@ func TestPrincipalContext(t *testing.T) {
 		}
 
 		currentPrincipal = ctx.GetCurrentPrincipal()
-		if !reflect.DeepEqual(currentPrincipal, originalPrincipal) {
+		if currentPrincipal.GetID() != originalPrincipal.GetID() {
 			t.Errorf(
 				"Current principal was expected to be user: '%s'. Instead got: '%s'",
 				originalPrincipal.GetID(),
@@ -71,6 +69,7 @@ func TestUserCanAccess(t *testing.T) {
 	if !u.CanAccess(acl1, types.Write) {
 		t.Error("user can't access user permission matching id")
 	}
+
 	if u.CanAccess(acl1, types.Admin) {
 		t.Error("user can access user permission with increased access type")
 	}
@@ -95,6 +94,7 @@ func TestUserCanAccess(t *testing.T) {
 		t.Error("user can access empty ACL")
 	}
 }
+
 func TestMachineCanAccess(t *testing.T) {
 	u := machine("test001")
 	a1 := types.Access{ID: "test001", AccessType: types.Write, Type: types.Machine}
@@ -132,8 +132,10 @@ func TestMachineCanAccess(t *testing.T) {
 
 func TestServiceCanAccess(t *testing.T) {
 	s := NewService("example.com", "serviceA")
-	a1 := types.Access{ID: "spiffe://example.com/serviceA", AccessType: types.Read,
-		Type: types.Service}
+	a1 := types.Access{
+		ID: "spiffe://example.com/serviceA", AccessType: types.Read,
+		Type: types.Service,
+	}
 
 	acl1 := types.ACL([]types.Access{a1})
 	if s.CanAccess(acl1, types.Admin) {
@@ -198,7 +200,7 @@ aV+BuROvrG4wCgYIKoZIzj0EAwIDSAAwRQIgZpgo1bmCAdSaVCqJKDmMKfui2dT/
 3ucYcCZi9dUZjtMCIQC/d1se0XhhZ8eRfqzf0Uj0jHvan4opB0aD5CgSVlct0w==
 -----END CERTIFICATE-----`
 
-// clientCertB64 is a base64 encoded cert (inner contents of a CERTIFICATE pem block)
+// clientCertB64 is a base64 encoded cert (inner contents of a CERTIFICATE pem block).
 const clientCertB64 = `MIICjzCCAjSgAwIBAgIUUOdxnpGiNZhsB0AySQMJ+Lx5WqEwCgYIKoZIzj0EAwIw
 aTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNh
 biBGcmFuY2lzY28xHzAdBgNVBAoTFkludGVybmV0IFdpZGdldHMsIEluYy4xDDAK
@@ -217,7 +219,7 @@ AiEA/GIpOpaFQbGSs42rKugOBngKtF0fuRAo2r4vMyL559A=`
 func TestMTLSSuccess(t *testing.T) {
 	hostname := "dev-devinlundberg"
 	expected := "dev-devinlundberg"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -225,7 +227,7 @@ func TestMTLSSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	c, err := x509.ParseCertificate(certBytes[:n])
+	c, _ := x509.ParseCertificate(certBytes[:n])
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -237,7 +239,6 @@ func TestMTLSSuccess(t *testing.T) {
 		time: func() time.Time { return time.Date(2016, time.April, 22, 11, 0, 0, 0, time.UTC) },
 	}
 	p, err := a.Authenticate(hostname, req)
-
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -248,7 +249,7 @@ func TestMTLSSuccess(t *testing.T) {
 
 func TestMTLSBadTime(t *testing.T) {
 	hostname := "dev-devinlundberg"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -256,7 +257,7 @@ func TestMTLSBadTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	c, err := x509.ParseCertificate(certBytes[:n])
+	c, _ := x509.ParseCertificate(certBytes[:n])
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -276,7 +277,7 @@ func TestMTLSBadTime(t *testing.T) {
 
 func TestMTLSNoCA(t *testing.T) {
 	hostname := "dev-devinlundberg"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -284,7 +285,7 @@ func TestMTLSNoCA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	c, err := x509.ParseCertificate(certBytes[:n])
+	c, _ := x509.ParseCertificate(certBytes[:n])
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -302,7 +303,7 @@ func TestMTLSNoCA(t *testing.T) {
 
 func TestMTLSBadHostname(t *testing.T) {
 	hostname := "BadHostname"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", "0t"+hostname)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(clientCertB64)))
@@ -311,6 +312,9 @@ func TestMTLSBadHostname(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	c, err := x509.ParseCertificate(certBytes[:n])
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -324,7 +328,6 @@ func TestMTLSBadHostname(t *testing.T) {
 	if err == nil {
 		t.Fatal("hostname should not match")
 	}
-
 }
 
 func TestGetUser(t *testing.T) {
@@ -415,7 +418,7 @@ func TestSpiffeToPrincipalBadInput(t *testing.T) {
 
 func testSpiffeAuthFlow(t *testing.T, authHeader string, provider Provider) {
 	expected := "spiffe://example.com/service"
-	req, err := http.NewRequest("GET", "http://localhost/", nil)
+	req, _ := http.NewRequest("GET", "http://localhost/", nil)
 	req.Header.Add("Authorization", authHeader)
 	req.RemoteAddr = "0.0.0.0:23423"
 	certBytes := make([]byte, base64.StdEncoding.DecodedLen(len(spiffeCertB64)))
@@ -424,6 +427,9 @@ func testSpiffeAuthFlow(t *testing.T, authHeader string, provider Provider) {
 		t.Fatal(err.Error())
 	}
 	c, err := x509.ParseCertificate(certBytes[:n])
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}

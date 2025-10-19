@@ -160,5 +160,5 @@ type RotationStatus struct {
 	EstimatedEndTime time.Time
 }
 
-// Verify interface compliance
+// Verify interface compliance.
 var _ keydb.Cryptor = (*KeyRotationManager)(nil)

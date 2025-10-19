@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -14,29 +15,29 @@ import (
 )
 
 var (
-	ErrACLDuplicateEntries = fmt.Errorf("Duplicate entries in ACL")
-	ErrACLContainsNone     = fmt.Errorf("ACL contains None access")
-	ErrACLEmptyPrincipal   = fmt.Errorf("Principals of type user, user group, machine, or machine prefix may not be empty.")
+	ErrACLDuplicateEntries = errors.New("duplicate entries in ACL")
+	ErrACLContainsNone     = errors.New("ACL contains None access")
+	ErrACLEmptyPrincipal   = errors.New("principals of type user, user group, machine, or machine prefix may not be empty")
 
-	ErrACLInvalidService               = fmt.Errorf("Service is invalid, must conform to 'spiffe://<domain>/<path>' format.")
-	ErrACLInvalidServicePrefixURL      = fmt.Errorf("Service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format.")
-	ErrACLInvalidServicePrefixNoSlash  = fmt.Errorf("Service prefix had no trailing slash, must conform to 'spiffe://<domain>/<path>/' format.")
-	ErrACLInvalidServicePrefixTooShort = fmt.Errorf("Service prefix too short, path of namespace for prefix needs to be longer.")
+	ErrACLInvalidService               = errors.New("service is invalid, must conform to 'spiffe://<domain>/<path>' format")
+	ErrACLInvalidServicePrefixURL      = errors.New("service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format")
+	ErrACLInvalidServicePrefixNoSlash  = errors.New("service prefix had no trailing slash, must conform to 'spiffe://<domain>/<path>/' format")
+	ErrACLInvalidServicePrefixTooShort = errors.New("service prefix too short, path of namespace for prefix needs to be longer")
 
-	ErrInvalidKeyID       = fmt.Errorf("KeyID can only contain alphanumeric characters, colons, and underscores.")
-	ErrInvalidVersionHash = fmt.Errorf("Hash does not match")
+	ErrInvalidKeyID       = errors.New("key ID can only contain alphanumeric characters, colons, and underscores")
+	ErrInvalidVersionHash = errors.New("hash does not match")
 
-	ErrInactiveToPrimary = fmt.Errorf("Version must be Active to promote to Primary")
-	ErrPrimaryToActive   = fmt.Errorf("Primary Key can not be demoted. Specify Active key to promote.")
-	ErrPrimaryToInactive = fmt.Errorf("Version must be Active to demote to Inactive")
+	ErrInactiveToPrimary = errors.New("version must be active to promote to primary")
+	ErrPrimaryToActive   = errors.New("primary key cannot be demoted, specify active key to promote")
+	ErrPrimaryToInactive = errors.New("version must be active to demote to inactive")
 
-	ErrMulitplePrimary = fmt.Errorf("More than one Primary key")
-	ErrSameVersionID   = fmt.Errorf("Repeated Version ID")
+	ErrMulitplePrimary = errors.New("more than one primary key")
+	ErrSameVersionID   = errors.New("repeated version ID")
 
-	ErrInvalidStatus      = fmt.Errorf("Invalid Status")
-	ErrKeyVersionNotFound = fmt.Errorf("Key version not found")
-	ErrKeyIDNotFound      = fmt.Errorf("KeyID not found")
-	ErrKeyExists          = fmt.Errorf("Key Exists")
+	ErrInvalidStatus      = errors.New("invalid status")
+	ErrKeyVersionNotFound = errors.New("key version not found")
+	ErrKeyIDNotFound      = errors.New("key ID not found")
+	ErrKeyExists          = errors.New("key exists")
 )
 
 const (
@@ -103,7 +104,7 @@ func (s VersionStatus) MarshalJSON() ([]byte, error) {
 type PrincipalType int
 
 const (
-	// Unknown represents a bad PrincipalType that cannot be marshaled
+	// Unknown represents a bad PrincipalType that cannot be marshaled.
 	Unknown PrincipalType = -1
 	// User represents a single LDAP User.
 	User = iota
@@ -135,7 +136,7 @@ func (s *PrincipalType) UnmarshalJSON(b []byte) error {
 	case `"ServicePrefix"`:
 		*s = ServicePrefix
 	default:
-		// To ensure compatibilty in the event of new PrincipalTypes, don't
+		// To ensure compatibility in the event of new PrincipalTypes, don't
 		// throw an error. Instead just create a bogus Type. When displaying
 		// the ACL to the user, fail on the single entry. GetKey & GetACL will work.
 		*s = Unknown
@@ -353,15 +354,15 @@ type KeyVersion struct {
 // key is rotated.
 type KeyVersionList []KeyVersion
 
-// Len, Swap, and Less are included to provide a consistant ordering for Key
-// Version lists. This is necessary to hash the list consistantly.
+// Len, Swap, and Less are included to provide a consistent ordering for Key
+// Version lists. This is necessary to hash the list consistently.
 
 // Len returns the length of the key version list.
 func (kvl KeyVersionList) Len() int {
 	return len(kvl)
 }
 
-// Swap swaps two elements in the list
+// Swap swaps two elements in the list.
 func (kvl KeyVersionList) Swap(i, j int) {
 	kvl[i], kvl[j] = kvl[j], kvl[i]
 }
@@ -464,7 +465,6 @@ func (kvl KeyVersionList) Hash() string {
 	}
 	hash := sha256.Sum256(buf)
 	return hex.EncodeToString(hash[0:32])
-
 }
 
 // Update changes the status of a particular key version. It also updates any
@@ -499,7 +499,6 @@ func (kvl KeyVersionList) Update(versionID uint64, s VersionStatus) (KeyVersionL
 		}
 	}
 	return nil, ErrKeyVersionNotFound
-
 }
 
 // Principal is a person, machine, or process that accesses an object.
@@ -609,12 +608,12 @@ const (
 
 // Response is the format for responses from the api server.
 type Response struct {
-	Status    string      `json:"status"`
-	Code      int         `json:"code"`
-	Host      string      `json:"host"`
-	Timestamp int64       `json:"ts"`
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data"`
+	Status    string `json:"status"`
+	Code      int    `json:"code"`
+	Host      string `json:"host"`
+	Timestamp int64  `json:"ts"`
+	Message   string `json:"message"`
+	Data      any    `json:"data"`
 }
 
 // AccessCallbackInput is the input to the access callback function.

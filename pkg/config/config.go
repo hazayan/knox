@@ -2,6 +2,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -103,29 +104,29 @@ type LimitsConfig struct {
 
 // ClientConfig holds configuration for the Knox CLI client.
 type ClientConfig struct {
-	CurrentProfile string                   `mapstructure:"current_profile"`
-	Profiles       map[string]ClientProfile `mapstructure:"profiles"`
+	CurrentProfile string                   `mapstructure:"current_profile" json:"current_profile"`
+	Profiles       map[string]ClientProfile `mapstructure:"profiles" json:"profiles"`
 }
 
 // ClientProfile represents a client connection profile.
 type ClientProfile struct {
-	Server string          `mapstructure:"server"`
-	TLS    ClientTLSConfig `mapstructure:"tls"`
-	Cache  CacheConfig     `mapstructure:"cache"`
+	Server string          `mapstructure:"server" json:"server"`
+	TLS    ClientTLSConfig `mapstructure:"tls" json:"tls"`
+	Cache  CacheConfig     `mapstructure:"cache" json:"cache"`
 }
 
 // ClientTLSConfig holds client TLS configuration.
 type ClientTLSConfig struct {
-	CACert     string `mapstructure:"ca_cert"`
-	ClientCert string `mapstructure:"client_cert"`
-	ClientKey  string `mapstructure:"client_key"`
+	CACert     string `mapstructure:"ca_cert" json:"ca_cert"`
+	ClientCert string `mapstructure:"client_cert" json:"client_cert"`
+	ClientKey  string `mapstructure:"client_key" json:"client_key"`
 }
 
 // CacheConfig holds cache configuration.
 type CacheConfig struct {
-	Enabled   bool   `mapstructure:"enabled"`
-	Directory string `mapstructure:"directory"`
-	TTL       string `mapstructure:"ttl"`
+	Enabled   bool   `mapstructure:"enabled" json:"enabled"`
+	Directory string `mapstructure:"directory" json:"directory"`
+	TTL       string `mapstructure:"ttl" json:"ttl"`
 }
 
 // DBusConfig holds configuration for the D-Bus bridge.
@@ -196,7 +197,8 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 
 	// Try to read config, but don't fail if it doesn't exist
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
 			// Return default config
 			return &ClientConfig{
 				CurrentProfile: "default",
@@ -259,7 +261,7 @@ func SaveClientConfig(path string, cfg *ClientConfig) error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 

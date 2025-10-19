@@ -1,9 +1,10 @@
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
+	"errors"
 	"fmt"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 var cmdDeactivate = &Command{
@@ -25,16 +26,16 @@ See also: knox reactivate, knox promote
 	`,
 }
 
-func runDeactivate(cmd *Command, args []string) *ErrorStatus {
+func runDeactivate(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 2 {
-		return &ErrorStatus{fmt.Errorf("deactivate takes exactly two argument. See 'knox help deactivate'"), false}
+		return &ErrorStatus{errors.New("deactivate takes exactly two argument. See 'knox help deactivate'"), false}
 	}
 	keyID := args[0]
 	keyVersion := args[1]
 
 	err := cli.UpdateVersion(keyID, keyVersion, types.Inactive)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error updating version: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error updating version: %s", err.Error()), true}
 	}
 	fmt.Printf("Deactivated %s successfully.\n", keyVersion)
 	return nil

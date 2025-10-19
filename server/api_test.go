@@ -17,50 +17,12 @@ import (
 	"github.com/hazayan/knox/server/keydb"
 )
 
-const TESTVAL int = 1
-
-type mockAuthFail struct{}
-
-func (a mockAuthFail) Authenticate(r *http.Request) (types.Principal, error) {
-	return nil, fmt.Errorf("Error!")
-}
-func (a mockAuthFail) IsUser(p types.Principal) bool {
-	return false
-}
-
-type mockAuthTrue struct{}
-
-func (a mockAuthTrue) Authenticate(r *http.Request) (types.Principal, error) {
-	return nil, nil
-}
-func (a mockAuthTrue) IsUser(p types.Principal) bool {
-	return true
-}
-
-func mockFailureHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-	return nil, errF(types.InternalServerErrorCode, "")
-}
-
-func mockHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-	return TESTVAL, nil
-}
-
-func additionalMockHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func additionalMockHandler(_ KeyManager, _ types.Principal, _ map[string]string) (any, *HTTPError) {
 	return "The meaning of life is 42", nil
 }
 
-func mockAccessCallback(input types.AccessCallbackInput) (bool, error) {
+func mockAccessCallback(_ types.AccessCallbackInput) (bool, error) {
 	return true, nil
-}
-
-func mockRoute() Route {
-	return Route{
-		Method:     "GET",
-		Path:       "/v0/keys/",
-		Handler:    mockHandler,
-		Id:         "test1",
-		Parameters: []Parameter{},
-	}
 }
 
 func additionalMockRoute() Route {
@@ -68,17 +30,7 @@ func additionalMockRoute() Route {
 		Method:     "GET",
 		Path:       "/v0/custom/",
 		Handler:    additionalMockHandler,
-		Id:         "a-custom-route",
-		Parameters: []Parameter{},
-	}
-}
-
-func mockFailureRoute() Route {
-	return Route{
-		Method:     "GET",
-		Path:       "/v0/keys/",
-		Handler:    mockFailureHandler,
-		Id:         "test2",
+		ID:         "a-custom-route",
 		Parameters: []Parameter{},
 	}
 }
@@ -106,7 +58,6 @@ func TestAddDefaultAccess(t *testing.T) {
 		t.Fatal("The Key's ACL is too big: " + string(text))
 	}
 	defaultAccess = []types.Access{}
-
 }
 
 func TestSetAccessCallback(t *testing.T) {
@@ -133,22 +84,22 @@ func TestSetAccessCallback(t *testing.T) {
 func TestParseFormParameter(t *testing.T) {
 	p := PostParameter("key")
 
-	r, err := http.NewRequest("POST", "http://www.com/?key=nope", strings.NewReader("nokey=yup"))
+	r, err := http.NewRequest("POST", "https://www.com/?key=nope", strings.NewReader("nokey=yup"))
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+	_, ok := p.Get(r)
+	if ok {
+		t.Fatal("Key parameter should not be present in post form")
+	}
+
+	r, err = http.NewRequest("POST", "https://www.com/?key=nope", strings.NewReader("key=yup"))
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 	s, ok := p.Get(r)
-	if ok {
-		t.Fatal("Key parameter should not be present in post form")
-	}
-
-	r, err = http.NewRequest("POST", "http://www.com/?key=nope", strings.NewReader("key=yup"))
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-	s, ok = p.Get(r)
 	if !ok {
 		t.Fatal("Key parameter should be present in post form")
 	}
@@ -157,15 +108,14 @@ func TestParseFormParameter(t *testing.T) {
 	}
 
 	// This should cause some problems
-	r, err = http.NewRequest("POST", "http://www.com/?key=nope", nil)
+	r, err = http.NewRequest("POST", "https://www.com/?key=nope", nil)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	s, ok = p.Get(r)
+	_, ok = p.Get(r)
 	if ok {
 		t.Fatal("Key parameter should not be present in nil request body")
 	}
-
 }
 
 func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder) {
@@ -173,7 +123,7 @@ func checkinternalServerErrorResponse(t *testing.T, w *httptest.ResponseRecorder
 		t.Fatal("unexpected response code")
 	}
 	var resp types.Response
-	err := json.Unmarshal([]byte(w.Body.String()), &resp)
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	if err != nil {
 		t.Fatal("Test returned invalid JSON data")
 	}
@@ -247,7 +197,6 @@ func TestNewKey(t *testing.T) {
 		text, _ := json.Marshal(key.ACL)
 		t.Fatal("The Key's ACL is too big: " + string(text))
 	}
-
 }
 
 func TestBuildRequest(t *testing.T) {
@@ -313,7 +262,7 @@ func TestDuplicateRouteId(t *testing.T) {
 	additionalRoutes := []Route{
 		{
 			Method:  "POST",
-			Id:      "getkeys",
+			ID:      "getkeys",
 			Path:    "/v3/foobar/",
 			Handler: getKeysHandler,
 			Parameters: []Parameter{
@@ -344,7 +293,7 @@ func TestDuplicateMethodAndPath(t *testing.T) {
 	additionalRoutes := []Route{
 		{
 			Method:  "GET",
-			Id:      "a-unique-id",
+			ID:      "a-unique-id",
 			Path:    "/v0/keys/",
 			Handler: getKeysHandler,
 			Parameters: []Parameter{

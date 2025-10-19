@@ -1,16 +1,19 @@
+// Package keydb provides the database layer for Knox key storage.
+// It handles encryption, serialization, and persistence of keys with
+// support for multiple database backends and cryptographic providers.
 package keydb
 
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"sync"
 	"time"
 
 	"github.com/hazayan/knox/pkg/types"
 )
 
-var ErrDBVersion = fmt.Errorf("DB version does not match")
+var ErrDBVersion = errors.New("DB version does not match")
 
 // DBKey is a struct for the json serialization of keys in the database.
 type DBKey struct {
@@ -37,7 +40,7 @@ func (k *DBKey) Copy() *DBKey {
 	}
 }
 
-// EncKeyVersion is a struct for encrypting key data
+// EncKeyVersion is a struct for encrypting key data.
 type EncKeyVersion struct {
 	ID             uint64              `json:"id"`
 	EncData        []byte              `json:"data"`
@@ -152,7 +155,6 @@ func (db *TempDB) Add(keys ...*DBKey) error {
 		db.keys = append(db.keys, *k)
 	}
 	return nil
-
 }
 
 // Remove will remove the key id from the database.
@@ -178,7 +180,6 @@ type SQLDB struct {
 	UpdateStmt *sql.Stmt
 	AddStmt    *sql.Stmt
 	RemoveStmt *sql.Stmt
-	db         sql.DB
 }
 
 var sqlCreateKeys = `CREATE TABLE IF NOT EXISTS secrets (
@@ -324,10 +325,10 @@ func (db *SQLDB) Update(key *DBKey) error {
 	}
 	if affected == 0 {
 		rs, err := db.getStmt.Query(key.ID)
-		defer rs.Close()
 		if err != nil {
 			return err
 		}
+		defer rs.Close()
 		if !rs.Next() {
 			return types.ErrKeyIDNotFound
 		}

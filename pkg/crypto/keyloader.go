@@ -4,8 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -13,7 +15,7 @@ import (
 // Priority order:
 // 1. KNOX_MASTER_KEY environment variable (base64 or hex encoded)
 // 2. KNOX_MASTER_KEY_FILE environment variable (path to key file)
-// 3. Default key file location
+// 3. Default key file location.
 func LoadMasterKey() ([]byte, error) {
 	// Try environment variable first
 	if keyStr := os.Getenv("KNOX_MASTER_KEY"); keyStr != "" {
@@ -31,7 +33,7 @@ func LoadMasterKey() ([]byte, error) {
 		return loadMasterKeyFromFile(defaultKeyFile)
 	}
 
-	return nil, fmt.Errorf("no master key found: set KNOX_MASTER_KEY or KNOX_MASTER_KEY_FILE environment variable")
+	return nil, errors.New("no master key found: set KNOX_MASTER_KEY or KNOX_MASTER_KEY_FILE environment variable")
 }
 
 // decodeMasterKey decodes a master key from string (supports base64 or hex).
@@ -54,7 +56,7 @@ func decodeMasterKey(keyStr string) ([]byte, error) {
 		return nil, fmt.Errorf("decoded key has wrong length: %d bytes (expected 32)", len(key))
 	}
 
-	return nil, fmt.Errorf("failed to decode master key: must be base64 or hex encoded 32-byte key")
+	return nil, errors.New("failed to decode master key: must be base64 or hex encoded 32-byte key")
 }
 
 // loadMasterKeyFromFile loads the master key from a file.
@@ -66,10 +68,19 @@ func loadMasterKeyFromFile(path string) ([]byte, error) {
 	}
 
 	mode := info.Mode()
-	if mode&0077 != 0 {
+	if mode&0o077 != 0 {
 		return nil, fmt.Errorf("key file has insecure permissions %o (should be 0600)", mode)
 	}
 
+	// Validate file path for security
+	if !filepath.IsAbs(path) {
+		return nil, errors.New("key file path must be absolute")
+	}
+	if strings.Contains(path, "..") {
+		return nil, errors.New("key file path cannot contain parent directory references")
+	}
+
+	// #nosec G304 -- path is strictly validated above (absolute, no traversal, permissions checked)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key file: %w", err)
@@ -90,14 +101,14 @@ func GenerateMasterKeyString() (string, error) {
 // SaveMasterKeyToFile saves a master key to a file with secure permissions.
 func SaveMasterKeyToFile(key []byte, path string) error {
 	if len(key) != 32 {
-		return fmt.Errorf("key must be 32 bytes")
+		return errors.New("key must be 32 bytes")
 	}
 
 	// Encode as base64
 	encoded := base64.StdEncoding.EncodeToString(key)
 
 	// Write with secure permissions (owner read/write only)
-	if err := os.WriteFile(path, []byte(encoded), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(encoded), 0o600); err != nil {
 		return fmt.Errorf("failed to write key file: %w", err)
 	}
 

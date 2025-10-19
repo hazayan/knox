@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -15,7 +16,7 @@ import (
 var routes = [...]Route{
 	{
 		Method:  "GET",
-		Id:      "getkeys",
+		ID:      "getkeys",
 		Path:    "/v0/keys/",
 		Handler: getKeysHandler,
 		Parameters: []Parameter{
@@ -24,7 +25,7 @@ var routes = [...]Route{
 	},
 	{
 		Method:  "POST",
-		Id:      "postkeys",
+		ID:      "postkeys",
 		Path:    "/v0/keys/",
 		Handler: postKeysHandler,
 		Parameters: []Parameter{
@@ -36,61 +37,61 @@ var routes = [...]Route{
 
 	{
 		Method:  "GET",
-		Id:      "getkey",
+		ID:      "getkey",
 		Path:    "/v0/keys/{keyID}/",
 		Handler: getKeyHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 			QueryParameter("status"),
 		},
 	},
 	{
 		Method:  "DELETE",
-		Id:      "deletekey",
+		ID:      "deletekey",
 		Path:    "/v0/keys/{keyID}/",
 		Handler: deleteKeyHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 		},
 	},
 	{
 		Method:  "GET",
-		Id:      "getaccess",
+		ID:      "getaccess",
 		Path:    "/v0/keys/{keyID}/access/",
 		Handler: getAccessHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 		},
 	},
 	{
 		Method:  "PUT",
-		Id:      "putaccess",
+		ID:      "putaccess",
 		Path:    "/v0/keys/{keyID}/access/",
 		Handler: putAccessHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 			PostParameter("access"),
 			PostParameter("acl"),
 		},
 	},
 	{
 		Method:  "POST",
-		Id:      "postversion",
+		ID:      "postversion",
 		Path:    "/v0/keys/{keyID}/versions/",
 		Handler: postVersionHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
+			URLParameter("keyID"),
 			PostParameter("data"),
 		},
 	},
 	{
 		Method:  "PUT",
-		Id:      "putversion",
+		ID:      "putversion",
 		Path:    "/v0/keys/{keyID}/versions/{versionID}/",
 		Handler: putVersionsHandler,
 		Parameters: []Parameter{
-			UrlParameter("keyID"),
-			UrlParameter("versionID"),
+			URLParameter("keyID"),
+			URLParameter("versionID"),
 			PostParameter("status"),
 		},
 	},
@@ -105,7 +106,7 @@ var routes = [...]Route{
 // REST so that fix will be postponed until this actually is a problem.
 // The route for this handler is GET /v0/keys/
 // There are no authorization constraints on this route.
-func getKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func getKeysHandler(m KeyManager, _ types.Principal, parameters map[string]string) (any, *HTTPError) {
 	queryString := parameters["queryString"]
 
 	// Can't throw error since direct from a http request
@@ -138,8 +139,7 @@ func getKeysHandler(m KeyManager, principal types.Principal, parameters map[stri
 // It returns the key version ID of the original Primary key version.
 // The route for this handler is POST /v0/keys/
 // The postKeysHandler must be a User.
-func postKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
+func postKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	// Authorize
 	if !auth.IsUser(principal) {
 		return nil, errF(types.UnauthorizedCode, fmt.Sprintf("Must be a user to create keys, principal is %s", principal.GetID()))
@@ -175,10 +175,10 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 	key := newKey(keyID, acl, decodedData, principal)
 	err := m.AddNewKey(&key)
 	if err != nil {
-		if err == types.ErrKeyExists {
+		if errors.Is(err, types.ErrKeyExists) {
 			return nil, errF(types.KeyIdentifierExistsCode, fmt.Sprintf("Key %s already exists", keyID))
 		}
-		if err == types.ErrInvalidKeyID {
+		if errors.Is(err, types.ErrInvalidKeyID) {
 			return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("KeyID includes unsupported characters %s", keyID))
 		}
 
@@ -189,8 +189,8 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 
 // getKeyHandler gets the key matching the keyID in the request.
 // The route for this handler is GET /v0/keys/<key_id>/
-// The principal must have Read access to the key
-func getKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+// The principal must have Read access to the key.
+func getKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	status := types.Active
@@ -205,7 +205,7 @@ func getKeyHandler(m KeyManager, principal types.Principal, parameters map[strin
 	// Get data
 	key, getErr := m.GetKey(keyID, status)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -229,12 +229,12 @@ func getKeyHandler(m KeyManager, principal types.Principal, parameters map[strin
 // deleteKeyHandler deletes the key matching the keyID in the request.
 // The route for this handler is DELETE /v0/keys/<key_id>/
 // The principal needs Admin access to the key.
-func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -259,15 +259,14 @@ func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[st
 }
 
 // getAccessHandler gets the ACL for a specific Key.
-// The route for this handler is GET /v0/keys/<key_id>/access/
-func getAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
+// The route for this handler is GET /v0/keys/<key_id>/access/.
+func getAccessHandler(m KeyManager, _ types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -285,7 +284,7 @@ func getAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 // existing access rules will not be modified unless the same Type and Name is used
 // The route for this handler is PUT /v0/keys/<key_id>/access/
 // The principal needs Admin access.
-func putAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func putAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	accessStr, accessOK := parameters["access"]
@@ -319,7 +318,7 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 	// Get the Key
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -360,8 +359,7 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 // added as an Active key.
 // The route for this handler is PUT /v0/keys/<key_id>/versions/
 // The principal needs Write access.
-func postVersionHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
+func postVersionHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 	dataStr, dataOK := parameters["data"]
 	if !dataOK {
@@ -381,7 +379,7 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Inactive)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -401,7 +399,6 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 	version := newKeyVersion(decodedData, types.Active)
 
 	err := m.AddVersion(keyID, &version)
-
 	if err != nil {
 		return nil, errF(types.InternalServerErrorCode, err.Error())
 	}
@@ -421,8 +418,7 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 //
 // The route for this handler is PUT /v0/keys/<key_id>/versions/<version_id>/
 // The principal needs Write access.
-func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
-
+func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 	versionID := parameters["versionID"]
 
@@ -443,7 +439,7 @@ func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Inactive)
 	if getErr != nil {
-		if getErr == types.ErrKeyIDNotFound {
+		if errors.Is(getErr, types.ErrKeyIDNotFound) {
 			return nil, errF(types.KeyIdentifierDoesNotExistCode, fmt.Sprintf("No such key %s", keyID))
 		}
 		return nil, errF(types.InternalServerErrorCode, getErr.Error())
@@ -461,12 +457,12 @@ func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[
 
 	err := m.UpdateVersion(keyID, id, status)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil, nil
-	case types.ErrKeyVersionNotFound:
+	case errors.Is(err, types.ErrKeyVersionNotFound):
 		return nil, errF(types.KeyVersionDoesNotExistCode, err.Error())
-	case types.ErrPrimaryToInactive, types.ErrPrimaryToActive, types.ErrInactiveToPrimary:
+	case errors.Is(err, types.ErrPrimaryToInactive), errors.Is(err, types.ErrPrimaryToActive), errors.Is(err, types.ErrInactiveToPrimary):
 		return nil, errF(types.BadRequestDataCode, err.Error())
 	default:
 		return nil, errF(types.InternalServerErrorCode, err.Error())
@@ -478,7 +474,7 @@ func authorizeRequest(key *types.Key, principal types.Principal, access types.Ac
 		if r := recover(); r != nil {
 			log.Printf("Recovered from panic in access callback: %v", r)
 
-			err = fmt.Errorf("Recovered from panic in access callback: %v", r)
+			err = fmt.Errorf("recovered from panic in access callback: %v", r)
 		}
 	}()
 
@@ -492,5 +488,5 @@ func authorizeRequest(key *types.Key, principal types.Principal, access types.Ac
 		})
 	}
 
-	return
+	return allow, err
 }

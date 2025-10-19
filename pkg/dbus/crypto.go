@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -14,9 +13,9 @@ import (
 
 // Diffie-Hellman parameters using RFC 3526 Group 14 (2048-bit MODP)
 // SECURITY: Upgraded from 1024-bit to 2048-bit for ~112-bit security level
-// NOTE: This deviates from original FreeDesktop spec (1024-bit) for better security
+// NOTE: This deviates from original FreeDesktop spec (1024-bit) for better security.
 var (
-	// Prime modulus (2048-bit safe prime) - RFC 3526 Group 14
+	// Prime modulus (2048-bit safe prime) - RFC 3526 Group 14.
 	dhPrime = mustParseBigInt(
 		"FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"+
 			"29024E088A67CC74020BBEA63B139B22514A08798E3404DD"+
@@ -30,7 +29,7 @@ var (
 			"DE2BCBF6955817183995497CEA956AE515D2261898FA0510"+
 			"15728E5A8AACAA68FFFFFFFFFFFFFFFF", 16)
 
-	// Generator
+	// Generator.
 	dhGenerator = big.NewInt(2)
 )
 
@@ -70,13 +69,13 @@ func (dh *DHKeyExchange) ComputeSharedKey(peerPublicKeyBytes []byte) error {
 
 	// 1. Validate peer's public key is in valid range (1 < key < p)
 	if peerPublicKey.Cmp(big.NewInt(1)) <= 0 || peerPublicKey.Cmp(dhPrime) >= 0 {
-		return fmt.Errorf("invalid peer public key: out of range")
+		return errors.New("invalid peer public key: out of range")
 	}
 
 	// 2. Reject trivial values that could leak information
 	pMinusOne := new(big.Int).Sub(dhPrime, big.NewInt(1))
 	if peerPublicKey.Cmp(pMinusOne) == 0 {
-		return fmt.Errorf("invalid peer public key: trivial value p-1")
+		return errors.New("invalid peer public key: trivial value p-1")
 	}
 
 	// 3. Verify key is in correct subgroup (prevents small subgroup attack)
@@ -85,7 +84,7 @@ func (dh *DHKeyExchange) ComputeSharedKey(peerPublicKeyBytes []byte) error {
 	q := new(big.Int).Rsh(pMinusOne, 1) // q = (p-1)/2
 	subgroupTest := new(big.Int).Exp(peerPublicKey, q, dhPrime)
 	if subgroupTest.Cmp(big.NewInt(1)) != 0 {
-		return fmt.Errorf("invalid peer public key: not in prime-order subgroup")
+		return errors.New("invalid peer public key: not in prime-order subgroup")
 	}
 
 	// 4. Calculate shared secret: peer_public^private mod p
@@ -93,7 +92,7 @@ func (dh *DHKeyExchange) ComputeSharedKey(peerPublicKeyBytes []byte) error {
 
 	// 5. Verify shared secret is not trivial
 	if sharedSecret.Cmp(big.NewInt(1)) == 0 || sharedSecret.Cmp(pMinusOne) == 0 {
-		return fmt.Errorf("invalid shared secret: trivial value")
+		return errors.New("invalid shared secret: trivial value")
 	}
 
 	// Derive encryption key from shared secret using SHA-256
@@ -133,9 +132,9 @@ func deriveKey(sharedSecret []byte) []byte {
 }
 
 // encryptAES128CBC encrypts data using AES-128-CBC with PKCS7 padding.
-func encryptAES128CBC(key, plaintext []byte) (iv []byte, ciphertext []byte, err error) {
+func encryptAES128CBC(key, plaintext []byte) (iv, ciphertext []byte, err error) {
 	if len(key) != 16 {
-		return nil, nil, fmt.Errorf("key must be 16 bytes for AES-128")
+		return nil, nil, errors.New("key must be 16 bytes for AES-128")
 	}
 
 	// Apply PKCS7 padding
@@ -164,7 +163,7 @@ func encryptAES128CBC(key, plaintext []byte) (iv []byte, ciphertext []byte, err 
 // decryptAES128CBC decrypts data using AES-128-CBC with PKCS7 padding.
 func decryptAES128CBC(key, iv, ciphertext []byte) ([]byte, error) {
 	if len(key) != 16 {
-		return nil, fmt.Errorf("key must be 16 bytes for AES-128")
+		return nil, errors.New("key must be 16 bytes for AES-128")
 	}
 
 	if len(iv) != aes.BlockSize {
@@ -172,7 +171,7 @@ func decryptAES128CBC(key, iv, ciphertext []byte) ([]byte, error) {
 	}
 
 	if len(ciphertext)%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("ciphertext length must be multiple of block size")
+		return nil, errors.New("ciphertext length must be multiple of block size")
 	}
 
 	// Create cipher
@@ -248,7 +247,7 @@ func encodeDBusPublicKey(publicKey []byte) []byte {
 func decodeDBusPublicKey(data []byte) ([]byte, error) {
 	// The data is already the raw bytes from the D-Bus variant
 	if len(data) == 0 {
-		return nil, fmt.Errorf("empty public key")
+		return nil, errors.New("empty public key")
 	}
 	return data, nil
 }
@@ -260,19 +259,4 @@ func mustParseBigInt(s string, base int) *big.Int {
 		panic(fmt.Sprintf("failed to parse big int: %s", s))
 	}
 	return n
-}
-
-// serializeU32 serializes a uint32 as big-endian bytes.
-func serializeU32(n uint32) []byte {
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, n)
-	return b
-}
-
-// deserializeU32 deserializes a uint32 from big-endian bytes.
-func deserializeU32(b []byte) (uint32, error) {
-	if len(b) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(b))
-	}
-	return binary.BigEndian.Uint32(b), nil
 }

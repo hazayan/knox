@@ -16,8 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -45,13 +45,13 @@ type Backend struct {
 // The baseDir directory will be created if it doesn't exist.
 func New(baseDir string) (*Backend, error) {
 	// Ensure the directory exists
-	if err := os.MkdirAll(baseDir, 0700); err != nil {
+	if err := os.MkdirAll(baseDir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
 	// Verify we can write to the directory
 	testFile := filepath.Join(baseDir, ".knox-test")
-	if err := os.WriteFile(testFile, []byte("test"), 0600); err != nil {
+	if err := os.WriteFile(testFile, []byte("test"), 0o600); err != nil {
 		return nil, fmt.Errorf("storage directory is not writable: %w", err)
 	}
 	os.Remove(testFile)
@@ -63,7 +63,7 @@ func New(baseDir string) (*Backend, error) {
 }
 
 // GetKey retrieves a key by ID.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
+func (b *Backend) GetKey(_ context.Context, keyID string) (*types.Key, error) {
 	b.incrementOp("get")
 
 	lock := b.getLock(keyID)
@@ -72,7 +72,8 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) 
 
 	path := b.keyPath(keyID)
 
-	data, err := os.ReadFile(path)
+	// Path is sanitized by keyPath method - see sanitizeKeyID function
+	data, err := os.ReadFile(path) //nolint:gosec // Path sanitization prevents directory traversal
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, storage.ErrKeyNotFound
@@ -92,7 +93,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) 
 }
 
 // PutKey stores or updates a key.
-func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
+func (b *Backend) PutKey(_ context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}
@@ -113,7 +114,7 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 
 	// Write atomically using a temporary file + rename
 	tempPath := path + ".tmp"
-	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+	if err := os.WriteFile(tempPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write key file: %w", err)
 	}
 
@@ -126,7 +127,7 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 }
 
 // DeleteKey removes a key by ID.
-func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
+func (b *Backend) DeleteKey(_ context.Context, keyID string) error {
 	b.incrementOp("delete")
 
 	lock := b.getLock(keyID)
@@ -146,7 +147,7 @@ func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
 }
 
 // ListKeys returns all key IDs matching the given prefix.
-func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error) {
+func (b *Backend) ListKeys(_ context.Context, prefix string) ([]string, error) {
 	b.incrementOp("list")
 
 	var keys []string
@@ -177,7 +178,6 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to list keys: %w", err)
 	}
@@ -186,7 +186,7 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 }
 
 // UpdateKey atomically updates a key using the provided update function.
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
+func (b *Backend) UpdateKey(_ context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	b.incrementOp("update")
 
 	lock := b.getLock(keyID)
@@ -196,7 +196,8 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 	// Get current key (or nil if it doesn't exist)
 	var currentKey *types.Key
 	path := b.keyPath(keyID)
-	data, err := os.ReadFile(path)
+	// Path is sanitized by keyPath method - see sanitizeKeyID function
+	data, err := os.ReadFile(path) //nolint:gosec // Path sanitization prevents directory traversal
 	if err == nil {
 		var key types.Key
 		if err := json.Unmarshal(data, &key); err != nil {
@@ -232,7 +233,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 		}
 
 		tempPath := path + ".tmp"
-		if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		if err := os.WriteFile(tempPath, data, 0o600); err != nil {
 			return fmt.Errorf("failed to write updated key: %w", err)
 		}
 
@@ -251,7 +252,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 }
 
 // Ping checks if the backend is healthy.
-func (b *Backend) Ping(ctx context.Context) error {
+func (b *Backend) Ping(_ context.Context) error {
 	// Check if the base directory is accessible
 	if _, err := os.Stat(b.baseDir); err != nil {
 		return storage.ErrStorageUnavailable
@@ -259,7 +260,7 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 	// Try to write a test file
 	testPath := filepath.Join(b.baseDir, ".knox-health")
-	if err := os.WriteFile(testPath, []byte("health-check"), 0600); err != nil {
+	if err := os.WriteFile(testPath, []byte("health-check"), 0o600); err != nil {
 		return storage.ErrStorageUnavailable
 	}
 	os.Remove(testPath)
@@ -274,7 +275,7 @@ func (b *Backend) Close() error {
 }
 
 // Stats returns metrics about the backend's state.
-func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
+func (b *Backend) Stats(_ context.Context) (*storage.Stats, error) {
 	var totalKeys int64
 	var totalSize int64
 
@@ -290,14 +291,13 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate stats: %w", err)
 	}
 
 	// Collect operation counts
 	opCounts := make(map[string]int64)
-	b.opCounts.Range(func(key, value interface{}) bool {
+	b.opCounts.Range(func(key, value any) bool {
 		opCounts[key.(string)] = atomic.LoadInt64(value.(*int64))
 		return true
 	})
@@ -306,7 +306,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 		TotalKeys:       totalKeys,
 		StorageSize:     totalSize,
 		OperationCounts: opCounts,
-		BackendSpecific: map[string]interface{}{
+		BackendSpecific: map[string]any{
 			"backend":  "filesystem",
 			"base_dir": b.baseDir,
 		},
@@ -385,5 +385,7 @@ func (b *Backend) incrementOp(op string) {
 }
 
 // Verify that Backend implements the required interfaces at compile time.
-var _ storage.Backend = (*Backend)(nil)
-var _ storage.StatsProvider = (*Backend)(nil)
+var (
+	_ storage.Backend       = (*Backend)(nil)
+	_ storage.StatsProvider = (*Backend)(nil)
+)

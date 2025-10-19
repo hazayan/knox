@@ -1,9 +1,11 @@
+// Package client implements the Knox CLI client commands.
 package client
 
 import (
-	"github.com/hazayan/knox/pkg/types"
+	"errors"
 	"fmt"
 
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
@@ -17,7 +19,7 @@ var cmdAdd = &Command{
 Add will add a new key version to an existing key in knox. Key data of new version should be sent to stdin unless a key-template is specified.
 
 First way: key data of new version is sent to stdin.
-Please run "knox add <key_identifier>". 
+Please run "knox add <key_identifier>".
 
 Second way: the key-template option can be used to specify a template to generate the new key version, instead of stdin. For available key templates, run "knox key-templates".
 Please run "knox add --key-template <template_name> <key_identifier>".
@@ -33,9 +35,9 @@ See also: knox create, knox promote
 }
 var addTinkKeyset = cmdAdd.Flag.String("key-template", "", "name of a knox-supported Tink key template")
 
-func runAdd(cmd *Command, args []string) *ErrorStatus {
+func runAdd(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
-		return &ErrorStatus{fmt.Errorf("add takes only one argument. See 'knox help add'"), false}
+		return &ErrorStatus{errors.New("add takes only one argument. See 'knox help add'"), false}
 	}
 	keyID := args[0]
 	var data []byte
@@ -50,14 +52,14 @@ func runAdd(cmd *Command, args []string) *ErrorStatus {
 	}
 	versionID, err := cli.AddVersion(keyID, data)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error adding version: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error adding version: %s", err.Error()), true}
 	}
 	fmt.Printf("Added key version %d\n", versionID)
 	return nil
 }
 
 // getDataWithTemplate returns the data for a new version of a knox identifier that stores Tink keyset.
-func getDataWithTemplate(templateName string, keyID string) ([]byte, error) {
+func getDataWithTemplate(templateName, keyID string) ([]byte, error) {
 	err := obeyNamingRule(templateName, keyID)
 	if err != nil {
 		return nil, err

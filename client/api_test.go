@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"reflect"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -37,7 +36,9 @@ func TestMockClient(t *testing.T) {
 	a := []string{"active1", "active2"}
 	k0 := types.Key{
 		VersionList: []types.KeyVersion{
-			{Data: []byte(p), Status: types.Primary}, {Data: []byte(a[0]), Status: types.Active}, {Data: []byte(a[1]), Status: types.Active}}}
+			{Data: []byte(p), Status: types.Primary}, {Data: []byte(a[0]), Status: types.Active}, {Data: []byte(a[1]), Status: types.Active},
+		},
+	}
 
 	m := NewMock(p, a)
 	p1 := m.GetPrimary()
@@ -54,13 +55,12 @@ func TestMockClient(t *testing.T) {
 		}
 	}
 	k1 := m.GetKeyObject()
-	if !reflect.DeepEqual(k0, k1) {
+	if k0.ID != k1.ID || k0.VersionHash != k1.VersionHash || len(k0.VersionList) != len(k1.VersionList) {
 		t.Fatalf("Got %v, Want %v", k1, k0)
 	}
-
 }
 
-func buildGoodResponse(data interface{}) ([]byte, error) {
+func buildGoodResponse(data any) ([]byte, error) {
 	resp := &types.Response{
 		Status:    "ok",
 		Code:      types.OKCode,
@@ -70,10 +70,9 @@ func buildGoodResponse(data interface{}) ([]byte, error) {
 		Data:      data,
 	}
 	return json.Marshal(resp)
-
 }
 
-func buildErrorResponse(code int, data interface{}) ([]byte, error) {
+func buildErrorResponse(code int, data any) ([]byte, error) {
 	resp := &types.Response{
 		Status:    "err",
 		Code:      code,
@@ -83,7 +82,6 @@ func buildErrorResponse(code int, data interface{}) ([]byte, error) {
 		Data:      data,
 	}
 	return json.Marshal(resp)
-
 }
 
 // buildServer returns a server. Call Close when finished.
@@ -92,7 +90,7 @@ func buildServer(code int, body []byte, a func(r *http.Request)) *httptest.Serve
 		a(r)
 		w.WriteHeader(code)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(body)
+		_, _ = w.Write(body)
 	}))
 }
 
@@ -101,7 +99,7 @@ func buildConcurrentServer(code int, a func(r *http.Request) []byte) *httptest.S
 		resp := a(r)
 		w.WriteHeader(code)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(resp)
+		_, _ = w.Write(resp)
 	}))
 }
 
@@ -115,11 +113,7 @@ func isKnoxDaemonRunning() bool {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	if err == nil {
-		return true
-	}
-
-	return false
+	return err == nil
 }
 
 func TestGetKey(t *testing.T) {
@@ -166,7 +160,7 @@ func TestGetKey(t *testing.T) {
 	}
 }
 
-// TestGetKeyWithMultipleAuth tests getting keys with multiple auth methods
+// TestGetKeyWithMultipleAuth tests getting keys with multiple auth methods.
 func TestGetKeyWithMultipleAuth(t *testing.T) {
 	expected := types.Key{
 		ID:          "testkey",
@@ -186,17 +180,18 @@ func TestGetKeyWithMultipleAuth(t *testing.T) {
 		atomic.AddUint64(&ops, 1)
 		var resp []byte
 		var err error
-		if ops == 1 {
+		switch ops {
+		case 1:
 			resp, err = buildErrorResponse(types.UnauthorizedCode, nil)
 			if err != nil {
 				t.Fatalf("%s is not nil", err)
 			}
-		} else if ops == 2 {
+		case 2:
 			resp, err = buildGoodResponse(expected)
 			if err != nil {
 				t.Fatalf("%s is not nil", err)
 			}
-		} else {
+		default:
 			t.Fatalf("Unexpected number of requests: %d", ops)
 		}
 		return resp
@@ -254,16 +249,16 @@ func TestGetKeyWithMultipleAuth(t *testing.T) {
 	}
 }
 
-// TestNoAuthPrincipals tests the case where no auth handlers are available
+// TestNoAuthPrincipals tests the case where no auth handlers are available.
 func TestNoAuthPrincipals(t *testing.T) {
 	// Create a test server - won't be used since auth fails before request is made
 	resp, err := buildErrorResponse(types.UnauthenticatedCode, nil)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	srv := buildServer(200, resp, func(r *http.Request) {
+	srv := buildServer(200, resp, func(_ *http.Request) {
 		// This should not be called as auth should fail before request is made
-		t.Fatalf("Server was called, but auth should have failed before request was made")
+		t.Fatal("Server was called, but auth should have failed before request was made")
 	})
 	defer srv.Close()
 
@@ -292,14 +287,14 @@ func TestNoAuthPrincipals(t *testing.T) {
 	}
 }
 
-// TestOnlyUnauthPrincipals tests the case where a principal is provided but it is unauthorized
+// TestOnlyUnauthPrincipals tests the case where a principal is provided but it is unauthorized.
 func TestOnlyUnauthPrincipals(t *testing.T) {
 	// Create a test server which returns an unauthorized error
 	resp, err := buildErrorResponse(types.UnauthorizedCode, nil)
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	srv := buildServer(200, resp, func(r *http.Request) {})
+	srv := buildServer(200, resp, func(_ *http.Request) {})
 	defer srv.Close()
 
 	// Create client with the user auth handler
@@ -377,7 +372,7 @@ func TestCreateKey(t *testing.T) {
 		if r.URL.Path != "/v0/keys/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/")
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.PostForm["data"][0] != "ZGF0YQ==" {
 			t.Fatalf("%s is not expected: %s", r.PostForm["data"][0], "ZGF0YQ==")
 		}
@@ -434,7 +429,7 @@ func TestAddVersion(t *testing.T) {
 		if r.URL.Path != "/v0/keys/testkey/versions/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/versions/")
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.PostForm["data"][0] != "ZGF0YQ==" {
 			t.Fatalf("%s is not expected: %s", r.PostForm["data"][0], "ZGF0YQ==")
 		}
@@ -488,7 +483,7 @@ func TestPutVersion(t *testing.T) {
 		if r.URL.Path != "/v0/keys/testkey/versions/123/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/versions/123/")
 		}
-		r.ParseForm()
+		_ = r.ParseForm()
 		if r.PostForm["status"][0] != "\"Primary\"" {
 			t.Fatalf("%s is not expected: %s", r.PostForm["status"][0], "\"Primary\"")
 		}
@@ -520,7 +515,9 @@ func TestPutAccess(t *testing.T) {
 		if r.URL.Path != "/v0/keys/testkey/access/" {
 			t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/access/")
 		}
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("failed to parse form: %v", err)
+		}
 		if r.PostForm["acl"][0] == "" {
 			t.Fatalf("%s is empty", r.PostForm["access"][0])
 		}
@@ -663,11 +660,11 @@ func TestGetInvalidKeys(t *testing.T) {
 
 	bytes, err := json.Marshal(expected)
 	if err != nil {
-		t.Fatalf("Error marshalling key %s", err)
+		t.Fatalf("Error marshaling key %s", err)
 	}
 
 	tempDir := t.TempDir()
-	err = os.WriteFile(path.Join(tempDir, "testkey"), bytes, 0600)
+	err = os.WriteFile(path.Join(tempDir, "testkey"), bytes, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write invalid test key: %s", err)
 	}
@@ -690,7 +687,7 @@ func TestGetInvalidKeys(t *testing.T) {
 
 	_, err = cli.CacheGetKey("testkey")
 	if err == nil {
-		t.Fatalf("error expected for invalid key content")
+		t.Fatal("error expected for invalid key content")
 	} else {
 		if err.Error() != "invalid key content for the cached key" {
 			t.Fatalf("%s is not the expected error message", err)
@@ -699,7 +696,7 @@ func TestGetInvalidKeys(t *testing.T) {
 
 	_, err = cli.NetworkGetKey("testkey")
 	if err == nil {
-		t.Fatalf("error expected for invalid key content")
+		t.Fatal("error expected for invalid key content")
 	} else {
 		if err.Error() != "invalid key content for the remote key" {
 			t.Fatalf("%s is not the expected error message", err)

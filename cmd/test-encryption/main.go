@@ -40,13 +40,12 @@ func main() {
 	fmt.Printf("  Serialized DBKey: %s\n", dataStr)
 
 	// The JSON tag is "data" not "EncData" - check for that
-	if strings.Contains(dataStr, `"data"`) || strings.Contains(dataStr, "versions") {
-		fmt.Printf("✓ PASS: DBKey serialization includes encrypted data field\n")
-		fmt.Printf("  Size: %d bytes\n", len(data))
-	} else {
-		fmt.Printf("❌ FAILED: DBKey serialization missing data field\n")
+	if !strings.Contains(dataStr, `"data"`) && !strings.Contains(dataStr, "versions") {
+		fmt.Print("❌ FAILED: DBKey serialization missing data field\n")
 		os.Exit(1)
 	}
+	fmt.Print("✓ PASS: DBKey serialization includes encrypted data field\n")
+	fmt.Printf("  Size: %d bytes\n", len(data))
 
 	// Test 2: Verify wrapper structure
 	fmt.Println("\nTest 2: Verify wrapper storage structure...")
@@ -64,7 +63,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("✓ PASS: Wrapper structure created successfully\n")
+	fmt.Print("✓ PASS: Wrapper structure created successfully\n")
 	fmt.Printf("  Wrapper size: %d bytes\n", len(wrapperData))
 
 	// Test 3: Verify deserialization
@@ -81,14 +80,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if reconstructedDBKey.ID == testDBKey.ID {
-		fmt.Printf("✓ PASS: Round-trip serialization successful\n")
-		fmt.Printf("  Key ID: %s\n", reconstructedDBKey.ID)
-		fmt.Printf("  EncData present: %t\n", len(reconstructedDBKey.VersionList) > 0)
-	} else {
-		fmt.Printf("❌ FAILED: Deserialized data does not match\n")
+	if reconstructedDBKey.ID != testDBKey.ID {
+		fmt.Print("❌ FAILED: Deserialized data does not match\n")
 		os.Exit(1)
 	}
+	fmt.Print("✓ PASS: Round-trip serialization successful\n")
+	fmt.Printf("  Key ID: %s\n", reconstructedDBKey.ID)
+	fmt.Printf("  EncData present: %t\n", len(reconstructedDBKey.VersionList) > 0)
 
 	// Test 4: Verify backends don't see plaintext (conceptual test)
 	fmt.Println("\nTest 4: Verify storage adapter architecture...")
@@ -121,13 +119,6 @@ func main() {
 	fmt.Println("  - Secrets are encrypted before storage")
 	fmt.Println("  - Backends only handle encrypted data")
 	fmt.Println("  - No plaintext secrets in database")
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func maskPassword(dbURL string) string {

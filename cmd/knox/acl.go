@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -34,7 +35,7 @@ Examples:
   knox acl get myapp:api_key
   knox acl get myapp:api_key --json`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			client, err := getAPIClient()
@@ -68,7 +69,9 @@ Examples:
 				fmt.Fprintf(w, "%s\t%s\t%s\n", principalType, entry.ID, accessType)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
@@ -95,7 +98,7 @@ Examples:
   knox acl add myapp:api_key Service:spiffe://example.com/myservice:Write
   knox acl add myapp:api_key UserGroup:developers:Admin`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 			aclEntry := args[1]
 
@@ -106,7 +109,7 @@ Examples:
 			}
 
 			if len(acl) != 1 {
-				return fmt.Errorf("expected exactly one ACL entry")
+				return errors.New("expected exactly one ACL entry")
 			}
 
 			client, err := getAPIClient()
@@ -119,7 +122,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id": keyID,
 					"acl":    acl[0],
 					"status": "added",
@@ -151,7 +154,7 @@ Examples:
   knox acl remove myapp:api_key User:alice@example.com
   knox acl remove myapp:api_key Service:spiffe://example.com/myservice`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 			aclEntry := args[1] + ":None" // Add None access to remove
 
@@ -162,7 +165,7 @@ Examples:
 			}
 
 			if len(acl) != 1 {
-				return fmt.Errorf("expected exactly one ACL entry")
+				return errors.New("expected exactly one ACL entry")
 			}
 
 			client, err := getAPIClient()
@@ -175,7 +178,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id": keyID,
 					"acl":    acl[0],
 					"status": "removed",

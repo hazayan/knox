@@ -9,12 +9,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
 )
 
 func init() {
-	storage.RegisterBackend("memory", func(cfg storage.Config) (storage.Backend, error) {
+	storage.RegisterBackend("memory", func(_ storage.Config) (storage.Backend, error) {
 		return New(), nil
 	})
 }
@@ -43,7 +43,7 @@ func NewBackend() *Backend {
 }
 
 // GetKey retrieves a key by ID.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
+func (b *Backend) GetKey(_ context.Context, keyID string) (*types.Key, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -59,7 +59,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) 
 }
 
 // PutKey stores or updates a key.
-func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
+func (b *Backend) PutKey(_ context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 }
 
 // DeleteKey removes a key by ID.
-func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
+func (b *Backend) DeleteKey(_ context.Context, keyID string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -90,7 +90,7 @@ func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
 }
 
 // ListKeys returns all key IDs matching the given prefix.
-func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error) {
+func (b *Backend) ListKeys(_ context.Context, prefix string) ([]string, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -107,7 +107,7 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 }
 
 // UpdateKey atomically updates a key using the provided update function.
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
+func (b *Backend) UpdateKey(_ context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -147,7 +147,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 }
 
 // Ping checks if the backend is healthy.
-func (b *Backend) Ping(ctx context.Context) error {
+func (b *Backend) Ping(_ context.Context) error {
 	// Memory backend is always healthy
 	return nil
 }
@@ -164,7 +164,7 @@ func (b *Backend) Close() error {
 }
 
 // Stats returns metrics about the backend's state.
-func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
+func (b *Backend) Stats(_ context.Context) (*storage.Stats, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -187,7 +187,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 		TotalKeys:       int64(len(b.data)),
 		StorageSize:     totalSize,
 		OperationCounts: opCounts,
-		BackendSpecific: map[string]interface{}{
+		BackendSpecific: map[string]any{
 			"backend": "memory",
 		},
 	}, nil
@@ -207,15 +207,17 @@ func (b *Backend) copyKey(key *types.Key) *types.Key {
 		panic("failed to marshal key: " + err.Error())
 	}
 
-	var copy types.Key
-	if err := json.Unmarshal(data, &copy); err != nil {
+	var keyCopy types.Key
+	if err := json.Unmarshal(data, &keyCopy); err != nil {
 		// Should never happen for valid Knox keys
 		panic("failed to unmarshal key: " + err.Error())
 	}
 
-	return &copy
+	return &keyCopy
 }
 
 // Verify that Backend implements the required interfaces at compile time.
-var _ storage.Backend = (*Backend)(nil)
-var _ storage.StatsProvider = (*Backend)(nil)
+var (
+	_ storage.Backend       = (*Backend)(nil)
+	_ storage.StatsProvider = (*Backend)(nil)
+)

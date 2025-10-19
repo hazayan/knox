@@ -1,0 +1,186 @@
+version: "2"
+run:
+  build-tags:
+    - integration
+linters:
+  enable:
+    - canonicalheader
+    - copyloopvar
+    - dogsled
+    - dupl
+    - errorlint
+    - forbidigo
+    - gocritic
+    - godot
+    - goheader
+    - gosec
+    - intrange
+    - misspell
+    - musttag
+    - nakedret
+    - perfsprint
+    - revive
+    - staticcheck
+    - tparallel
+    - unconvert
+    - unparam
+    - usetesting
+    - whitespace
+  disable:
+    - paralleltest
+  settings:
+    errorlint:
+      errorf: false
+      asserts: true
+      comparison: true
+    forbidigo:
+      forbid:
+        - pattern: ^reflect\.DeepEqual$
+          msg: "Use cmp.Equal instead of reflect.DeepEqual"
+        - pattern: "^http\\.Method[A-Z][a-z]*$"
+          msg: "Use string literals instead of http.Method constants (https://pkg.go.dev/net/http#pkg-constants)"
+    gocritic:
+      disable-all: true
+      enabled-checks:
+        - commentedOutCode
+        - commentFormatting
+        - deprecatedComment
+        - paramTypeCombine
+    #goheader:
+    #  values:
+    #    regexp:
+    #      CopyrightDate: 'Copyright \d{4} '
+    #  template: |-
+    #    {{CopyrightDate}}The go-github AUTHORS. All rights reserved.
+
+    #    Use of this source code is governed by a BSD-style
+    #    license that can be found in the LICENSE file.
+    gosec:
+      excludes:
+        # duplicates errcheck
+        - G104
+        # int(os.Stdin.Fd())
+        - G115
+    misspell:
+      locale: US
+      # extra words from https://go.dev//wiki/Spelling
+      extra-words:
+        - typo: marshall
+          correction: marshal
+        - typo: marshalled
+          correction: marshaled
+        - typo: marshalling
+          correction: marshaling
+        - typo: unmarshall
+          correction: unmarshal
+        - typo: unmarshalling
+          correction: unmarshaling
+        - typo: unmarshalled
+          correction: unmarshaled
+        - typo: unmarshalling
+          correction: unmarshaling
+
+      ignore-rules:
+        - analyses # returned by the GitHub API
+        - cancelled # returned by the GitHub API
+    perfsprint:
+      errorf: true
+      strconcat: false
+    revive:
+      # Set below 0.8 to enable error-strings rule.
+      confidence: 0.6
+      rules:
+        - name: blank-imports
+        - name: bool-literal-in-expr
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: early-return
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+          arguments:
+            - disableChecksOnConstants
+            - disableChecksOnVariables
+            - disableStutteringCheck
+        - name: filename-format
+          arguments:
+            - ^[_a-z][_a-z0-9]*.go$
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-equal
+        - name: time-naming
+        - name: unexported-naming
+        - name: unexported-return
+        - name: unnecessary-format
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: use-any
+        - name: var-declaration
+        - name: var-naming
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF1008" # allow embedded field in selector
+    usetesting:
+      context-background: true
+      context-todo: true
+      os-chdir: true
+      os-mkdir-temp: true
+      os-setenv: true
+      os-create-temp: true
+      os-temp-dir: true
+  exclusions:
+    rules:
+      - linters:
+          - dogsled
+          - dupl
+          - gosec
+          - unparam
+        path: _test\.go
+
+      # We need to pass nil Context in order to test DoBare erroring on nil ctx.
+      - linters: [staticcheck]
+        path: _test\.go
+        text: "SA1012: do not pass a nil Context"
+
+      # The types package name is meaningful in this context
+      - linters: [revive]
+        path: pkg/types/.*\.go
+        text: "var-naming: avoid meaningless package names"
+
+      # We need to use sha1 for validating signatures
+      - linters: [gosec]
+        text: "G505: Blocklisted import crypto/sha1: weak cryptographic primitive"
+
+      # This is adapted from golangci-lint's default exclusions. It disables linting for error checks on
+      # os.RemoveAll, fmt.Fprint*, fmt.Scanf, and any function ending in "Close".
+      - linters: [errcheck]
+        text: Error return value of .(.*Close|fmt\.Fprint.*|fmt\.Scanf|os\.Remove(All)?). is not checked
+
+      # We don't care about file inclusion via variable in examples or internal tools.
+      - linters: [gosec]
+        path: ^(example|tools)\/
+        text: "G304: Potential file inclusion via variable"
+
+      # We don't run parallel integration tests
+      - linters: [paralleltest, tparallel]
+        path: ^test/integration
+
+      # Because fmt.Sprint(reset.Unix())) is more readable than strconv.FormatInt(reset.Unix(), 10).
+      - linters: [perfsprint]
+        text: fmt.Sprint.* can be replaced with faster strconv.FormatInt
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports

@@ -1,21 +1,23 @@
+// Package server provides the HTTP API server for Knox secret management.
+// It handles authentication, authorization, and routing for all Knox operations.
 package server
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/gorilla/mux"
-
 	"github.com/hazayan/knox/log"
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server/keydb"
 )
 
-// HTTPError is the error type with knox err subcode and message for logging purposes
+// HTTPError is the error type with knox err subcode and message for logging purposes.
 type HTTPError struct {
 	Subcode int
 	Message string
@@ -36,9 +38,9 @@ type httpErrResp struct {
 var HTTPErrMap = map[int]*httpErrResp{
 	types.NoKeyIDCode:                   {http.StatusBadRequest, "Missing Key ID"},
 	types.InternalServerErrorCode:       {http.StatusInternalServerError, "Internal Server Error"},
-	types.KeyIdentifierExistsCode:       {http.StatusBadRequest, "Key identifer exists"},
+	types.KeyIdentifierExistsCode:       {http.StatusBadRequest, "Key identifier exists"},
 	types.KeyVersionDoesNotExistCode:    {http.StatusNotFound, "Key version does not exist"},
-	types.KeyIdentifierDoesNotExistCode: {http.StatusNotFound, "Key identifer does not exist"},
+	types.KeyIdentifierDoesNotExistCode: {http.StatusNotFound, "Key identifier does not exist"},
 	types.UnauthenticatedCode:           {http.StatusUnauthorized, "User or machine is not authenticated"},
 	types.UnauthorizedCode:              {http.StatusForbidden, "User or machine not authorized"},
 	types.NotYetImplementedCode:         {http.StatusNotImplemented, "Not yet implemented"},
@@ -55,21 +57,22 @@ func combine(f, g func(http.HandlerFunc) http.HandlerFunc) func(http.HandlerFunc
 	}
 }
 
-// GetRouterFromKeyManager creates the mux router that serves knox routes from a key manager
+// GetRouterFromKeyManager creates the mux router that serves knox routes from a key manager.
 func GetRouterFromKeyManager(
-	cryptor keydb.Cryptor,
+	_ keydb.Cryptor,
 	keyManager KeyManager,
 	decorators [](func(http.HandlerFunc) http.HandlerFunc),
-	additionalRoutes []Route) (*mux.Router, error) {
-	existingRouteIds := map[string]Route{}
+	additionalRoutes []Route,
+) (*mux.Router, error) {
+	existingRouteIDs := map[string]Route{}
 	existingRouteMethodAndPaths := map[string]map[string]Route{}
 	allRoutes := append(routes[:], additionalRoutes[:]...)
 
 	for _, route := range allRoutes {
-		if _, routeExists := existingRouteIds[route.Id]; routeExists {
+		if _, routeExists := existingRouteIDs[route.ID]; routeExists {
 			return nil, fmt.Errorf(
-				"There are ID conflicts for the route with ID: '%v'",
-				route.Id,
+				"there are ID conflicts for the route with ID: '%v'",
+				route.ID,
 			)
 		}
 		childMap, methodExists := existingRouteMethodAndPaths[route.Method]
@@ -81,14 +84,14 @@ func GetRouterFromKeyManager(
 		} else {
 			if conflictingRoute, pathExists := childMap[route.Path]; pathExists {
 				return nil, fmt.Errorf(
-					"There are Method/Path conflicts for the following Route IDs: ('%v' and '%v')",
-					conflictingRoute.Id, route.Id,
+					"there are Method/Path conflicts for the following Route IDs: ('%v' and '%v')",
+					conflictingRoute.ID, route.ID,
 				)
 			}
 		}
 
 		existingRouteMethodAndPaths[route.Method][route.Path] = route
-		existingRouteIds[route.Id] = route
+		existingRouteIDs[route.ID] = route
 	}
 
 	r := mux.NewRouter()
@@ -115,7 +118,8 @@ func GetRouter(
 	cryptor keydb.Cryptor,
 	db keydb.DB,
 	decorators [](func(http.HandlerFunc) http.HandlerFunc),
-	additionalRoutes []Route) (*mux.Router, error) {
+	additionalRoutes []Route,
+) (*mux.Router, error) {
 	m := NewKeyManager(cryptor, db)
 
 	return GetRouterFromKeyManager(cryptor, m, decorators, additionalRoutes)
@@ -125,30 +129,31 @@ func addRoute(
 	router *mux.Router,
 	route Route,
 	routeDecorator func(f http.HandlerFunc) http.HandlerFunc,
-	keyManager KeyManager) {
-	handler := setupRoute(route.Id, keyManager)(parseParams(route.Parameters)(routeDecorator(route.ServeHTTP)))
+	keyManager KeyManager,
+) {
+	handler := setupRoute(route.ID, keyManager)(parseParams(route.Parameters)(routeDecorator(route.ServeHTTP)))
 	router.Handle(route.Path, handler).Methods(route.Method)
 }
 
 // Parameter is an interface through which route-specific Knox API Parameters
-// can be specified
+// can be specified.
 type Parameter interface {
 	Name() string
 	Get(r *http.Request) (string, bool)
 }
 
-// UrlParameter is an implementation of the Parameter interface that extracts
+// URLParameter is an implementation of the Parameter interface that extracts
 // parameter values from the URL as referenced in section 3.3 of RFC2396.
-type UrlParameter string
+type URLParameter string
 
-// Get returns the value of the URL parameter
-func (p UrlParameter) Get(r *http.Request) (string, bool) {
+// Get returns the value of the URL parameter.
+func (p URLParameter) Get(r *http.Request) (string, bool) {
 	s, ok := mux.Vars(r)[string(p)]
 	return s, ok
 }
 
-// Name defines the URL-embedded key that this parameter maps to
-func (p UrlParameter) Name() string {
+// Name defines the URL-embedded key that this parameter maps to.
+func (p URLParameter) Name() string {
 	return string(p)
 }
 
@@ -157,7 +162,7 @@ func (p UrlParameter) Name() string {
 // as referenced in section 3.4 of RFC2396.
 type RawQueryParameter string
 
-// Get returns the value of the entire query string
+// Get returns the value of the entire query string.
 func (p RawQueryParameter) Get(r *http.Request) (string, bool) {
 	return r.URL.RawQuery, true
 }
@@ -173,7 +178,7 @@ func (p RawQueryParameter) Name() string {
 // as referenced in section 3.4 of RFC2396.
 type QueryParameter string
 
-// Get returns the value of the query string parameter
+// Get returns the value of the query string parameter.
 func (p QueryParameter) Get(r *http.Request) (string, bool) {
 	val, ok := r.URL.Query()[string(p)]
 	if !ok {
@@ -182,17 +187,17 @@ func (p QueryParameter) Get(r *http.Request) (string, bool) {
 	return val[0], true
 }
 
-// Name defines the URL-embedded key that this parameter maps to
+// Name defines the URL-embedded key that this parameter maps to.
 func (p QueryParameter) Name() string {
 	return string(p)
 }
 
 // PostParameter is an implementation of the Parameter interface that
 // extracts values embedded in the web form transmitted in the
-// request body
+// request body.
 type PostParameter string
 
-// Get returns the value of the appropriate parameter from the request body
+// Get returns the value of the appropriate parameter from the request body.
 func (p PostParameter) Get(r *http.Request) (string, bool) {
 	err := r.ParseForm()
 	if err != nil {
@@ -205,21 +210,21 @@ func (p PostParameter) Get(r *http.Request) (string, bool) {
 	return k[0], ok
 }
 
-// Name represents the key corresponding to this parameter in the request form
+// Name represents the key corresponding to this parameter in the request form.
 func (p PostParameter) Name() string {
 	return string(p)
 }
 
 // Route is a struct that defines a path and method-specific
-// HTTP route on the Knox server
+// HTTP route on the Knox server.
 type Route struct {
 	// Handler represents the handler function that is responsible for serving
 	// this route
-	Handler func(db KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError)
+	Handler func(db KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError)
 
 	// Id represents A unique string identifier that represents this specific
 	// route
-	Id string
+	ID string
 
 	// Path represents the relative HTTP path (or prefix) that must be specified
 	//  in order to invoke this route
@@ -235,7 +240,7 @@ type Route struct {
 }
 
 // WriteErr returns a function that can encode error information and set an
-// HTTP error response code in the specified HTTP response writer
+// HTTP error response code in the specified HTTP response writer.
 func WriteErr(apiErr *HTTPError) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp := new(types.Response)
@@ -260,8 +265,8 @@ func WriteErr(apiErr *HTTPError) http.HandlerFunc {
 }
 
 // WriteData returns a function that can write arbitrary data to the specified
-// HTTP response writer
-func WriteData(w http.ResponseWriter, data interface{}) {
+// HTTP response writer.
+func WriteData(w http.ResponseWriter, data any) {
 	r := new(types.Response)
 	r.Message = ""
 	r.Code = types.OKCode
@@ -325,8 +330,14 @@ func newKeyVersion(d []byte, s types.VersionStatus) types.KeyVersion {
 	version.Data = d
 	version.Status = s
 	version.CreationTime = time.Now().UnixNano()
-	// This is only 63 bits of randomness, but it appears to be the fastest way.
-	version.ID = uint64(rand.Int63())
+	// Use crypto/rand for secure random number generation
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		version.ID = uint64(time.Now().UnixNano())
+	} else {
+		version.ID = binary.BigEndian.Uint64(randomBytes)
+	}
 	return version
 }
 

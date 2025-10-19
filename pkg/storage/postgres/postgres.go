@@ -8,12 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
-	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/types"
+	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 func init() {
@@ -151,7 +152,6 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 		 DO UPDATE SET key_data = $2, updated_at = NOW()`,
 		key.ID, keyData,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to upsert key: %w", err)
 	}
@@ -167,7 +167,6 @@ func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
 		"DELETE FROM knox_keys WHERE key_id = $1",
 		keyID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to delete key: %w", err)
 	}
@@ -235,7 +234,12 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			// Log rollback error but don't fail the operation
+			log.Printf("failed to rollback transaction: %v", err)
+		}
+	}()
 
 	// Get current key with row lock
 	var keyData []byte
@@ -251,7 +255,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 			return fmt.Errorf("failed to unmarshal existing key: %w", err)
 		}
 		currentKey = &key
-	} else if err != sql.ErrNoRows {
+	} else if !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed to query key: %w", err)
 	}
 
@@ -353,7 +357,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 	stats := &storage.Stats{
 		TotalKeys:       totalKeys,
 		OperationCounts: opCounts,
-		BackendSpecific: map[string]interface{}{
+		BackendSpecific: map[string]any{
 			"backend":          "postgres",
 			"open_connections": dbStats.OpenConnections,
 			"in_use":           dbStats.InUse,
@@ -372,9 +376,9 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 
 // Transaction represents a PostgreSQL transaction.
 type Transaction struct {
-	tx       *sql.Tx
-	backend  *Backend
-	commited bool
+	tx        *sql.Tx
+	backend   *Backend
+	committed bool
 }
 
 // BeginTx starts a new transaction.
@@ -433,7 +437,6 @@ func (t *Transaction) PutKey(ctx context.Context, key *types.Key) error {
 		 DO UPDATE SET key_data = $2, updated_at = NOW()`,
 		key.ID, keyData,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to upsert key: %w", err)
 	}
@@ -447,7 +450,6 @@ func (t *Transaction) DeleteKey(ctx context.Context, keyID string) error {
 		"DELETE FROM knox_keys WHERE key_id = $1",
 		keyID,
 	)
-
 	if err != nil {
 		return fmt.Errorf("failed to delete key: %w", err)
 	}
@@ -466,23 +468,25 @@ func (t *Transaction) DeleteKey(ctx context.Context, keyID string) error {
 
 // Commit applies all operations in the transaction atomically.
 func (t *Transaction) Commit() error {
-	if t.commited {
-		return fmt.Errorf("transaction already committed")
+	if t.committed {
+		return errors.New("transaction already committed")
 	}
-	t.commited = true
+	t.committed = true
 	return t.tx.Commit()
 }
 
 // Rollback aborts all operations in the transaction.
 func (t *Transaction) Rollback() error {
-	if t.commited {
+	if t.committed {
 		return nil // Already committed, nothing to rollback
 	}
 	return t.tx.Rollback()
 }
 
 // Verify that Backend implements the required interfaces at compile time.
-var _ storage.Backend = (*Backend)(nil)
-var _ storage.TransactionalBackend = (*Backend)(nil)
-var _ storage.StatsProvider = (*Backend)(nil)
-var _ storage.Transaction = (*Transaction)(nil)
+var (
+	_ storage.Backend              = (*Backend)(nil)
+	_ storage.TransactionalBackend = (*Backend)(nil)
+	_ storage.StatsProvider        = (*Backend)(nil)
+	_ storage.Transaction          = (*Transaction)(nil)
+)
