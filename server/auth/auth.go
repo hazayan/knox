@@ -1,3 +1,5 @@
+// Package auth provides authentication providers for the Knox server.
+// It handles various authentication methods including mTLS, SPIFFE, and GitHub OAuth.
 package auth
 
 import (
@@ -22,6 +24,7 @@ const (
 	principalCtxKey contextKey = iota
 )
 
+// PrincipalContext provides access to authentication context information.
 type PrincipalContext interface {
 	SetCurrentPrincipal(principal types.Principal)
 	GetCurrentPrincipal() types.Principal
@@ -34,6 +37,7 @@ type principalContext struct {
 	invocationCount int
 }
 
+// NewPrincipalContext creates a new principal context from an HTTP request.
 func NewPrincipalContext(request *http.Request) PrincipalContext {
 	return &principalContext{
 		principalCtxKey,
@@ -60,7 +64,7 @@ func (ctx *principalContext) SetCurrentPrincipal(principal types.Principal) {
 func (ctx *principalContext) setPrincipalInner(httpRequest *http.Request, principal types.Principal) {
 	ctx.once.Do(func() {
 		context.Set(httpRequest, ctx.principalCtxKey, principal)
-		ctx.invocationCount += 1
+		ctx.invocationCount++
 	})
 }
 
@@ -101,9 +105,9 @@ func verifyCertificate(r *http.Request, cas *x509.CertPool,
 }
 
 // NewMTLSAuthProvider initializes a chain of trust with given CA certificates.
-func NewMTLSAuthProvider(CAs *x509.CertPool) *MTLSAuthProvider {
+func NewMTLSAuthProvider(cas *x509.CertPool) *MTLSAuthProvider {
 	return &MTLSAuthProvider{
-		CAs:  CAs,
+		CAs:  cas,
 		time: time.Now,
 	}
 }
@@ -148,9 +152,9 @@ func (p *MTLSAuthProvider) Authenticate(token string, r *http.Request) (types.Pr
 // NewSpiffeAuthProvider initializes a chain of trust with given CA certificates,
 // identical to the MTLS provider except the principal is a Spiffe ID instead
 // of a hostname and the CN of the cert is ignored.
-func NewSpiffeAuthProvider(CAs *x509.CertPool) *SpiffeProvider {
+func NewSpiffeAuthProvider(cas *x509.CertPool) *SpiffeProvider {
 	return &SpiffeProvider{
-		CAs:  CAs,
+		CAs:  cas,
 		time: time.Now,
 	}
 }
@@ -177,7 +181,7 @@ func (p *SpiffeProvider) Type() byte {
 }
 
 // Authenticate performs TLS based Authentication and extracts the Spiffe URI extension.
-func (p *SpiffeProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
+func (p *SpiffeProvider) Authenticate(_ string, r *http.Request) (types.Principal, error) {
 	cert, err := verifyCertificate(r, p.CAs, p.time)
 	if err != nil {
 		return nil, err
@@ -226,10 +230,10 @@ type SpiffeFallbackProvider struct {
 // NewSpiffeAuthFallbackProvider initializes a chain of trust with given CA certificates,
 // identical to the SpiffeProvider except the Type is defined as the MTLSAuthProvider
 // Type().
-func NewSpiffeAuthFallbackProvider(CAs *x509.CertPool) *SpiffeFallbackProvider {
+func NewSpiffeAuthFallbackProvider(cas *x509.CertPool) *SpiffeFallbackProvider {
 	return &SpiffeFallbackProvider{
 		SpiffeProvider: SpiffeProvider{
-			CAs:  CAs,
+			CAs:  cas,
 			time: time.Now,
 		},
 	}
@@ -241,7 +245,7 @@ func (p *SpiffeFallbackProvider) Name() string {
 }
 
 // Type is set to be identical to the Type of the MTLSAuthProvider.
-func (s *SpiffeFallbackProvider) Type() byte {
+func (p *SpiffeFallbackProvider) Type() byte {
 	return (&MTLSAuthProvider{}).Type()
 }
 
@@ -271,7 +275,7 @@ func (p *GitHubProvider) Type() byte {
 }
 
 // Authenticate uses the token to get user data from github.com.
-func (p *GitHubProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
+func (p *GitHubProvider) Authenticate(token string, _ *http.Request) (types.Principal, error) {
 	user := &GitHubLoginFormat{}
 	if err := p.getAPI("https://api.github.com/user", token, user); err != nil {
 		return nil, err
@@ -485,7 +489,7 @@ func (s service) CanAccess(acl types.ACL, t types.AccessType) bool {
 	for _, a := range acl {
 		switch a.Type {
 		case types.Service:
-			if a.ID == string(s.GetID()) && a.AccessType.CanAccess(t) {
+			if a.ID == s.GetID() && a.AccessType.CanAccess(t) {
 				return true
 			}
 		case types.ServicePrefix:

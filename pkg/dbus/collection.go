@@ -51,7 +51,8 @@ func (c *Collection) makeKeyID(itemID string) string {
 // Export exports the collection to D-Bus.
 func (c *Collection) Export(conn *dbus.Conn) error {
 	// Create properties handler
-	c.props = prop.New(conn, c.path, map[string]map[string]*prop.Prop{
+	var err error
+	c.props, err = prop.Export(conn, c.path, map[string]map[string]*prop.Prop{
 		CollectionInterface: {
 			"Items": {
 				Value:    []dbus.ObjectPath{},
@@ -85,6 +86,9 @@ func (c *Collection) Export(conn *dbus.Conn) error {
 			},
 		},
 	})
+	if err != nil {
+		return err
+	}
 
 	// Export the collection
 	if err := conn.Export(c, c.path, CollectionInterface); err != nil {
@@ -138,10 +142,7 @@ func (c *Collection) loadItems(conn *dbus.Conn) error {
 		}
 
 		// Create item
-		item, err := createItemFromKnoxKey(c, key)
-		if err != nil {
-			continue
-		}
+		item := createItemFromKnoxKey(c, key)
 
 		// Export item
 		if err := item.Export(conn, c.props); err != nil {

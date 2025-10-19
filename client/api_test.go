@@ -113,11 +113,7 @@ func isKnoxDaemonRunning() bool {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
-	if err == nil {
-		return true
-	}
-
-	return false
+	return err == nil
 }
 
 func TestGetKey(t *testing.T) {
@@ -262,7 +258,7 @@ func TestNoAuthPrincipals(t *testing.T) {
 	}
 	srv := buildServer(200, resp, func(_ *http.Request) {
 		// This should not be called as auth should fail before request is made
-		t.Fatalf("Server was called, but auth should have failed before request was made")
+		t.Fatal("Server was called, but auth should have failed before request was made")
 	})
 	defer srv.Close()
 
@@ -298,7 +294,7 @@ func TestOnlyUnauthPrincipals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
-	srv := buildServer(200, resp, func(r *http.Request) {})
+	srv := buildServer(200, resp, func(_ *http.Request) {})
 	defer srv.Close()
 
 	// Create client with the user auth handler
@@ -691,7 +687,7 @@ func TestGetInvalidKeys(t *testing.T) {
 
 	_, err = cli.CacheGetKey("testkey")
 	if err == nil {
-		t.Fatalf("error expected for invalid key content")
+		t.Fatal("error expected for invalid key content")
 	} else {
 		if err.Error() != "invalid key content for the cached key" {
 			t.Fatalf("%s is not the expected error message", err)
@@ -700,7 +696,7 @@ func TestGetInvalidKeys(t *testing.T) {
 
 	_, err = cli.NetworkGetKey("testkey")
 	if err == nil {
-		t.Fatalf("error expected for invalid key content")
+		t.Fatal("error expected for invalid key content")
 	} else {
 		if err.Error() != "invalid key content for the remote key" {
 			t.Fatalf("%s is not the expected error message", err)

@@ -1,3 +1,6 @@
+// Package keydb provides the database layer for Knox key storage.
+// It handles encryption, serialization, and persistence of keys with
+// support for multiple database backends and cryptographic providers.
 package keydb
 
 import (
@@ -177,7 +180,6 @@ type SQLDB struct {
 	UpdateStmt *sql.Stmt
 	AddStmt    *sql.Stmt
 	RemoveStmt *sql.Stmt
-	db         sql.DB
 }
 
 var sqlCreateKeys = `CREATE TABLE IF NOT EXISTS secrets (
@@ -323,10 +325,10 @@ func (db *SQLDB) Update(key *DBKey) error {
 	}
 	if affected == 0 {
 		rs, err := db.getStmt.Query(key.ID)
-		defer rs.Close()
 		if err != nil {
 			return err
 		}
+		defer rs.Close()
 		if !rs.Next() {
 			return types.ErrKeyIDNotFound
 		}

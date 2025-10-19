@@ -59,7 +59,7 @@ var (
 	updateAccessServicePrefix = cmdUpdateAccess.Flag.Bool("N", false, "")
 )
 
-func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
+func runUpdateAccess(_ *Command, args []string) *ErrorStatus {
 	if *updateAccessACL != "" {
 		if len(args) != 1 {
 			return &ErrorStatus{errors.New("access takes one argument when used with --acl. See 'knox help access'"), false}
@@ -67,16 +67,16 @@ func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
 		keyID := args[0]
 		b, err := os.ReadFile(*updateAccessACL)
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("Could not read acl file: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("could not read acl file: %s", err.Error()), false}
 		}
 		acl := []types.Access{}
 		err = json.Unmarshal(b, &acl)
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("Could not decode access list properly: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("could not decode access list properly: %s", err.Error()), false}
 		}
 		err = cli.PutAccess(keyID, acl...)
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("Failed to update access: %s", err.Error()), true}
+			return &ErrorStatus{fmt.Errorf("failed to update access: %s", err.Error()), true}
 		}
 		fmt.Println("Successfully updated Access")
 		return nil
@@ -118,7 +118,7 @@ func runUpdateAccess(cmd *Command, args []string) *ErrorStatus {
 	}
 	err := cli.PutAccess(keyID, access)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Failed to update access: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("failed to update access: %s", err.Error()), true}
 	}
 	fmt.Println("Successfully updated Access")
 	return nil

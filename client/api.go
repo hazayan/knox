@@ -32,8 +32,8 @@ const (
 )
 
 var (
-	errNoAuth           = errors.New("No authentication data given. Use 'knox login' or set KNOX_USER_AUTH or KNOX_MACHINE_AUTH")
-	errUnsuccessfulAuth = errors.New("Unsuccessful authorization. No attempted principals were able to perform the requested operation")
+	errNoAuth           = errors.New("no authentication data given. Use 'knox login' or set KNOX_USER_AUTH or KNOX_MACHINE_AUTH")
+	errUnsuccessfulAuth = errors.New("unsuccessful authorization. No attempted principals were able to perform the requested operation")
 )
 
 // Client is an interface for interacting with a specific knox key.
@@ -61,12 +61,12 @@ func (c *fileClient) update() error {
 	var key types.Key
 	f, err := os.Open("/var/lib/knox/v0/keys/" + c.keyID)
 	if err != nil {
-		return fmt.Errorf("Knox key file err: %s", err.Error())
+		return fmt.Errorf("knox key file err: %s", err.Error())
 	}
 	defer f.Close()
 	err = json.NewDecoder(f).Decode(&key)
 	if err != nil {
-		return fmt.Errorf("Knox json decode err: %s", err.Error())
+		return fmt.Errorf("knox json decode err: %s", err.Error())
 	}
 	c.setValues(&key)
 	return nil
@@ -113,7 +113,7 @@ func NewFileClient(keyID string) (Client, error) {
 	}
 	err = json.Unmarshal(jsonKey, &key)
 	if err != nil {
-		return nil, fmt.Errorf("Knox json decode err: %s", err.Error())
+		return nil, fmt.Errorf("knox json decode err: %s", err.Error())
 	}
 	c.setValues(&key)
 	go func() {
@@ -205,6 +205,7 @@ type APIClient interface {
 	NetworkGetKeyWithStatus(keyID string, status types.VersionStatus) (*types.Key, error)
 }
 
+// HTTP is an interface for making HTTP requests in the Knox client.
 type HTTP interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -370,17 +371,6 @@ func (c *HTTPClient) UpdateVersion(keyID, versionID string, status types.Version
 	return c.UncachedClient.UpdateVersion(keyID, versionID, status)
 }
 
-func (c *HTTPClient) getClient() (HTTP, error) {
-	if c.UncachedClient.DefaultClient == nil {
-		c.UncachedClient.DefaultClient = &http.Client{}
-	}
-	return c.UncachedClient.DefaultClient, nil
-}
-
-func (c *HTTPClient) getHTTPData(method string, path string, body url.Values, data any) error {
-	return c.UncachedClient.getHTTPData(method, path, body, data)
-}
-
 // UncachedHTTPClient is a client that uses HTTP to talk to Knox without caching.
 type UncachedHTTPClient struct {
 	// Host is used as the host for http connections
@@ -528,11 +518,11 @@ func (c *UncachedHTTPClient) UpdateVersion(keyID, versionID string, status types
 	return err
 }
 
-func (c *UncachedHTTPClient) getClient() (HTTP, error) {
+func (c *UncachedHTTPClient) getClient() HTTP {
 	if c.DefaultClient == nil {
 		c.DefaultClient = &http.Client{}
 	}
-	return c.DefaultClient, nil
+	return c.DefaultClient
 }
 
 func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, data any) error {
@@ -570,10 +560,7 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 		if clientOverride != nil {
 			cli = clientOverride
 		} else {
-			cli, err = c.getClient()
-			if err != nil {
-				return err
-			}
+			cli = c.getClient()
 		}
 
 		resp := &types.Response{}
@@ -584,22 +571,20 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 			if err != nil {
 				return err
 			}
-			if resp.Status != "ok" {
-				if resp.Code == types.UnauthorizedCode || resp.Code == types.UnauthenticatedCode {
-					// If we get a 401 or 403, we need to continue to a different auth handler.
-					break
-				} else {
-					// If the failure is non authentication related, retry if we got a 500.
-					if (resp.Code != types.InternalServerErrorCode) || (i == maxRetryAttempts) {
-						// If we get a 500, we need to retry the request.
-						return fmt.Errorf("%s", resp.Message)
-					}
-					time.Sleep(GetBackoffDuration(i))
-				}
-			} else {
+			if resp.Status == "ok" {
 				// If we got a successful response, we can return the data.
 				return nil
 			}
+			if resp.Code == types.UnauthorizedCode || resp.Code == types.UnauthenticatedCode {
+				// If we get a 401 or 403, we need to continue to a different auth handler.
+				break
+			}
+			// If the failure is non authentication related, retry if we got a 500.
+			if (resp.Code != types.InternalServerErrorCode) || (i == maxRetryAttempts) {
+				// If we get a 500, we need to retry the request.
+				return fmt.Errorf("%s", resp.Message)
+			}
+			time.Sleep(GetBackoffDuration(i))
 		}
 	}
 

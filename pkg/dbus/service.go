@@ -58,7 +58,7 @@ func (b *Bridge) Start() error {
 	}
 
 	// Create properties
-	b.props = prop.New(b.conn, ServicePath, map[string]map[string]*prop.Prop{
+	b.props, _ = prop.Export(b.conn, ServicePath, map[string]map[string]*prop.Prop{
 		ServiceInterface: {
 			"Collections": {
 				Value:    []dbus.ObjectPath{},
@@ -279,7 +279,7 @@ func (b *Bridge) Unlock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.Obje
 }
 
 // Lock locks objects (no-op in our implementation).
-func (b *Bridge) Lock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+func (b *Bridge) Lock(_ []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
 	// We don't support locking
 	return []dbus.ObjectPath{}, "/", nil
 }
@@ -366,7 +366,7 @@ func (b *Bridge) ReadAlias(name string) (dbus.ObjectPath, *dbus.Error) {
 }
 
 // SetAlias sets an alias for a collection.
-func (b *Bridge) SetAlias(name string, collection dbus.ObjectPath) *dbus.Error {
+func (b *Bridge) SetAlias(_ string, _ dbus.ObjectPath) *dbus.Error {
 	// TODO: Implement alias support
 	return nil
 }

@@ -14,7 +14,7 @@ The authentication variables are how the knox client communicates who is perform
 
 If the $KNOX_USER_AUTH env variable is set, the value will be used as an OAuth token for authenticating the user.
 
-If the $KNOX_MACHINE_AUTH env variable is set, the value will be used as the current client hostname. 
+If the $KNOX_MACHINE_AUTH env variable is set, the value will be used as the current client hostname.
 
 See also: knox login
 	`,
@@ -53,7 +53,7 @@ func help(args []string) {
 		return
 	}
 	if len(args) != 1 {
-		fmt.Fprintf(os.Stderr, "usage: knox help command\n\nToo many arguments given.\n")
+		fmt.Fprint(os.Stderr, "usage: knox help command\n\nToo many arguments given.\n")
 		os.Exit(2) // failed at 'go help'
 	}
 

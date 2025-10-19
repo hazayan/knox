@@ -208,7 +208,7 @@ func (s *Session) Unexport(conn *dbus.Conn) {
 
 // D-Bus methods
 
-// Close is the D-Bus method for closing a session.
+// CloseDBus is the D-Bus method for closing a session.
 func (s *Session) CloseDBus() *dbus.Error {
 	if err := s.Close(); err != nil {
 		return dbus.MakeFailedError(err)

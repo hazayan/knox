@@ -227,7 +227,7 @@ func TestMTLSSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	c, err := x509.ParseCertificate(certBytes[:n])
+	c, _ := x509.ParseCertificate(certBytes[:n])
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -257,7 +257,7 @@ func TestMTLSBadTime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	c, err := x509.ParseCertificate(certBytes[:n])
+	c, _ := x509.ParseCertificate(certBytes[:n])
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -285,7 +285,7 @@ func TestMTLSNoCA(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	c, err := x509.ParseCertificate(certBytes[:n])
+	c, _ := x509.ParseCertificate(certBytes[:n])
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -312,6 +312,9 @@ func TestMTLSBadHostname(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	c, err := x509.ParseCertificate(certBytes[:n])
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}
@@ -424,6 +427,9 @@ func testSpiffeAuthFlow(t *testing.T, authHeader string, provider Provider) {
 		t.Fatal(err.Error())
 	}
 	c, err := x509.ParseCertificate(certBytes[:n])
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	req.TLS = &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{c},
 	}

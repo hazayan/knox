@@ -34,7 +34,7 @@ func (p *SPIFFEProvider) Name() string {
 }
 
 // Authenticate authenticates a request using SPIFFE identities.
-func (p *SPIFFEProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
+func (p *SPIFFEProvider) Authenticate(_ string, r *http.Request) (types.Principal, error) {
 	// Check if TLS is used
 	if r.TLS == nil {
 		return nil, errors.New("TLS not enabled")

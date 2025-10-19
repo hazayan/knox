@@ -36,14 +36,14 @@ func runGetACL(_ *Command, args []string) *ErrorStatus {
 	keyID := args[0]
 	acl, err := cli.GetACL(keyID)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error getting key ACL: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error getting key ACL: %s", err.Error()), true}
 	}
 
 	if *getACLJSON {
 		aclEnc, err := json.Marshal(acl)
 		if err != nil {
 			// malformated ACL considered as knox server side error
-			return &ErrorStatus{fmt.Errorf("Could not marshal ACL: %v", acl), true}
+			return &ErrorStatus{fmt.Errorf("could not marshal ACL: %v", acl), true}
 		}
 		fmt.Println(string(aclEnc))
 		return nil
@@ -53,7 +53,7 @@ func runGetACL(_ *Command, args []string) *ErrorStatus {
 		aEnc, err := json.Marshal(a)
 		if err != nil {
 			// malformated ACL entry considered as knox server side error
-			return &ErrorStatus{fmt.Errorf("Could not marshal entry: %v", a), true}
+			return &ErrorStatus{fmt.Errorf("could not marshal entry: %v", a), true}
 		}
 		fmt.Println(string(aEnc))
 	}

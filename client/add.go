@@ -1,3 +1,4 @@
+// Package client implements the Knox CLI client commands.
 package client
 
 import (
@@ -34,7 +35,7 @@ See also: knox create, knox promote
 }
 var addTinkKeyset = cmdAdd.Flag.String("key-template", "", "name of a knox-supported Tink key template")
 
-func runAdd(cmd *Command, args []string) *ErrorStatus {
+func runAdd(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
 		return &ErrorStatus{errors.New("add takes only one argument. See 'knox help add'"), false}
 	}
@@ -51,7 +52,7 @@ func runAdd(cmd *Command, args []string) *ErrorStatus {
 	}
 	versionID, err := cli.AddVersion(keyID, data)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error adding version: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error adding version: %s", err.Error()), true}
 	}
 	fmt.Printf("Added key version %d\n", versionID)
 	return nil

@@ -226,7 +226,7 @@ func Authentication(providers []auth.Provider, matcher ProviderMatcher) func(htt
 		return func(w http.ResponseWriter, r *http.Request) {
 			var defaultPrincipal types.Principal
 			allPrincipals := map[string]types.Principal{}
-			errReturned := errors.New("No matching authentication providers found")
+			errReturned := errors.New("no matching authentication providers found")
 
 			for _, p := range providers {
 				if match, payload := matcher(p, r); match {
@@ -252,7 +252,6 @@ func Authentication(providers []auth.Provider, matcher ProviderMatcher) func(htt
 
 			SetPrincipal(r, types.NewPrincipalMux(defaultPrincipal, allPrincipals))
 			f(w, r)
-			return
 		}
 	}
 }

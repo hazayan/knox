@@ -63,7 +63,7 @@ func New(baseDir string) (*Backend, error) {
 }
 
 // GetKey retrieves a key by ID.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
+func (b *Backend) GetKey(_ context.Context, keyID string) (*types.Key, error) {
 	b.incrementOp("get")
 
 	lock := b.getLock(keyID)
@@ -93,7 +93,7 @@ func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) 
 }
 
 // PutKey stores or updates a key.
-func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
+func (b *Backend) PutKey(_ context.Context, key *types.Key) error {
 	if err := key.Validate(); err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 }
 
 // DeleteKey removes a key by ID.
-func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
+func (b *Backend) DeleteKey(_ context.Context, keyID string) error {
 	b.incrementOp("delete")
 
 	lock := b.getLock(keyID)
@@ -147,7 +147,7 @@ func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
 }
 
 // ListKeys returns all key IDs matching the given prefix.
-func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error) {
+func (b *Backend) ListKeys(_ context.Context, prefix string) ([]string, error) {
 	b.incrementOp("list")
 
 	var keys []string
@@ -186,7 +186,7 @@ func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error)
 }
 
 // UpdateKey atomically updates a key using the provided update function.
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
+func (b *Backend) UpdateKey(_ context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
 	b.incrementOp("update")
 
 	lock := b.getLock(keyID)
@@ -252,7 +252,7 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 }
 
 // Ping checks if the backend is healthy.
-func (b *Backend) Ping(ctx context.Context) error {
+func (b *Backend) Ping(_ context.Context) error {
 	// Check if the base directory is accessible
 	if _, err := os.Stat(b.baseDir); err != nil {
 		return storage.ErrStorageUnavailable
@@ -275,7 +275,7 @@ func (b *Backend) Close() error {
 }
 
 // Stats returns metrics about the backend's state.
-func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
+func (b *Backend) Stats(_ context.Context) (*storage.Stats, error) {
 	var totalKeys int64
 	var totalSize int64
 

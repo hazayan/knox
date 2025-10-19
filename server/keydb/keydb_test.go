@@ -73,7 +73,7 @@ func TestDBCopy(t *testing.T) {
 
 func TestTempErrs(t *testing.T) {
 	db := &TempDB{}
-	err := errors.New("Does not compute... EXTERMINATE! EXTERMINATE!")
+	err := errors.New("does not compute... exterminate exterminate")
 	db.SetError(err)
 	TesterErrs(t, db, err)
 }

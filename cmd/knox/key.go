@@ -53,7 +53,7 @@ Examples:
   knox key create myapp:api_key --data-file secret.txt
   knox key create myapp:api_key --data "secret" --acl "User:alice@example.com:Read"`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			// Get data from various sources
@@ -138,7 +138,7 @@ Examples:
   knox key get myapp:api_key --all
   knox key get myapp:api_key --status Primary`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			client, err := getAPIClient()
@@ -196,7 +196,7 @@ Examples:
   knox key list myapp:
   knox key list --json`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				prefix = args[0]
 			}
@@ -261,7 +261,7 @@ Examples:
   knox key delete myapp:api_key
   knox key delete myapp:api_key --force`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			if !force {
@@ -321,7 +321,7 @@ Examples:
   knox key rotate myapp:api_key --data "newsecret123"
   echo "newsecret123" | knox key rotate myapp:api_key`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			// Get data
@@ -389,7 +389,7 @@ Examples:
   knox key versions myapp:api_key
   knox key versions myapp:api_key --json`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			keyID := args[0]
 
 			client, err := getAPIClient()
@@ -452,11 +452,10 @@ func displayKey(key *types.Key, showAll bool) error {
 		}
 	} else {
 		primary := key.VersionList.GetPrimary()
-		if primary != nil {
-			fmt.Println(string(primary.Data))
-		} else {
+		if primary == nil {
 			return errors.New("no primary version found")
 		}
+		fmt.Println(string(primary.Data))
 	}
 
 	return nil

@@ -77,11 +77,11 @@ var (
 // the Writer's Write method.  A Logger can be used simultaneously from
 // multiple goroutines; it guarantees to serialize access to the Writer.
 type Logger struct {
-	mu      sync.Mutex // ensures atomic writes; protects the following fields
-	prefix  string     // prefix to write at beginning of each line
-	flag    int        // properties
-	out     io.Writer  // destination for output
-	buf     []byte     // for accumulating text to write
+	mu     sync.Mutex // ensures atomic writes; protects the following fields
+	prefix string     // prefix to write at beginning of each line
+	flag   int        // properties
+	out    io.Writer  // destination for output
+
 	service string
 	version string
 	host    string
@@ -145,10 +145,10 @@ func (l *Logger) formatHeader(buf *[]byte, t time.Time, file string, line int) {
 			*buf = append(*buf, ' ')
 		}
 		if l.flag&(Ltime|Lmicroseconds) != 0 {
-			hour, min, sec := t.Clock()
+			hour, minute, sec := t.Clock()
 			itoa(buf, hour, 2)
 			*buf = append(*buf, ':')
-			itoa(buf, min, 2)
+			itoa(buf, minute, 2)
 			*buf = append(*buf, ':')
 			itoa(buf, sec, 2)
 			if l.flag&Lmicroseconds != 0 {

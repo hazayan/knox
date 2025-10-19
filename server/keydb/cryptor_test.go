@@ -115,7 +115,7 @@ func TestBadCryptorVersion(t *testing.T) {
 	crypt2 := NewAESGCMCryptor(1, testSecret)
 	_, err = crypt2.Decrypt(encK)
 	if err == nil {
-		t.Fatalf("err is nil on bad crypter version")
+		t.Fatal("err is nil on bad crypter version")
 	}
 }
 

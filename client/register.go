@@ -59,14 +59,14 @@ func parseTimeout(val string) (time.Duration, error) {
 	return time.ParseDuration(val)
 }
 
-func runRegister(cmd *Command, args []string) *ErrorStatus {
+func runRegister(_ *Command, _ []string) *ErrorStatus {
 	if _, ok := cli.(*UncachedHTTPClient); ok {
 		fmt.Println("Cannot Register in No Cache mode")
 		return nil
 	}
 	timeout, err := parseTimeout(*registerTimeout)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Invalid value for timeout flag: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("invalid value for timeout flag: %s", err.Error()), false}
 	}
 
 	k := NewKeysFile(path.Join(daemonFolder, daemonToRegister))
@@ -74,23 +74,23 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 		// Short circuit & handle `knox register -r`, which is expected to remove all keys
 		err := k.Lock()
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("There was an error obtaining file lock: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("there was an error obtaining file lock: %s", err.Error()), false}
 		}
 		err = k.Overwrite([]string{})
 		if err != nil {
 			if err := k.Unlock(); err != nil {
-				return &ErrorStatus{fmt.Errorf("Failed to unlock after overwrite: %s", err.Error()), false}
+				return &ErrorStatus{fmt.Errorf("failed to unlock after overwrite: %s", err.Error()), false}
 			}
-			return &ErrorStatus{fmt.Errorf("Failed to unregister all keys: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("failed to unregister all keys: %s", err.Error()), false}
 		}
 		err = k.Unlock()
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("There was an error unlocking register file: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("there was an error unlocking register file: %s", err.Error()), false}
 		}
 		logf("Successfully unregistered all keys.")
 		return nil
 	} else if *registerKey == "" && *registerKeyFile == "" {
-		return &ErrorStatus{errors.New("You must include a key or key file to register. see 'knox help register'"), false}
+		return &ErrorStatus{errors.New("you must include a key or key file to register. see 'knox help register'"), false}
 	}
 	// Get the list of keys to add
 	var ks []string
@@ -98,7 +98,7 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 		f := NewKeysFile(*registerKeyFile)
 		ks, err = f.Get()
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("There was an error reading input key file %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("there was an error reading input key file %s", err.Error()), false}
 		}
 	} else {
 		ks = []string{*registerKey}
@@ -106,7 +106,7 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 	// Handle adding new keys to the registered file
 	err = k.Lock()
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("There was an error obtaining file lock: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("there was an error obtaining file lock: %s", err.Error()), false}
 	}
 	if *registerRemove {
 		logf("Attempting to overwrite existing keys with %v.", ks)
@@ -116,13 +116,13 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 	}
 	if err != nil {
 		if err := k.Unlock(); err != nil {
-			return &ErrorStatus{fmt.Errorf("Failed to unlock after registration: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("failed to unlock after registration: %s", err.Error()), false}
 		}
-		return &ErrorStatus{fmt.Errorf("There was an error registering keys %v: %s", ks, err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("there was an error registering keys %v: %s", ks, err.Error()), false}
 	}
 	err = k.Unlock()
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("There was an error unlocking register file: %s", err.Error()), false}
+		return &ErrorStatus{fmt.Errorf("there was an error unlocking register file: %s", err.Error()), false}
 	}
 	// If specified, force retrieval of keys
 	if *registerAndGet {
@@ -132,7 +132,7 @@ func runRegister(cmd *Command, args []string) *ErrorStatus {
 			select {
 			case <-c:
 				return &ErrorStatus{fmt.Errorf(
-					"Error getting key from daemon (hit timeout after %s seconds); check knox logs for details (most recent error: %v)",
+					"error getting key from daemon (hit timeout after %s seconds); check knox logs for details (most recent error: %v)",
 					timeout.String(), err), false}
 			case <-time.After(registerRecheckTime):
 				key, err = cli.CacheGetKey(*registerKey)

@@ -239,10 +239,10 @@ func TestUpdate(t *testing.T) {
 		t.Fatalf("%s is not nil", err)
 	}
 	keys, err := d.registerKeyFile.Get()
-	err = d.registerKeyFile.Unlock()
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
+	err = d.registerKeyFile.Unlock()
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
@@ -317,7 +317,7 @@ func TestUpdate(t *testing.T) {
 				t.Fatalf("failed to set good response: %v", err)
 			}
 		case "/v0/keys/" + expected.ID + "/":
-			t.Fatalf("Should not call for a key again")
+			t.Fatal("Should not call for a key again")
 		default:
 			t.Fatal("Unexpected path:" + r.URL.Path)
 		}
@@ -410,10 +410,10 @@ func TestUpdate(t *testing.T) {
 
 func addRegisteredKey(k, reg string) error {
 	f, err := os.OpenFile(reg, os.O_APPEND|os.O_WRONLY, 0o666)
-	defer f.Close()
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	_, err = f.WriteString(k + "\n")
 	return err
 }
@@ -610,11 +610,7 @@ func TestLockTimeout(t *testing.T) {
 		t.Fatal("flock is not installed in path")
 	}
 
-	tmp, err := os.MkdirTemp("", "test-lock-timeout")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmp)
+	tmp := t.TempDir()
 
 	lockFile := path.Join(tmp, "lock")
 	_ = os.WriteFile(lockFile, []byte{}, 0o600)
@@ -628,10 +624,10 @@ func TestLockTimeout(t *testing.T) {
 			_ = syscall.Kill(-locker.Process.Pid, syscall.SIGKILL)
 
 			// Print stdout/stderr from locking process for debugging
-			allStdout, err := io.ReadAll(stdout)
-			allStderr, err := io.ReadAll(stderr)
-			t.Log(string(allStdout), err)
-			t.Log(string(allStderr), err)
+			allStdout, _ := io.ReadAll(stdout)
+			allStderr, _ := io.ReadAll(stderr)
+			t.Log(string(allStdout))
+			t.Log(string(allStderr))
 		}
 	}()
 

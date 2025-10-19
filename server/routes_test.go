@@ -73,7 +73,7 @@ func TestGetKeys(t *testing.T) {
 		}
 	}
 
-	db.SetError(errors.New("Test Error!"))
+	db.SetError(errors.New("test error"))
 	_, err = getKeysHandler(m, u, map[string]string{"queryString": "a1=NOHASH"})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -154,7 +154,7 @@ func TestPostKeys(t *testing.T) {
 		}
 	}
 
-	db.SetError(errors.New("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = postKeysHandler(m, u, map[string]string{"id": "a3", "data": "MQ=="})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -180,7 +180,7 @@ func TestGetKey(t *testing.T) {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
 		if len(k.ACL) != 0 {
-			t.Fatalf("Expected key acl to be empty")
+			t.Fatal("Expected key acl to be empty")
 		}
 		if len(k.VersionList) != 1 {
 			t.Fatalf("Expected len to be 1 not %d", len(k.VersionList))
@@ -199,7 +199,7 @@ func TestGetKey(t *testing.T) {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
 		if len(k.ACL) != 0 {
-			t.Fatalf("Expected key acl to be empty")
+			t.Fatal("Expected key acl to be empty")
 		}
 		if len(k.VersionList) != 1 {
 			t.Fatalf("Expected len to be 1 not %d", len(k.VersionList))
@@ -218,7 +218,7 @@ func TestGetKey(t *testing.T) {
 			t.Fatalf("Expected ID to be a1 not %s", k.ID)
 		}
 		if len(k.ACL) != 0 {
-			t.Fatalf("Expected key acl to be empty")
+			t.Fatal("Expected key acl to be empty")
 		}
 		if len(k.VersionList) != 1 {
 			t.Fatalf("Expected len to be 1 not %d", len(k.VersionList))
@@ -263,7 +263,7 @@ func TestDeleteKey(t *testing.T) {
 		t.Fatal("Expected err")
 	}
 
-	db.SetError(errors.New("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = deleteKeyHandler(m, u, map[string]string{"keyID": "a1"})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -357,7 +357,7 @@ func TestPutAccess(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	db.SetError(errors.New("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = putAccessHandler(m, u, map[string]string{"keyID": "a1", "acl": string(accessJSON)})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -427,7 +427,7 @@ func TestLegacyPutAccess(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	db.SetError(errors.New("Test Error"))
+	db.SetError(errors.New("test error"))
 	_, err = putAccessHandler(m, u, map[string]string{"keyID": "a1", "access": string(accessJSON)})
 	if err == nil {
 		t.Fatal("Expected err")
@@ -632,7 +632,7 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback returns true",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(_ types.AccessCallbackInput) (bool, error) {
 				return true, nil
 			},
 			ExpectedAuthorized: true,
@@ -641,7 +641,7 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback returns false",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(_ types.AccessCallbackInput) (bool, error) {
 				return false, nil
 			},
 			ExpectedAuthorized: false,
@@ -666,11 +666,11 @@ func TestAuthorizeRequest(t *testing.T) {
 		{
 			Name:  "AccessCallback panics",
 			Input: triggerCallBackInput,
-			CallBackImpl: func(input types.AccessCallbackInput) (bool, error) {
+			CallBackImpl: func(_ types.AccessCallbackInput) (bool, error) {
 				panic("intentional panic")
 			},
 			ExpectedAuthorized: false,
-			ExpectedError:      errors.New("Recovered from panic in access callback: intentional panic"),
+			ExpectedError:      errors.New("recovered from panic in access callback: intentional panic"),
 		},
 	}
 

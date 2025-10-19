@@ -59,7 +59,7 @@ func failureGetKeyMetric(keyID string, err error) {
 	})
 }
 
-func runGet(cmd *Command, args []string) *ErrorStatus {
+func runGet(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
 		return &ErrorStatus{errors.New("get takes only one argument. See 'knox help get'"), false}
 	}
@@ -104,7 +104,7 @@ func runGet(cmd *Command, args []string) *ErrorStatus {
 	}
 	if err != nil {
 		failureGetKeyMetric(keyID, err)
-		return &ErrorStatus{fmt.Errorf("Error getting key: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error getting key: %s", err.Error()), true}
 	}
 	if *getJSON {
 		data, err := json.Marshal(key)

@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -260,19 +259,4 @@ func mustParseBigInt(s string, base int) *big.Int {
 		panic(fmt.Sprintf("failed to parse big int: %s", s))
 	}
 	return n
-}
-
-// serializeU32 serializes a uint32 as big-endian bytes.
-func serializeU32(n uint32) []byte {
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, n)
-	return b
-}
-
-// deserializeU32 deserializes a uint32 from big-endian bytes.
-func deserializeU32(b []byte) (uint32, error) {
-	if len(b) != 4 {
-		return 0, fmt.Errorf("expected 4 bytes, got %d", len(b))
-	}
-	return binary.BigEndian.Uint32(b), nil
 }

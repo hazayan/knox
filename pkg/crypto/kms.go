@@ -105,21 +105,25 @@ func NewMockKMSProvider() *MockKMSProvider {
 	return &MockKMSProvider{name: "mock"}
 }
 
+// Name returns the provider name.
 func (m *MockKMSProvider) Name() string {
 	return m.name
 }
 
-func (m *MockKMSProvider) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
+// Decrypt decrypts ciphertext using mock provider (no actual decryption).
+func (m *MockKMSProvider) Decrypt(_ context.Context, ciphertext []byte) ([]byte, error) {
 	// Mock: just return as-is (NO ACTUAL DECRYPTION)
 	return ciphertext, nil
 }
 
-func (m *MockKMSProvider) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
+// Encrypt encrypts plaintext using mock provider (no actual encryption).
+func (m *MockKMSProvider) Encrypt(_ context.Context, plaintext []byte) ([]byte, error) {
 	// Mock: just return as-is (NO ACTUAL ENCRYPTION)
 	return plaintext, nil
 }
 
-func (m *MockKMSProvider) GenerateDataKey(ctx context.Context, keySpec string) ([]byte, []byte, error) {
+// GenerateDataKey generates a data key using mock provider.
+func (m *MockKMSProvider) GenerateDataKey(_ context.Context, _ string) ([]byte, []byte, error) {
 	key := make([]byte, 32)
 	// In mock, plaintext and ciphertext are the same
 	return key, key, nil

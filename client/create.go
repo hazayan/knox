@@ -20,7 +20,7 @@ var cmdCreate = &Command{
 Create will create a new key in knox with input as the primary key version. Key data should be sent to stdin unless a key-template is specified.
 
 First way: key data is sent to stdin.
-Please run "knox create <key_identifier>". 
+Please run "knox create <key_identifier>".
 
 Second way: the key-template option can be used to specify a template to generate the initial primary key version, instead of stdin. For available key templates, run "knox key-templates".
 Please run "knox create --key-template <template_name> <key_identifier>".
@@ -36,7 +36,7 @@ See also: knox add, knox get
 }
 var createTinkKeyset = cmdCreate.Flag.String("key-template", "", "name of a knox-supported Tink key template")
 
-func runCreate(cmd *Command, args []string) *ErrorStatus {
+func runCreate(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
 		return &ErrorStatus{errors.New("create takes exactly one argument. See 'knox help create'"), false}
 	}
@@ -60,7 +60,7 @@ func runCreate(cmd *Command, args []string) *ErrorStatus {
 	acl := types.ACL{}
 	versionID, err := cli.CreateKey(keyID, data, acl)
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error adding version: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error adding version: %s", err.Error()), true}
 	}
 	fmt.Printf("Created key with initial version %d\n", versionID)
 	return nil

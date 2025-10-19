@@ -25,8 +25,8 @@ func runDelete(_ *Command, args []string) *ErrorStatus {
 
 	err := cli.DeleteKey(args[0])
 	if err != nil {
-		return &ErrorStatus{fmt.Errorf("Error deleting key: %s", err.Error()), true}
+		return &ErrorStatus{fmt.Errorf("error deleting key: %s", err.Error()), true}
 	}
-	fmt.Printf("Successfully deleted key\n")
+	fmt.Print("Successfully deleted key\n")
 	return nil
 }

@@ -29,7 +29,7 @@ func (p *MTLSProvider) Name() string {
 }
 
 // Authenticate authenticates a request using TLS client certificates.
-func (p *MTLSProvider) Authenticate(token string, r *http.Request) (types.Principal, error) {
+func (p *MTLSProvider) Authenticate(_ string, r *http.Request) (types.Principal, error) {
 	// Check if TLS is used
 	if r.TLS == nil {
 		return nil, errors.New("TLS not enabled")

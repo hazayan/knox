@@ -35,11 +35,13 @@ func NewAWSKMSProvider(keyID, region string) (*AWSKMSProvider, error) {
 	}, nil
 }
 
+// Name returns the name of the AWS KMS provider.
 func (a *AWSKMSProvider) Name() string {
 	return "aws-kms"
 }
 
-func (a *AWSKMSProvider) Decrypt(ctx context.Context, ciphertext []byte) ([]byte, error) {
+// Decrypt decrypts ciphertext using AWS KMS.
+func (a *AWSKMSProvider) Decrypt(_ context.Context, _ []byte) ([]byte, error) {
 	// TODO: Implement actual AWS KMS integration
 	// This requires:
 	// 1. Import github.com/aws/aws-sdk-go-v2/service/kms
@@ -51,25 +53,26 @@ func (a *AWSKMSProvider) Decrypt(ctx context.Context, ciphertext []byte) ([]byte
 	// if err != nil {
 	//     return nil, err
 	// }
-	// client := kms.NewFromConfig(cfg)
-	// result, err := client.Decrypt(ctx, &kms.DecryptInput{
+	// kmsClient := kms.NewFromConfig(cfg)
+	// output, err := kmsClient.Decrypt(ctx, &kms.DecryptInput{
 	//     CiphertextBlob: ciphertext,
 	//     KeyId:          aws.String(a.keyID),
 	// })
 	// if err != nil {
 	//     return nil, err
 	// }
-	// return result.Plaintext, nil
-
-	return nil, errors.New("AWS KMS integration not yet implemented - add github.com/aws/aws-sdk-go-v2/service/kms")
+	// return output.Plaintext, nil
+	return nil, errors.New("AWS KMS integration not yet implemented")
 }
 
-func (a *AWSKMSProvider) Encrypt(ctx context.Context, plaintext []byte) ([]byte, error) {
+// Encrypt encrypts plaintext using AWS KMS.
+func (a *AWSKMSProvider) Encrypt(_ context.Context, _ []byte) ([]byte, error) {
 	// TODO: Implement actual AWS KMS integration
 	return nil, errors.New("AWS KMS integration not yet implemented")
 }
 
-func (a *AWSKMSProvider) GenerateDataKey(ctx context.Context, keySpec string) ([]byte, []byte, error) {
+// GenerateDataKey generates a data key using AWS KMS.
+func (a *AWSKMSProvider) GenerateDataKey(_ context.Context, _ string) ([]byte, []byte, error) {
 	// TODO: Implement actual AWS KMS integration
 	return nil, nil, errors.New("AWS KMS integration not yet implemented")
 }
