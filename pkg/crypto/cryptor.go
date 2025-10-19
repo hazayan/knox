@@ -36,7 +36,7 @@ func NewAESCryptor(masterKey []byte) (*AESCryptor, error) {
 }
 
 // NewAESCryptorFromFile loads the master key from a file.
-func NewAESCryptorFromFile(path string) (*AESCryptor, error) {
+func NewAESCryptorFromFile(_ string) (*AESCryptor, error) {
 	// This would load from a secure key file
 	// For now, this is a placeholder - in production, integrate with KMS/HSM
 	return nil, errors.New("file-based key loading not yet implemented - use environment variable")
@@ -83,7 +83,7 @@ func (c *AESCryptor) Decrypt(dbKey *keydb.DBKey) (*types.Key, error) {
 }
 
 // EncryptVersion encrypts a single key version.
-func (c *AESCryptor) EncryptVersion(key *types.Key, version *types.KeyVersion) (*keydb.EncKeyVersion, error) {
+func (c *AESCryptor) EncryptVersion(_ *types.Key, version *types.KeyVersion) (*keydb.EncKeyVersion, error) {
 	return c.encryptVersion(version)
 }
 

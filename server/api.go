@@ -1,3 +1,5 @@
+// Package server provides the HTTP API server for Knox secret management.
+// It handles authentication, authorization, and routing for all Knox operations.
 package server
 
 import (
@@ -57,20 +59,20 @@ func combine(f, g func(http.HandlerFunc) http.HandlerFunc) func(http.HandlerFunc
 
 // GetRouterFromKeyManager creates the mux router that serves knox routes from a key manager.
 func GetRouterFromKeyManager(
-	cryptor keydb.Cryptor,
+	_ keydb.Cryptor,
 	keyManager KeyManager,
 	decorators [](func(http.HandlerFunc) http.HandlerFunc),
 	additionalRoutes []Route,
 ) (*mux.Router, error) {
-	existingRouteIds := map[string]Route{}
+	existingRouteIDs := map[string]Route{}
 	existingRouteMethodAndPaths := map[string]map[string]Route{}
 	allRoutes := append(routes[:], additionalRoutes[:]...)
 
 	for _, route := range allRoutes {
-		if _, routeExists := existingRouteIds[route.Id]; routeExists {
+		if _, routeExists := existingRouteIDs[route.ID]; routeExists {
 			return nil, fmt.Errorf(
-				"There are ID conflicts for the route with ID: '%v'",
-				route.Id,
+				"there are ID conflicts for the route with ID: '%v'",
+				route.ID,
 			)
 		}
 		childMap, methodExists := existingRouteMethodAndPaths[route.Method]
@@ -82,14 +84,14 @@ func GetRouterFromKeyManager(
 		} else {
 			if conflictingRoute, pathExists := childMap[route.Path]; pathExists {
 				return nil, fmt.Errorf(
-					"There are Method/Path conflicts for the following Route IDs: ('%v' and '%v')",
-					conflictingRoute.Id, route.Id,
+					"there are Method/Path conflicts for the following Route IDs: ('%v' and '%v')",
+					conflictingRoute.ID, route.ID,
 				)
 			}
 		}
 
 		existingRouteMethodAndPaths[route.Method][route.Path] = route
-		existingRouteIds[route.Id] = route
+		existingRouteIDs[route.ID] = route
 	}
 
 	r := mux.NewRouter()
@@ -129,7 +131,7 @@ func addRoute(
 	routeDecorator func(f http.HandlerFunc) http.HandlerFunc,
 	keyManager KeyManager,
 ) {
-	handler := setupRoute(route.Id, keyManager)(parseParams(route.Parameters)(routeDecorator(route.ServeHTTP)))
+	handler := setupRoute(route.ID, keyManager)(parseParams(route.Parameters)(routeDecorator(route.ServeHTTP)))
 	router.Handle(route.Path, handler).Methods(route.Method)
 }
 
@@ -140,18 +142,18 @@ type Parameter interface {
 	Get(r *http.Request) (string, bool)
 }
 
-// UrlParameter is an implementation of the Parameter interface that extracts
+// URLParameter is an implementation of the Parameter interface that extracts
 // parameter values from the URL as referenced in section 3.3 of RFC2396.
-type UrlParameter string
+type URLParameter string
 
 // Get returns the value of the URL parameter.
-func (p UrlParameter) Get(r *http.Request) (string, bool) {
+func (p URLParameter) Get(r *http.Request) (string, bool) {
 	s, ok := mux.Vars(r)[string(p)]
 	return s, ok
 }
 
 // Name defines the URL-embedded key that this parameter maps to.
-func (p UrlParameter) Name() string {
+func (p URLParameter) Name() string {
 	return string(p)
 }
 
@@ -222,7 +224,7 @@ type Route struct {
 
 	// Id represents A unique string identifier that represents this specific
 	// route
-	Id string
+	ID string
 
 	// Path represents the relative HTTP path (or prefix) that must be specified
 	//  in order to invoke this route

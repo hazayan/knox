@@ -1,3 +1,6 @@
+// Package keydb provides cryptographic operations for Knox key storage.
+// It handles encryption and decryption of keys using various cryptographic
+// providers with support for versioning and key rotation.
 package keydb
 
 import (
@@ -11,7 +14,7 @@ import (
 	"github.com/hazayan/knox/pkg/types"
 )
 
-var ErrCryptorVersion = errors.New("Cryptor version does not match")
+var ErrCryptorVersion = errors.New("cryptor version does not match")
 
 // Cryptor is an interface for converting a knox Key to a DB Key.
 type Cryptor interface {

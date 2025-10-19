@@ -194,15 +194,15 @@ func getKeysetInfoFromTinkKeysetHandle(
 
 // tinkKeysetInfo translates tink keyset info to JSON format, doesn't contain any actual key material.
 type tinkKeysetInfo struct {
-	PrimaryKeyId uint32         `json:"primary_key_id"`
+	PrimaryKeyID uint32         `json:"primary_key_id"`
 	KeyInfo      []*tinkKeyInfo `json:"key_info"`
 }
 
 // tinkKeyInfo translates tink key info to JSON format, doesn't contain any actual key material.
 type tinkKeyInfo struct {
-	TypeUrl          string `json:"type_url"`
+	TypeURL          string `json:"type_url"`
 	Status           string `json:"status"`
-	KeyId            uint32 `json:"key_id"`
+	KeyID            uint32 `json:"key_id"`
 	OutputPrefixType string `json:"output_prefix_type"`
 	KnoxVersionID    uint64 `json:"knox_version_id"`
 }
@@ -220,11 +220,11 @@ func newTinkKeysetInfo(
 
 // newTinkKeyInfo translates Tink key info to JSON format.
 func newTinkKeysInfo(
-	keysetInfo_KeyInfo []*tinkpb.KeysetInfo_KeyInfo,
+	keysetInfoKeyInfo []*tinkpb.KeysetInfo_KeyInfo,
 	tinkKeyIDToKnoxVersionID map[uint32]uint64,
 ) []*tinkKeyInfo {
 	var tinkKeysInfo []*tinkKeyInfo
-	for _, v := range keysetInfo_KeyInfo {
+	for _, v := range keysetInfoKeyInfo {
 		tinkKeysInfo = append(tinkKeysInfo, &tinkKeyInfo{
 			v.TypeUrl,
 			v.Status.String(),

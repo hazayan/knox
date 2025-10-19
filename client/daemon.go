@@ -41,11 +41,7 @@ var (
 )
 
 var (
-	lockTimeout   = 10 * time.Second
-	lockRetryTime = 50 * time.Millisecond
-)
-
-var (
+	lockTimeout                       = 10 * time.Second
 	defaultFilePermission os.FileMode = 0o666
 	defaultDirPermission  os.FileMode = 0o777
 )
@@ -54,11 +50,11 @@ var daemonRefreshTime = 10 * time.Minute
 
 const tinkPrefix = "tink:"
 
-func runDaemon(cmd *Command, args []string) *ErrorStatus {
+func runDaemon(_ *Command, _ []string) *ErrorStatus {
 	if os.Getenv("KNOX_MACHINE_AUTH") == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return &ErrorStatus{fmt.Errorf("You're on a host with no name: %s", err.Error()), false}
+			return &ErrorStatus{fmt.Errorf("you're on a host with no name: %s", err.Error()), false}
 		}
 		_ = os.Setenv("KNOX_MACHINE_AUTH", hostname)
 	}
@@ -134,29 +130,29 @@ func (d *daemon) loop(refresh time.Duration) {
 func (d *daemon) initialize() error {
 	err := os.MkdirAll(d.dir, defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to initialize /var/lib/knox (run 'sudo mkdir /var/lib/knox'?): %s", err.Error())
+		return fmt.Errorf("failed to initialize /var/lib/knox (run 'sudo mkdir /var/lib/knox'?): %s", err.Error())
 	}
 
 	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.dir, defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up directory permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up directory permissions: %s", err.Error())
 	}
 	err = os.MkdirAll(d.keyDir(), defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to make key folders: %s", err.Error())
+		return fmt.Errorf("failed to make key folders: %s", err.Error())
 	}
 
 	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.keyDir(), defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up directory permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up directory permissions: %s", err.Error())
 	}
 	_, err = os.Stat(d.registerFilename())
 	if os.IsNotExist(err) {
 		err := os.WriteFile(d.registerFilename(), []byte{}, defaultFilePermission)
 		if err != nil {
-			return fmt.Errorf("Failed to initialize registered key file: %s", err.Error())
+			return fmt.Errorf("failed to initialize registered key file: %s", err.Error())
 		}
 	} else if err != nil {
 		return err
@@ -165,7 +161,7 @@ func (d *daemon) initialize() error {
 	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.registerFilename(), defaultFilePermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up register file permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up register file permissions: %s", err.Error())
 	}
 	d.registerKeyFile = NewKeysFile(d.registerFilename())
 	return nil
@@ -283,7 +279,7 @@ func (d daemon) processKey(keyID string) error {
 			// This removes keys that do not exist or the machine is unauthorized to access
 			_ = d.registerKeyFile.Remove([]string{keyID})
 		}
-		return fmt.Errorf("Error getting key %s: %s", keyID, err.Error())
+		return fmt.Errorf("error getting key %s: %s", keyID, err.Error())
 	}
 	// Do not cache any new keys if they have invalid content
 	if key.ID == "" || key.ACL == nil || key.VersionList == nil || key.VersionHash == "" {
@@ -293,29 +289,29 @@ func (d daemon) processKey(keyID string) error {
 	if strings.HasPrefix(keyID, tinkPrefix) {
 		keysetHandle, _, err := getTinkKeysetHandleFromKnoxVersionList(key.VersionList)
 		if err != nil {
-			return fmt.Errorf("Error fetching keyset handle for this tink key %s: %s", keyID, err.Error())
+			return fmt.Errorf("error fetching keyset handle for this tink key %s: %s", keyID, err.Error())
 		}
 		tinkKeyset, err := convertTinkKeysetHandleToBytes(keysetHandle)
 		if err != nil {
-			return fmt.Errorf("Error converting tink keyset handle to bytes %s: %s", keyID, err.Error())
+			return fmt.Errorf("error converting tink keyset handle to bytes %s: %s", keyID, err.Error())
 		}
 		key.TinkKeyset = base64.StdEncoding.EncodeToString(tinkKeyset)
 	}
 
 	b, err := json.Marshal(key)
 	if err != nil {
-		return fmt.Errorf("Error marshaling key %s: %s", keyID, err.Error())
+		return fmt.Errorf("error marshaling key %s: %s", keyID, err.Error())
 	}
 	// Write to tmpfile, mv to normal location. Close + rm on failures
 	tmpFile, err := os.CreateTemp(d.dir, fmt.Sprintf(".*.%s.tmp", keyID))
 	if err != nil {
-		return fmt.Errorf("Error opening tmp file for key %s: %s", keyID, err.Error())
+		return fmt.Errorf("error opening tmp file for key %s: %s", keyID, err.Error())
 	}
 	_, err = tmpFile.Write(b)
 	if err != nil {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())
-		return fmt.Errorf("Error writing key %s to file: %s", keyID, err.Error())
+		return fmt.Errorf("error writing key %s to file: %s", keyID, err.Error())
 	}
 	// Done writing
 	tmpFile.Close()
@@ -323,12 +319,12 @@ func (d daemon) processKey(keyID string) error {
 	err = os.Rename(tmpFile.Name(), d.keyFilename(keyID))
 	if err != nil {
 		os.Remove(tmpFile.Name())
-		return fmt.Errorf("Error renaming key %s temporary file: %s", keyID, err.Error())
+		return fmt.Errorf("error renaming key %s temporary file: %s", keyID, err.Error())
 	}
 
 	err = os.Chmod(d.keyFilename(keyID), defaultFilePermission)
 	if err != nil {
-		return fmt.Errorf("Failed to open up key file permissions: %s", err.Error())
+		return fmt.Errorf("failed to open up key file permissions: %s", err.Error())
 	}
 	return nil
 }
@@ -397,11 +393,10 @@ func (k *KeysFile) Get() ([]string, error) {
 func (k *KeysFile) Remove(ks []string) error {
 	oldKeys, err := k.Get()
 	if err != nil {
-		if os.IsNotExist(err) {
-			oldKeys = []string{}
-		} else {
+		if !os.IsNotExist(err) {
 			return err
 		}
+		oldKeys = []string{}
 	}
 	// Use a map to remove any duplicates
 	newKeys := make(map[string]bool)
@@ -430,11 +425,10 @@ func (k *KeysFile) Remove(ks []string) error {
 func (k *KeysFile) Add(ks []string) error {
 	oldKeys, err := k.Get()
 	if err != nil {
-		if os.IsNotExist(err) {
-			oldKeys = []string{}
-		} else {
+		if !os.IsNotExist(err) {
 			return err
 		}
+		oldKeys = []string{}
 	}
 	// Use a map to remove any duplicates
 	newKeys := make(map[string]bool)

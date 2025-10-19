@@ -34,7 +34,7 @@ type cachedKey struct {
 
 // NewDBAdapter creates a new storage backend adapter.
 // The adapter stores encrypted DBKey data - the backend never sees plaintext.
-func NewDBAdapter(backend Backend, cryptor keydb.Cryptor) keydb.DB {
+func NewDBAdapter(backend Backend, _ keydb.Cryptor) keydb.DB {
 	return &DBAdapter{
 		backend: backend,
 		cache:   make(map[string]*cachedKey),

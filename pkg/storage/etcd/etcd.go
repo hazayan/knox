@@ -25,35 +25,41 @@ type Backend struct {
 }
 
 // New creates a new etcd storage backend.
-func New(endpoints []string, prefix string) (*Backend, error) {
+func New(_ []string, _ string) (*Backend, error) {
 	return nil, errors.New("etcd backend not yet implemented")
 }
 
-// Placeholder methods to satisfy the interface.
-func (b *Backend) GetKey(ctx context.Context, keyID string) (*types.Key, error) {
+// GetKey retrieves a key from etcd storage.
+func (b *Backend) GetKey(_ context.Context, _ string) (*types.Key, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
+// PutKey stores a key in etcd storage.
+func (b *Backend) PutKey(_ context.Context, _ *types.Key) error {
 	return errors.New("not implemented")
 }
 
-func (b *Backend) DeleteKey(ctx context.Context, keyID string) error {
+// DeleteKey removes a key from etcd storage.
+func (b *Backend) DeleteKey(_ context.Context, _ string) error {
 	return errors.New("not implemented")
 }
 
-func (b *Backend) ListKeys(ctx context.Context, prefix string) ([]string, error) {
+// ListKeys lists keys from etcd storage.
+func (b *Backend) ListKeys(_ context.Context, _ string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
+// UpdateKey updates a key in etcd storage.
+func (b *Backend) UpdateKey(_ context.Context, _ string, _ func(*types.Key) (*types.Key, error)) error {
 	return errors.New("not implemented")
 }
 
-func (b *Backend) Ping(ctx context.Context) error {
+// Ping checks etcd connectivity.
+func (b *Backend) Ping(_ context.Context) error {
 	return errors.New("not implemented")
 }
 
+// Close closes the etcd connection.
 func (b *Backend) Close() error {
 	return nil
 }
