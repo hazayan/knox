@@ -61,7 +61,10 @@ Examples:
 			var err error
 
 			if dataFile != "" {
-				keyData, err = os.ReadFile(dataFile)
+				homeDir, _ := os.UserHomeDir()
+				allowedDirs := []string{homeDir, "."}
+				allowedExts := []string{".txt", ".json", ".pem"}
+				keyData, err = validateAndReadFile(dataFile, allowedDirs, allowedExts)
 				if err != nil {
 					return fmt.Errorf("failed to read data file: %w", err)
 				}
@@ -98,7 +101,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id":     keyID,
 					"version_id": versionID,
 					"status":     "created",
@@ -221,7 +224,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"keys":  keys,
 					"count": len(keys),
 				})
@@ -264,7 +267,10 @@ Examples:
 			if !force {
 				fmt.Printf("Are you sure you want to delete key '%s'? (y/N): ", keyID)
 				var response string
-				fmt.Scanln(&response)
+				_, err := fmt.Scanln(&response)
+				if err != nil {
+					return fmt.Errorf("failed to read user input: %w", err)
+				}
 				if strings.ToLower(response) != "y" {
 					fmt.Println("Deletion cancelled")
 					return nil
@@ -281,7 +287,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id": keyID,
 					"status": "deleted",
 				})
@@ -323,7 +329,10 @@ Examples:
 			var err error
 
 			if dataFile != "" {
-				keyData, err = os.ReadFile(dataFile)
+				homeDir, _ := os.UserHomeDir()
+				allowedDirs := []string{homeDir, "."}
+				allowedExts := []string{".txt", ".json", ".pem"}
+				keyData, err = validateAndReadFile(dataFile, allowedDirs, allowedExts)
 				if err != nil {
 					return fmt.Errorf("failed to read data file: %w", err)
 				}
@@ -351,7 +360,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id":     keyID,
 					"version_id": versionID,
 					"status":     "added",
@@ -415,7 +424,9 @@ Examples:
 				fmt.Fprintf(w, "%d\t%s\t%d\n", v.ID, status, v.CreationTime)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
@@ -527,7 +538,9 @@ func getAPIClient() (client.APIClient, error) {
 			cacheFolder = filepath.Join(home, cacheFolder[2:])
 		}
 		// Create cache directory if it doesn't exist
-		os.MkdirAll(cacheFolder, 0o700)
+		if err := os.MkdirAll(cacheFolder, 0o700); err != nil {
+			return nil, fmt.Errorf("failed to create cache directory: %w", err)
+		}
 	}
 
 	knoxClient := client.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)

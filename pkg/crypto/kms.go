@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -37,6 +39,15 @@ func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 			return nil, errors.New("no encrypted master key found: set KNOX_MASTER_KEY_ENCRYPTED or KNOX_MASTER_KEY_ENCRYPTED_FILE")
 		}
 
+		// Validate file path for security
+		if !filepath.IsAbs(keyFile) {
+			return nil, errors.New("KMS key file path must be absolute")
+		}
+		if strings.Contains(keyFile, "..") {
+			return nil, errors.New("KMS key file path cannot contain parent directory references")
+		}
+
+		// #nosec G304 -- keyFile path is strictly validated above (absolute, no traversal)
 		data, err := os.ReadFile(keyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read encrypted key file: %w", err)

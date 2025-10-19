@@ -171,7 +171,7 @@ func TestGetKey(t *testing.T) {
 		t.Fatalf("%+v is not nil", err)
 	}
 
-	i, err := getKeyHandler(m, u, map[string]string{"keyID": "a1"})
+	i, _ := getKeyHandler(m, u, map[string]string{"keyID": "a1"})
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
@@ -190,7 +190,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	i, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Inactive\""})
+	i, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Inactive\""})
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
@@ -209,7 +209,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	i, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Primary\""})
+	i, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "\"Primary\""})
 	switch k := i.(type) {
 	default:
 		t.Fatal("Unexpected type of response")
@@ -228,7 +228,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	i, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "AJSDFLKJlks"})
+	_, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "AJSDFLKJlks"})
 	if err == nil {
 		t.Fatal("Expected err")
 	}

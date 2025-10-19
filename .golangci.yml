@@ -79,6 +79,12 @@ linters:
           correction: unmarshaled
         - typo: unmarshalling
           correction: unmarshaling
+      ignore-words:
+        - cryptor
+        - testuser
+        - testkeyid
+        - nokey
+        - checkinternal
       ignore-rules:
         - analyses # returned by the GitHub API
         - cancelled # returned by the GitHub API

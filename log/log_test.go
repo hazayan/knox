@@ -73,7 +73,7 @@ var tests = []tester{
 }
 
 // Test using Println("hello", 23, "world") or using Printf("hello %d world", 23).
-func testPrint(t *testing.T, flag int, prefix string, pattern string, useFormat bool) {
+func testPrint(t *testing.T, flag int, prefix, pattern string, useFormat bool) {
 	var m LogMessage
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
@@ -214,7 +214,9 @@ func TestOutputJSON(t *testing.T) {
 	var m LogMessage
 	var b bytes.Buffer
 	l := New(&b, "", LstdFlags)
-	l.OutputJSON(data)
+	if err := l.OutputJSON(data); err != nil {
+		t.Fatalf("OutputJSON failed: %v", err)
+	}
 	d := struct {
 		Title  string
 		Number int
@@ -236,7 +238,9 @@ func TestOutputBinary(t *testing.T) {
 	var m LogMessage
 	var b bytes.Buffer
 	l := New(&b, "", LstdFlags)
-	l.OutputBinary([]byte(""))
+	if err := l.OutputBinary([]byte("")); err != nil {
+		t.Fatalf("OutputBinary failed: %v", err)
+	}
 	err := json.NewDecoder(&b).Decode(&m)
 	if err != nil {
 		t.Errorf("Unexpected error decoding log JSON: %q", err.Error())

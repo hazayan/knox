@@ -28,15 +28,12 @@ For more about knox, see https://github.com/hazayan/knox.
 See also: knox help auth
 	`
 )
-const DefaultTokenFileLocation = ".knox_user_auth"
+const DefaultTokenFileLocation = ".knox_token"
 
 func NewLoginCommand(
 	oauthTokenEndpoint string,
 	oauthClientID string,
 	tokenFileLocation string,
-	usageLine string,
-	shortDescription string,
-	longDescription string,
 ) *Command {
 	runLoginAugmented := func(cmd *Command, args []string) *ErrorStatus {
 		return runLogin(cmd, oauthClientID, tokenFileLocation, oauthTokenEndpoint, args)
@@ -54,20 +51,10 @@ func NewLoginCommand(
 		tokenFileLocation = path.Join(currentUser.HomeDir, tokenFileLocation)
 	}
 
-	if usageLine == "" {
-		usageLine = DefaultUsageLine
-	}
-	if shortDescription == "" {
-		shortDescription = DefaultShortDescription
-	}
-	if longDescription == "" {
-		longDescription = fmt.Sprintf(DefaultLongDescriptionFormat, tokenFileLocation)
-	}
-
 	return &Command{
 		UsageLine: DefaultUsageLine,
 		Short:     DefaultShortDescription,
-		Long:      longDescription,
+		Long:      fmt.Sprintf(DefaultLongDescriptionFormat, tokenFileLocation),
 		Run:       runLoginAugmented,
 	}
 }
@@ -104,7 +91,17 @@ func runLogin(
 		return &ErrorStatus{fmt.Errorf("Problem getting password: %s", err.Error()), false}
 	}
 
-	resp, err := http.PostForm(oauthTokenEndpoint,
+	// Validate OAuth endpoint URL for security
+	parsedURL, err := url.Parse(oauthTokenEndpoint)
+	if err != nil {
+		return &ErrorStatus{fmt.Errorf("Invalid OAuth endpoint URL: %s", err.Error()), false}
+	}
+	if parsedURL.Scheme != "https" {
+		return &ErrorStatus{errors.New("OAuth endpoint must use HTTPS"), false}
+	}
+
+	// URL is validated above to ensure it uses HTTPS (see gosec G107)
+	resp, err := http.PostForm(oauthTokenEndpoint, // #nosec G107 -- URL is validated above to ensure it uses HTTPS
 		url.Values{
 			"grant_type": {"password"},
 			"client_id":  {oauthClientID},

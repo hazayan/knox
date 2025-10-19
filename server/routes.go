@@ -106,7 +106,7 @@ var routes = [...]Route{
 // REST so that fix will be postponed until this actually is a problem.
 // The route for this handler is GET /v0/keys/
 // There are no authorization constraints on this route.
-func getKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func getKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	queryString := parameters["queryString"]
 
 	// Can't throw error since direct from a http request
@@ -139,7 +139,7 @@ func getKeysHandler(m KeyManager, principal types.Principal, parameters map[stri
 // It returns the key version ID of the original Primary key version.
 // The route for this handler is POST /v0/keys/
 // The postKeysHandler must be a User.
-func postKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func postKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	// Authorize
 	if !auth.IsUser(principal) {
 		return nil, errF(types.UnauthorizedCode, fmt.Sprintf("Must be a user to create keys, principal is %s", principal.GetID()))
@@ -190,7 +190,7 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 // getKeyHandler gets the key matching the keyID in the request.
 // The route for this handler is GET /v0/keys/<key_id>/
 // The principal must have Read access to the key.
-func getKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func getKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	status := types.Active
@@ -229,7 +229,7 @@ func getKeyHandler(m KeyManager, principal types.Principal, parameters map[strin
 // deleteKeyHandler deletes the key matching the keyID in the request.
 // The route for this handler is DELETE /v0/keys/<key_id>/
 // The principal needs Admin access to the key.
-func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	key, getErr := m.GetKey(keyID, types.Primary)
@@ -260,7 +260,7 @@ func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[st
 
 // getAccessHandler gets the ACL for a specific Key.
 // The route for this handler is GET /v0/keys/<key_id>/access/.
-func getAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func getAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	// Get the key
@@ -284,7 +284,7 @@ func getAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 // existing access rules will not be modified unless the same Type and Name is used
 // The route for this handler is PUT /v0/keys/<key_id>/access/
 // The principal needs Admin access.
-func putAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func putAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
 	accessStr, accessOK := parameters["access"]
@@ -359,7 +359,7 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 // added as an Active key.
 // The route for this handler is PUT /v0/keys/<key_id>/versions/
 // The principal needs Write access.
-func postVersionHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func postVersionHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 	dataStr, dataOK := parameters["data"]
 	if !dataOK {
@@ -418,7 +418,7 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 //
 // The route for this handler is PUT /v0/keys/<key_id>/versions/<version_id>/
 // The principal needs Write access.
-func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError) {
+func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 	versionID := parameters["versionID"]
 

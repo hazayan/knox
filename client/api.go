@@ -2,18 +2,20 @@ package client
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -172,7 +174,13 @@ func Register(keyID string) ([]byte, error) {
 func GetBackoffDuration(attempt int) time.Duration {
 	basef := float64(baseBackoff)
 	// Add some randomness.
-	duration := rand.Float64()*float64(attempt) + basef
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback to deterministic value if crypto/rand fails
+		randomBytes = []byte{1, 2, 3, 4, 5, 6, 7, 8}
+	}
+	randomValue := float64(binary.BigEndian.Uint64(randomBytes)) / float64(^uint64(0))
+	duration := randomValue*float64(attempt) + basef
 
 	if duration > float64(maxBackoff) {
 		return maxBackoff
@@ -222,17 +230,44 @@ func NewClient(host string, client HTTP, authHandlers []AuthHandler, keyFolder, 
 	}
 }
 
+// validateCacheFilePath ensures the cache file path is safe and allowed.
+func validateCacheFilePath(baseDir, file string) (string, error) {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", err
+	}
+	absFile, err := filepath.Abs(filepath.Join(baseDir, file))
+	if err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(absFile, absBase) {
+		return "", errors.New("cache file path is outside allowed directory")
+	}
+	if strings.Contains(absFile, "..") {
+		return "", errors.New("path traversal detected in cache file path")
+	}
+	// Only allow .json files for cache
+	if filepath.Ext(absFile) != ".json" {
+		return "", errors.New("cache file must have .json extension")
+	}
+	return absFile, nil
+}
+
 // CacheGetKey gets the key from file system cache.
 func (c *HTTPClient) CacheGetKey(keyID string) (*types.Key, error) {
 	if c.KeyFolder == "" {
 		return nil, errors.New("no folder set for cached key")
 	}
-	path := path.Join(c.KeyFolder, keyID)
-	b, err := os.ReadFile(path)
+	cacheFile, err := validateCacheFilePath(c.KeyFolder, keyID+".json")
 	if err != nil {
 		return nil, err
 	}
-	k := types.Key{Path: path}
+
+	b, err := os.ReadFile(cacheFile) // #nosec G304 -- cacheFile is validated by validateCacheFilePath
+	if err != nil {
+		return nil, err
+	}
+	k := types.Key{Path: cacheFile}
 	err = json.Unmarshal(b, &k)
 	if err != nil {
 		return nil, err
@@ -269,12 +304,15 @@ func (c *HTTPClient) CacheGetKeyWithStatus(keyID string, status types.VersionSta
 	if err != nil {
 		return nil, err
 	}
-	path := c.KeyFolder + keyID + "?status=" + string(st)
-	b, err := os.ReadFile(path)
+	cacheFile, err := validateCacheFilePath(c.KeyFolder, keyID+"_"+string(st)+".json")
 	if err != nil {
 		return nil, err
 	}
-	k := types.Key{Path: path}
+	b, err := os.ReadFile(cacheFile) // #nosec G304 -- cacheFile is validated by validateCacheFilePath
+	if err != nil {
+		return nil, err
+	}
+	k := types.Key{Path: cacheFile}
 	err = json.Unmarshal(b, &k)
 	if err != nil {
 		return nil, err
@@ -339,7 +377,7 @@ func (c *HTTPClient) getClient() (HTTP, error) {
 	return c.UncachedClient.DefaultClient, nil
 }
 
-func (c *HTTPClient) getHTTPData(method string, path string, body url.Values, data interface{}) error {
+func (c *HTTPClient) getHTTPData(method string, path string, body url.Values, data any) error {
 	return c.UncachedClient.getHTTPData(method, path, body, data)
 }
 
@@ -497,7 +535,7 @@ func (c *UncachedHTTPClient) getClient() (HTTP, error) {
 	return c.DefaultClient, nil
 }
 
-func (c *UncachedHTTPClient) getHTTPData(method string, path string, body url.Values, data interface{}) error {
+func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, data any) error {
 	if len(c.AuthHandlers) == 0 {
 		return errNoAuth
 	}
@@ -583,7 +621,7 @@ func getHTTPResp(cli HTTP, r *http.Request, resp *types.Response) error {
 	return decoder.Decode(resp)
 }
 
-// MockClient builds a client that ignores certs and talks to the given host.
+// MockClient builds a client for testing that uses a custom certificate pool.
 func MockClient(host, keyFolder string) *HTTPClient {
 	return &HTTPClient{
 		KeyFolder: keyFolder,
@@ -592,8 +630,16 @@ func MockClient(host, keyFolder string) *HTTPClient {
 			AuthHandlers: []AuthHandler{func() (string, string, HTTP) {
 				return "TESTAUTH", "TESTAUTHTYPE", nil
 			}},
-			DefaultClient: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}},
-			Version:       "mock",
+			DefaultClient: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				},
+			}}},
+			Version: "mock",
 		},
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -199,7 +200,10 @@ func (s *Session) Export(conn *dbus.Conn) error {
 
 // Unexport removes the session from D-Bus.
 func (s *Session) Unexport(conn *dbus.Conn) {
-	conn.Export(nil, s.path, SessionInterface)
+	if err := conn.Export(nil, s.path, SessionInterface); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to unexport session: %v", err)
+	}
 }
 
 // D-Bus methods

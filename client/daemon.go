@@ -2,11 +2,11 @@ package client
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -60,7 +60,7 @@ func runDaemon(cmd *Command, args []string) *ErrorStatus {
 		if err != nil {
 			return &ErrorStatus{fmt.Errorf("You're on a host with no name: %s", err.Error()), false}
 		}
-		os.Setenv("KNOX_MACHINE_AUTH", hostname)
+		_ = os.Setenv("KNOX_MACHINE_AUTH", hostname)
 	}
 
 	d := daemon{
@@ -95,7 +95,7 @@ func (d *daemon) loop(refresh time.Duration) {
 	if err != nil {
 		fatalf("Unable to watch files: %s", err.Error())
 	}
-	watcher.Add(d.registerFilename())
+	_ = watcher.Add(d.registerFilename())
 
 	for {
 		logf("Daemon updating all registered keys")
@@ -115,7 +115,13 @@ func (d *daemon) loop(refresh time.Duration) {
 			logf("Got file watcher event: %s on %s", event.Op.String(), event.Name)
 		case <-t.C:
 			// add random jitter to prevent a stampede
-			<-time.After(time.Duration(rand.Intn(10)) * time.Millisecond)
+			randomBytes := make([]byte, 1)
+			if _, err := rand.Read(randomBytes); err != nil {
+				// Fallback to deterministic value if crypto/rand fails
+				randomBytes = []byte{5}
+			}
+			jitter := time.Duration(randomBytes[0]%10) * time.Millisecond
+			<-time.After(jitter)
 			daemonReportMetrics(map[string]uint64{
 				"err":     d.updateErrCount,
 				"get_err": d.getKeyErrCount,
@@ -171,7 +177,7 @@ func (d *daemon) update() error {
 		return err
 	}
 	// defer this so that functions can update the register file.
-	defer d.registerKeyFile.Unlock()
+	defer func() { _ = d.registerKeyFile.Unlock() }()
 	keyIDs, err := d.registerKeyFile.Get()
 	if err != nil {
 		return err
@@ -202,13 +208,13 @@ func (d *daemon) update() error {
 				logf("error getting cache key: %s", err)
 				// Remove existing cached key with invalid format (saved with previous version clients)
 				if _, err = os.Stat(d.keyFilename(keyID)); err == nil {
-					d.deleteKey(keyID)
+					_ = d.deleteKey(keyID)
 				}
 			} else {
 				keyMap[keyID] = key.VersionHash
 			}
 		} else {
-			d.deleteKey(keyID)
+			_ = d.deleteKey(keyID)
 		}
 	}
 
@@ -275,7 +281,7 @@ func (d daemon) processKey(keyID string) error {
 	if err != nil {
 		if err.Error() == "User or machine not authorized" || err.Error() == "Key identifier does not exist" {
 			// This removes keys that do not exist or the machine is unauthorized to access
-			d.registerKeyFile.Remove([]string{keyID})
+			_ = d.registerKeyFile.Remove([]string{keyID})
 		}
 		return fmt.Errorf("Error getting key %s: %s", keyID, err.Error())
 	}
@@ -417,7 +423,7 @@ func (k *KeysFile) Remove(ks []string) error {
 		buffer.WriteString(k)
 		buffer.WriteByte('\n')
 	}
-	return os.WriteFile(k.fn, buffer.Bytes(), 0o666)
+	return os.WriteFile(k.fn, buffer.Bytes(), 0o600)
 }
 
 // Add will add the key IDs to the list. It expects Lock to have been called.
@@ -448,7 +454,7 @@ func (k *KeysFile) Add(ks []string) error {
 		buffer.WriteString(k)
 		buffer.WriteByte('\n')
 	}
-	return os.WriteFile(k.fn, buffer.Bytes(), 0o666)
+	return os.WriteFile(k.fn, buffer.Bytes(), 0o600)
 }
 
 // Overwrite deletes all existing values in the key list and writes the input.
@@ -465,7 +471,7 @@ func (k *KeysFile) Overwrite(ks []string) error {
 		buffer.WriteString(k)
 		buffer.WriteByte('\n')
 	}
-	return os.WriteFile(k.fn, buffer.Bytes(), 0o666)
+	return os.WriteFile(k.fn, buffer.Bytes(), 0o600)
 }
 
 func identifyLockHolders(filename string) (string, error) {

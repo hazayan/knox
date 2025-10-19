@@ -139,7 +139,7 @@ type Stats struct {
 	OperationCounts map[string]int64
 
 	// Backend-specific metrics
-	BackendSpecific map[string]interface{}
+	BackendSpecific map[string]any
 }
 
 // StatsProvider is an optional interface that backends can implement

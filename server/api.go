@@ -1,9 +1,10 @@
 package server
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -217,7 +218,7 @@ func (p PostParameter) Name() string {
 type Route struct {
 	// Handler represents the handler function that is responsible for serving
 	// this route
-	Handler func(db KeyManager, principal types.Principal, parameters map[string]string) (interface{}, *HTTPError)
+	Handler func(db KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError)
 
 	// Id represents A unique string identifier that represents this specific
 	// route
@@ -263,7 +264,7 @@ func WriteErr(apiErr *HTTPError) http.HandlerFunc {
 
 // WriteData returns a function that can write arbitrary data to the specified
 // HTTP response writer.
-func WriteData(w http.ResponseWriter, data interface{}) {
+func WriteData(w http.ResponseWriter, data any) {
 	r := new(types.Response)
 	r.Message = ""
 	r.Code = types.OKCode
@@ -327,8 +328,14 @@ func newKeyVersion(d []byte, s types.VersionStatus) types.KeyVersion {
 	version.Data = d
 	version.Status = s
 	version.CreationTime = time.Now().UnixNano()
-	// This is only 63 bits of randomness, but it appears to be the fastest way.
-	version.ID = uint64(rand.Int63())
+	// Use crypto/rand for secure random number generation
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails
+		version.ID = uint64(time.Now().UnixNano())
+	} else {
+		version.ID = binary.BigEndian.Uint64(randomBytes)
+	}
 	return version
 }
 

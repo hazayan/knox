@@ -149,7 +149,9 @@ Examples:
 					marker, name, prof.Server, cacheStatus, tlsStatus)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
@@ -243,7 +245,10 @@ Examples:
 	cmd.Flags().StringVar(&clientCert, "client-cert", "", "Client certificate file")
 	cmd.Flags().StringVar(&clientKey, "client-key", "", "Client key file")
 	cmd.Flags().StringVar(&cacheDir, "cache-dir", "", "Cache directory")
-	cmd.MarkFlagRequired("server")
+	if err := cmd.MarkFlagRequired("server"); err != nil {
+		// Log the error but continue - this is a configuration issue
+		fmt.Fprintf(os.Stderr, "Warning: failed to mark server flag as required: %v\n", err)
+	}
 
 	return cmd
 }
@@ -373,7 +378,9 @@ Examples:
 					marker, name, prof.Server, cacheStatus)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}

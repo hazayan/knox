@@ -608,12 +608,12 @@ const (
 
 // Response is the format for responses from the api server.
 type Response struct {
-	Status    string      `json:"status"`
-	Code      int         `json:"code"`
-	Host      string      `json:"host"`
-	Timestamp int64       `json:"ts"`
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data"`
+	Status    string `json:"status"`
+	Code      int    `json:"code"`
+	Host      string `json:"host"`
+	Timestamp int64  `json:"ts"`
+	Message   string `json:"message"`
+	Data      any    `json:"data"`
 }
 
 // AccessCallbackInput is the input to the access callback function.

@@ -18,7 +18,7 @@ See also: knox create
     `,
 }
 
-func runDelete(cmd *Command, args []string) *ErrorStatus {
+func runDelete(_ *Command, args []string) *ErrorStatus {
 	if len(args) != 1 {
 		return &ErrorStatus{errors.New("create takes exactly one argument. See 'knox help delete'"), false}
 	}

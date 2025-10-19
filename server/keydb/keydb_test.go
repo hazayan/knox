@@ -231,7 +231,7 @@ func TesterAddUpdate(t *testing.T, db DB, timeout time.Duration) {
 				if string(ak.EncData) != "b" {
 					t.Fatalf("%s does not equal b", string(ak.EncData))
 				}
-				version = newK.DBVersion
+				_ = newK.DBVersion // version assignment was unused
 				complete = true
 			} else if err != nil {
 				t.Fatal(err)

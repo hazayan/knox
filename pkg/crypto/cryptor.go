@@ -223,7 +223,7 @@ func (c *AESCryptor) decryptWithKey(key, ciphertext []byte) ([]byte, error) {
 }
 
 // DeriveKey derives a key from a password using HKDF.
-func DeriveKey(password []byte, salt []byte, info []byte) ([]byte, error) {
+func DeriveKey(password, salt, info []byte) ([]byte, error) {
 	if len(salt) < 16 {
 		return nil, errors.New("salt must be at least 16 bytes")
 	}

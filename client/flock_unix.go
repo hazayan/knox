@@ -26,7 +26,7 @@ func newFlock() *flock {
 }
 
 // lock acquires an advisory lock on a file descriptor.
-func (f *flock) lock(k *KeysFile, mode os.FileMode, exclusive bool, timeout time.Duration) error {
+func (f *flock) lock(k *KeysFile, _ os.FileMode, exclusive bool, timeout time.Duration) error {
 	var t time.Time
 	for {
 		// If we're beyond our timeout then return an error.
@@ -59,7 +59,7 @@ func (f *flock) lock(k *KeysFile, mode os.FileMode, exclusive bool, timeout time
 }
 
 // unlock releases an advisory lock on a file descriptor.
-func (f *flock) unlock(k *KeysFile) error {
+func (f *flock) unlock(_ *KeysFile) error {
 	return syscall.Flock(f.fd, syscall.LOCK_UN)
 }
 

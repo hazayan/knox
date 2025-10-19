@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"log"
 )
 
 var cmdUnregister = &Command{
@@ -27,7 +28,11 @@ func runUnregister(cmd *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("Error locking the register file: %s", err.Error()), false}
 	}
-	defer k.Unlock()
+	defer func() {
+		if err := k.Unlock(); err != nil {
+			log.Printf("Error unlocking register file: %v", err)
+		}
+	}()
 
 	err = k.Remove([]string{args[0]})
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -233,7 +234,12 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			// Log rollback error but don't fail the operation
+			log.Printf("failed to rollback transaction: %v", err)
+		}
+	}()
 
 	// Get current key with row lock
 	var keyData []byte
@@ -351,7 +357,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 	stats := &storage.Stats{
 		TotalKeys:       totalKeys,
 		OperationCounts: opCounts,
-		BackendSpecific: map[string]interface{}{
+		BackendSpecific: map[string]any{
 			"backend":          "postgres",
 			"open_connections": dbStats.OpenConnections,
 			"in_use":           dbStats.InUse,

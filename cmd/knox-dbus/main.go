@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -54,10 +55,12 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize logging
-	logging.Initialize(logging.Config{
+	if err := logging.Initialize(logging.Config{
 		Level:  "info",
 		Format: "text",
-	})
+	}); err != nil {
+		log.Fatalf("Failed to initialize logging: %v", err)
+	}
 
 	logging.Infof("Knox D-Bus bridge %s starting...", version)
 	logging.Infof("Configuration: %s", cfgFile)
@@ -89,7 +92,11 @@ func runDaemon(cmd *cobra.Command, args []string) error {
 	if err := bridge.Start(); err != nil {
 		return fmt.Errorf("failed to start bridge: %w", err)
 	}
-	defer bridge.Stop()
+	defer func() {
+		if err := bridge.Stop(); err != nil {
+			log.Printf("Error stopping bridge: %v", err)
+		}
+	}()
 
 	logging.Info("D-Bus bridge started successfully")
 	logging.Infof("Namespace prefix: %s", cfg.Knox.NamespacePrefix)
@@ -134,7 +141,11 @@ func createHTTPClient(cfg *config.DBusConfig) (*http.Client, error) {
 
 	// Load CA certificate if specified
 	if cfg.Knox.TLS.CACert != "" {
-		caCert, err := os.ReadFile(cfg.Knox.TLS.CACert)
+		// Validate CA cert path for security
+		if !filepath.IsAbs(cfg.Knox.TLS.CACert) || strings.Contains(cfg.Knox.TLS.CACert, "..") {
+			return nil, errors.New("CA certificate path must be absolute and not contain '..'")
+		}
+		caCert, err := os.ReadFile(cfg.Knox.TLS.CACert) // #nosec G304 -- path is validated above
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CA certificate: %w", err)
 		}
@@ -199,7 +210,20 @@ func createAuthHandlers(cfg *config.DBusConfig) []client.AuthHandler {
 		}
 
 		tokenFile := filepath.Join(homeDir, ".knox", "token")
-		token, err := os.ReadFile(tokenFile)
+
+		// Validate token file path for security
+		if !filepath.IsAbs(tokenFile) {
+			return "", "", nil
+		}
+		if strings.Contains(tokenFile, "..") {
+			return "", "", nil
+		}
+
+		// Validate token file path for security
+		if !filepath.IsAbs(tokenFile) || strings.Contains(tokenFile, "..") {
+			return "", "", nil
+		}
+		token, err := os.ReadFile(tokenFile) // #nosec G304 -- path is validated above
 		if err != nil {
 			return "", "", nil
 		}

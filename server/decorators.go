@@ -2,8 +2,10 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/gorilla/context"
 	"github.com/hazayan/knox/log"
@@ -124,7 +126,10 @@ func Logger(logger *log.Logger) func(http.HandlerFunc) http.HandlerFunc {
 				e.StatusCode = HTTPErrMap[apiError.Subcode].Code
 				e.Msg = apiError.Message
 			}
-			logger.OutputJSON(e)
+			if err := logger.OutputJSON(e); err != nil {
+				// Log the error but continue - this is best effort logging
+				fmt.Fprintf(os.Stderr, "failed to output JSON log: %v\n", err)
+			}
 		}
 	}
 }

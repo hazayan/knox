@@ -69,7 +69,9 @@ Examples:
 				fmt.Fprintf(w, "%s\t%s\t%s\n", principalType, entry.ID, accessType)
 			}
 
-			w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
 			return nil
 		},
 	}
@@ -120,7 +122,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id": keyID,
 					"acl":    acl[0],
 					"status": "added",
@@ -176,7 +178,7 @@ Examples:
 			}
 
 			if jsonOutput {
-				return json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
 					"key_id": keyID,
 					"acl":    acl[0],
 					"status": "removed",
