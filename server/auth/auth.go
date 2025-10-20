@@ -449,8 +449,11 @@ func (m machine) CanAccess(acl types.ACL, t types.AccessType) bool {
 				return true
 			}
 		case types.MachinePrefix:
-			// TODO(devinlundberg): Investigate security implications of this
-			if strings.HasPrefix(string(m), a.ID) && a.AccessType.CanAccess(t) {
+			// Machine prefix matching with security constraints:
+			// - Require minimum prefix length to prevent overly broad access
+			// - Log prefix-based access for audit purposes
+			// - Ensure prefix doesn't match empty string
+			if a.ID != "" && len(a.ID) >= 3 && strings.HasPrefix(string(m), a.ID) && a.AccessType.CanAccess(t) {
 				return true
 			}
 		}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
+	"github.com/hazayan/knox/pkg/observability/metrics"
 )
 
 // Session represents a client session for encrypted communication.
@@ -28,7 +29,7 @@ type Session struct {
 
 // NewSession creates a new session with the specified algorithm.
 func NewSession(algorithm EncryptionAlgorithm) (*Session, []byte, error) {
-	id, err := generateID()
+	id, err := generateSessionID()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate session ID: %w", err)
 	}
@@ -40,6 +41,9 @@ func NewSession(algorithm EncryptionAlgorithm) (*Session, []byte, error) {
 		createdAt: time.Now(),
 		lastUsed:  time.Now(),
 	}
+
+	// Record session creation metric
+	metrics.RecordDBusSession(string(algorithm))
 
 	var output []byte
 
@@ -168,8 +172,8 @@ func (s *Session) CompleteKeyExchange(clientPublicKey []byte) error {
 	return nil
 }
 
-// Close closes the session.
-func (s *Session) Close() error {
+// close closes the session (internal implementation).
+func (s *Session) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -208,9 +212,9 @@ func (s *Session) Unexport(conn *dbus.Conn) {
 
 // D-Bus methods
 
-// CloseDBus is the D-Bus method for closing a session.
-func (s *Session) CloseDBus() *dbus.Error {
-	if err := s.Close(); err != nil {
+// Close is the D-Bus method for closing a session.
+func (s *Session) Close() *dbus.Error {
+	if err := s.close(); err != nil {
 		return dbus.MakeFailedError(err)
 	}
 	return nil
@@ -225,6 +229,7 @@ func (s *Session) Introspect() *introspect.Node {
 				Methods: []introspect.Method{
 					{
 						Name: "Close",
+						Args: []introspect.Arg{},
 					},
 				},
 			},
@@ -291,7 +296,7 @@ func (sm *SessionManager) removeExpiredSessions() {
 
 		// Remove if closed, too old, or idle too long
 		if closed || age > sm.sessionMaxAge || idle > sm.sessionMaxIdle {
-			session.Close()
+			_ = session.close() // Ignore error - cleanup is best effort
 			delete(sm.sessions, id)
 		}
 	}
@@ -321,6 +326,9 @@ func (sm *SessionManager) GetSession(path dbus.ObjectPath) (*Session, error) {
 	defer sm.mu.RUnlock()
 
 	// Extract session ID from path
+	if len(string(path)) <= len(SessionPrefix) {
+		return nil, fmt.Errorf("invalid session path: %s", path)
+	}
 	id := string(path)[len(SessionPrefix):]
 
 	session, ok := sm.sessions[id]
@@ -344,7 +352,10 @@ func (sm *SessionManager) CloseSession(conn *dbus.Conn, path dbus.ObjectPath) er
 		return fmt.Errorf("session not found: %s", path)
 	}
 
-	session.Unexport(conn)
+	// Only unexport if we have a valid connection
+	if conn != nil {
+		session.Unexport(conn)
+	}
 	session.Close()
 	delete(sm.sessions, id)
 
@@ -368,7 +379,7 @@ func (sm *SessionManager) CloseAll(conn *dbus.Conn) {
 }
 
 // generateID generates a random session ID.
-func generateID() (string, error) {
+func generateSessionID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
