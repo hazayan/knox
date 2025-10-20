@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -86,7 +87,7 @@ func runLogin(
 		return &ErrorStatus{errors.New("invalid arguments. See 'knox login -h'"), false}
 	}
 
-	fmt.Println("Please enter your password:")
+	log.Println("Please enter your password:")
 	password, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("problem getting password: %s", err.Error()), false}

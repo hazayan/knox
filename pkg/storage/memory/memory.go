@@ -89,7 +89,7 @@ func (b *Backend) DeleteKey(_ context.Context, keyID string) error {
 	return nil
 }
 
-// ListKeys returns all key IDs matching the given prefix.
+// ListKeys returns all keys with the given prefix.
 func (b *Backend) ListKeys(_ context.Context, prefix string) ([]string, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

@@ -40,7 +40,26 @@ func LoadMasterKey() ([]byte, error) {
 func decodeMasterKey(keyStr string) ([]byte, error) {
 	keyStr = strings.TrimSpace(keyStr)
 
-	// Try base64 decoding first
+	// Try hex decoding first for hex-looking strings (64 chars, only hex chars)
+	if len(keyStr) == 64 {
+		isHex := true
+		for _, c := range keyStr {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+				isHex = false
+				break
+			}
+		}
+		if isHex {
+			if key, err := hex.DecodeString(keyStr); err == nil {
+				if len(key) == 32 {
+					return key, nil
+				}
+				return nil, fmt.Errorf("decoded key has wrong length: %d bytes (expected 32)", len(key))
+			}
+		}
+	}
+
+	// Try base64 decoding
 	if key, err := base64.StdEncoding.DecodeString(keyStr); err == nil {
 		if len(key) == 32 {
 			return key, nil
@@ -48,7 +67,7 @@ func decodeMasterKey(keyStr string) ([]byte, error) {
 		return nil, fmt.Errorf("decoded key has wrong length: %d bytes (expected 32)", len(key))
 	}
 
-	// Try hex decoding
+	// Try hex decoding for any hex string (not just 64 chars)
 	if key, err := hex.DecodeString(keyStr); err == nil {
 		if len(key) == 32 {
 			return key, nil
@@ -113,4 +132,33 @@ func SaveMasterKeyToFile(key []byte, path string) error {
 	}
 
 	return nil
+}
+
+// GetKMSProvider returns a KMS provider based on the provider name.
+// Currently only supports "mock" for testing purposes.
+// For personal/small professional use, cloud KMS providers are not supported.
+func GetKMSProvider(name string) (KMSProvider, error) {
+	switch name {
+	case "mock":
+		return NewMockKMSProvider(), nil
+	default:
+		return nil, fmt.Errorf("unsupported KMS provider: %s (only 'mock' provider is available for testing)", name)
+	}
+}
+
+// GenerateMasterKeyWithKMS generates a new master key and encrypts it with the specified KMS provider.
+func GenerateMasterKeyWithKMS(provider KMSProvider) (plaintext []byte, encrypted string, err error) {
+	// Generate a new master key
+	plaintext = make([]byte, 32)
+	if _, err := rand.Read(plaintext); err != nil {
+		return nil, "", fmt.Errorf("failed to generate master key: %w", err)
+	}
+
+	// Encrypt with KMS
+	encrypted, err = EncryptMasterKeyWithKMS(provider, plaintext)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to encrypt master key with KMS: %w", err)
+	}
+
+	return plaintext, encrypted, nil
 }

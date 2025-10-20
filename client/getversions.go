@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/hazayan/knox/pkg/types"
@@ -62,9 +63,9 @@ func runGetVersions(_ *Command, args []string) *ErrorStatus {
 			status = []byte("(unknown)")
 		}
 		if *verboseOutput {
-			fmt.Printf("%d %s\n", v.ID, string(status))
+			log.Printf("%d %s\n", v.ID, string(status))
 		} else {
-			fmt.Printf("%d\n", v.ID)
+			log.Printf("%d\n", v.ID)
 		}
 	}
 	return nil

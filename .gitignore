@@ -2,3 +2,12 @@ bin/
 prompt.md
 .idea
 .envrc
+.rules
+meta
+todo
+
+# Coverage files
+*.out
+*coverage.html
+*coverage.out
+coverage.out

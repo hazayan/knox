@@ -29,6 +29,7 @@ type KMSProvider interface {
 // LoadMasterKeyFromKMS loads the master key using a KMS provider.
 // The encrypted key is stored in an environment variable or file,
 // and decrypted on-demand using the KMS.
+// Note: Primarily used for testing with MockKMSProvider.
 func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 	// Check if encrypted key is in environment
 	encryptedKeyB64 := os.Getenv("KNOX_MASTER_KEY_ENCRYPTED")
@@ -78,6 +79,7 @@ func LoadMasterKeyFromKMS(provider KMSProvider) ([]byte, error) {
 }
 
 // EncryptMasterKeyWithKMS encrypts a master key for storage.
+// Note: Primarily used for testing with MockKMSProvider.
 func EncryptMasterKeyWithKMS(provider KMSProvider, masterKey []byte) (string, error) {
 	if len(masterKey) != 32 {
 		return "", errors.New("master key must be 32 bytes")
@@ -96,6 +98,9 @@ func EncryptMasterKeyWithKMS(provider KMSProvider, masterKey []byte) (string, er
 
 // MockKMSProvider is a mock KMS provider for testing.
 // DO NOT USE IN PRODUCTION - keys are not actually protected!
+// This is suitable for development and testing environments only.
+// For production use, rely on secure key storage via environment
+// variables or properly secured key files.
 type MockKMSProvider struct {
 	name string
 }

@@ -336,7 +336,7 @@ curl http://localhost:9000/health
 ### Contacts
 - **Security Issues:** security@example.com
 - **Operations:** ops@example.com
-- **GitHub Issues:** https://github.com/pinterest/knox/issues
+- **GitHub Issues:** https://github.com/hazayan/knox/issues
 
 ---
 

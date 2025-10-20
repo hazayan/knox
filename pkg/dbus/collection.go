@@ -1,3 +1,5 @@
+// Package dbus implements the FreeDesktop Secret Service API.
+// Spec: https://specifications.freedesktop.org/secret-service-spec/latest/
 package dbus
 
 import (
@@ -7,34 +9,43 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
+	"github.com/hazayan/knox/pkg/observability/metrics"
 	"github.com/hazayan/knox/pkg/types"
 )
 
 // Collection represents a collection of secret items.
 type Collection struct {
-	name   string
-	path   dbus.ObjectPath
-	prefix string // Knox key prefix for this collection
-	label  string
-	bridge *Bridge
-	items  map[string]*Item
-	mu     sync.RWMutex
-	props  *prop.Properties
+	name     string
+	path     dbus.ObjectPath
+	prefix   string // Knox key prefix for this collection
+	label    string
+	bridge   *Bridge
+	items    map[string]*Item
+	mu       sync.RWMutex
+	props    *prop.Properties
+	created  int64 // Creation timestamp (Unix seconds)
+	modified int64 // Last modification timestamp (Unix seconds)
+	locked   bool  // Whether the collection is locked
 }
 
 // NewCollection creates a new collection.
 func NewCollection(bridge *Bridge, name, label string) *Collection {
+	now := time.Now().Unix()
 	return &Collection{
-		name:   name,
-		path:   makeCollectionPath(name),
-		prefix: bridge.config.Knox.NamespacePrefix + ":" + name + ":",
-		label:  label,
-		bridge: bridge,
-		items:  make(map[string]*Item),
+		name:     name,
+		path:     makeCollectionPath(name),
+		prefix:   bridge.config.Knox.NamespacePrefix + ":" + name + ":",
+		label:    label,
+		bridge:   bridge,
+		items:    make(map[string]*Item),
+		created:  now,
+		modified: now,
+		locked:   false,
 	}
 }
 
@@ -50,9 +61,10 @@ func (c *Collection) makeKeyID(itemID string) string {
 
 // Export exports the collection to D-Bus.
 func (c *Collection) Export(conn *dbus.Conn) error {
-	// Create properties handler
 	var err error
-	c.props, err = prop.Export(conn, c.path, map[string]map[string]*prop.Prop{
+
+	// Create properties
+	c.props, err = prop.Export(conn, c.Path(), map[string]map[string]*prop.Prop{
 		CollectionInterface: {
 			"Items": {
 				Value:    []dbus.ObjectPath{},
@@ -73,21 +85,21 @@ func (c *Collection) Export(conn *dbus.Conn) error {
 				Callback: nil,
 			},
 			"Created": {
-				Value:    uint64(0), // TODO: Track creation time
+				Value:    uint64(0),
 				Writable: false,
-				Emit:     prop.EmitFalse,
+				Emit:     prop.EmitTrue,
 				Callback: nil,
 			},
 			"Modified": {
-				Value:    uint64(0), // TODO: Track modification time
+				Value:    uint64(0),
 				Writable: false,
-				Emit:     prop.EmitFalse,
+				Emit:     prop.EmitTrue,
 				Callback: nil,
 			},
 		},
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to export properties: %w", err)
 	}
 
 	// Export the collection
@@ -107,6 +119,11 @@ func (c *Collection) Export(conn *dbus.Conn) error {
 func (c *Collection) Unexport(conn *dbus.Conn) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Skip if connection is nil (e.g., in tests)
+	if conn == nil {
+		return
+	}
 
 	// Unexport all items
 	for _, item := range c.items {
@@ -181,38 +198,96 @@ func (c *Collection) onLabelChanged(change *prop.Change) *dbus.Error {
 
 // Delete deletes the collection.
 func (c *Collection) Delete() (dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusCollection("Delete")
+		metrics.RecordDBusOperation("CollectionDelete", "success", duration)
+	}()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// Delete all items
-	for _, item := range c.items {
-		if err := c.bridge.knoxClient.DeleteKey(item.keyID); err != nil {
-			return "/", dbus.MakeFailedError(fmt.Errorf("failed to delete key %s: %w", item.keyID, err))
-		}
+	if err := c.DeleteAllItems(); err != nil {
+		return "/", dbus.MakeFailedError(fmt.Errorf("failed to delete collection items: %w", err))
 	}
 
 	// No prompt needed
 	return "/", nil
 }
 
+// DeleteAllItems deletes all items in the collection.
+func (c *Collection) DeleteAllItems() error {
+	for _, item := range c.items {
+		if err := c.bridge.knoxClient.DeleteKey(item.keyID); err != nil {
+			return fmt.Errorf("failed to delete key %s: %w", item.keyID, err)
+		}
+	}
+	return nil
+}
+
 // SearchItems searches for items matching the given attributes.
-func (c *Collection) SearchItems(attributes map[string]string) ([]dbus.ObjectPath, *dbus.Error) {
+func (c *Collection) SearchItems(attributes map[string]string) ([]dbus.ObjectPath, error) {
+	metrics.RecordDBusCollection("SearchItems")
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	var results []dbus.ObjectPath
+	var matches []dbus.ObjectPath
 
 	for _, item := range c.items {
-		if item.MatchAttributes(attributes) {
-			results = append(results, item.Path())
+		if item.MatchesAttributes(attributes) {
+			matches = append(matches, item.Path())
 		}
 	}
 
-	return results, nil
+	return matches, nil
+}
+
+// Lock locks the collection and all its items.
+func (c *Collection) Lock() {
+	metrics.RecordDBusCollection("Lock")
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.locked = true
+	c.props.SetMust(CollectionInterface, "Locked", true)
+
+	// Lock all items in the collection
+	for _, item := range c.items {
+		item.Lock()
+	}
+}
+
+// Unlock unlocks the collection and all its items.
+func (c *Collection) Unlock() {
+	metrics.RecordDBusCollection("Unlock")
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.locked = false
+	c.props.SetMust(CollectionInterface, "Locked", false)
+
+	// Unlock all items in the collection
+	for _, item := range c.items {
+		item.Unlock()
+	}
+}
+
+// IsLocked returns whether the collection is locked.
+func (c *Collection) IsLocked() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.locked
 }
 
 // CreateItem creates a new item in the collection.
 func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secret, replace bool) (dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusCollection("CreateItem")
+		metrics.RecordDBusOperation("CollectionCreateItem", "success", duration)
+	}()
 	// Extract properties
 	label := ""
 	if labelVar, ok := properties["org.freedesktop.Secret.Item.Label"]; ok {
@@ -256,7 +331,7 @@ func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secre
 	}
 
 	// Create default ACL (grant admin access to creator)
-	// TODO: Get actual user principal
+	// For D-Bus bridge, use a system principal
 	acl := types.ACL{
 		{
 			Type:       types.User,
@@ -282,8 +357,101 @@ func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secre
 	// Update Items property
 	c.updateItemsProperty()
 
+	// Emit signal for item creation
+	if c.bridge.signalManager != nil {
+		c.bridge.signalManager.EmitItemAdded(c.Path(), item.Path())
+	}
+
 	// No prompt needed
 	return item.Path(), "/", nil
+}
+
+// SetProperties sets properties on the collection.
+func (c *Collection) SetProperties(properties map[string]dbus.Variant) *dbus.Error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusCollection("SetProperties")
+		metrics.RecordDBusOperation("CollectionSetProperties", "success", duration)
+	}()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Update label if provided
+	if labelVar, ok := properties["org.freedesktop.Secret.Collection.Label"]; ok {
+		if label, ok := labelVar.Value().(string); ok {
+			if err := validateLabel(label); err != nil {
+				return dbus.MakeFailedError(fmt.Errorf("invalid label: %w", err))
+			}
+			c.label = label
+			c.props.SetMust(CollectionInterface, "Label", label)
+			c.modified = time.Now().Unix()
+		}
+	}
+
+	return nil
+}
+
+// GetSecrets retrieves secrets for multiple items in this collection.
+func (c *Collection) GetSecrets(items []dbus.ObjectPath, sessionPath dbus.ObjectPath) (map[dbus.ObjectPath]Secret, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusCollection("GetSecrets")
+		metrics.RecordDBusOperation("CollectionGetSecrets", "success", duration)
+	}()
+	secrets := make(map[dbus.ObjectPath]Secret)
+
+	// Get session
+	session, err := c.bridge.sessionMgr.GetSession(sessionPath)
+	if err != nil {
+		return nil, dbus.MakeFailedError(err)
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	// Find each item and get its secret
+	for _, itemPath := range items {
+		// Parse item path to find item ID
+		pathStr := string(itemPath)
+		if !hasPrefix(pathStr, CollectionPrefix) {
+			continue
+		}
+
+		// Extract collection name and item ID
+		remainder := pathStr[len(CollectionPrefix):]
+		parts := splitPath(remainder)
+		if len(parts) != 2 {
+			continue
+		}
+
+		// Verify this is the correct collection
+		if parts[0] != c.name {
+			continue
+		}
+
+		itemID := parts[1]
+
+		// Find item in collection
+		item, ok := c.items[itemID]
+		if !ok {
+			continue
+		}
+
+		// Check if item is locked
+		if item.IsLocked() {
+			continue // Skip locked items
+		}
+
+		// Get secret
+		secret, err := item.GetSecret(session.Path())
+		if err == nil {
+			secrets[itemPath] = secret
+		}
+	}
+
+	return secrets, nil
 }
 
 // Introspect returns XML introspection data.
@@ -316,6 +484,20 @@ func (c *Collection) Introspect() *introspect.Node {
 							{Name: "prompt", Type: "o", Direction: "out"},
 						},
 					},
+					{
+						Name: "SetProperties",
+						Args: []introspect.Arg{
+							{Name: "properties", Type: "a{sv}", Direction: "in"},
+						},
+					},
+					{
+						Name: "GetSecrets",
+						Args: []introspect.Arg{
+							{Name: "items", Type: "ao", Direction: "in"},
+							{Name: "session", Type: "o", Direction: "in"},
+							{Name: "secrets", Type: "a{o(oayays)}", Direction: "out"},
+						},
+					},
 				},
 				Properties: []introspect.Property{
 					{Name: "Items", Type: "ao", Access: "read"},
@@ -343,8 +525,10 @@ func (c *Collection) removeItem(item *Item) {
 	// Remove from map
 	delete(c.items, itemID)
 
-	// Unexport from D-Bus
-	item.Unexport(c.bridge.conn)
+	// Unexport from D-Bus (if bridge and connection are available)
+	if c.bridge != nil && c.bridge.conn != nil {
+		item.Unexport(c.bridge.conn)
+	}
 
 	// Update Items property
 	c.updateItemsProperty()
@@ -356,7 +540,9 @@ func (c *Collection) updateItemsProperty() {
 	for _, item := range c.items {
 		paths = append(paths, item.Path())
 	}
-	c.props.SetMust(CollectionInterface, "Items", paths)
+	if c.props != nil {
+		c.props.SetMust(CollectionInterface, "Items", paths)
+	}
 }
 
 // generateItemID generates a unique item ID.
@@ -375,7 +561,7 @@ func generateItemID(label string, attributes map[string]string) string {
 	}
 
 	// Fall back to random ID
-	id, _ := generateID()
+	id := generateID()
 	return id
 }
 

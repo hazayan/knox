@@ -38,6 +38,6 @@ func runUnregister(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("error removing the key: %s", err.Error()), false}
 	}
-	fmt.Println("Unregistered key successfully")
+	log.Println("Unregistered key successfully")
 	return nil
 }

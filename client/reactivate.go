@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/hazayan/knox/pkg/types"
 )
@@ -36,6 +37,6 @@ func runReactivate(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("error reactivating version: %s", err.Error()), true}
 	}
-	fmt.Printf("Reactivated %s successfully.\n", versionID)
+	log.Printf("Reactivated %s successfully.\n", versionID)
 	return nil
 }

@@ -44,6 +44,9 @@ func NewAESCryptorFromFile(_ string) (*AESCryptor, error) {
 
 // Encrypt encrypts a Knox key using envelope encryption.
 func (c *AESCryptor) Encrypt(key *types.Key) (*keydb.DBKey, error) {
+	if key == nil {
+		return nil, errors.New("key cannot be nil")
+	}
 	dbKey := &keydb.DBKey{
 		ID:          key.ID,
 		ACL:         key.ACL,
@@ -64,6 +67,9 @@ func (c *AESCryptor) Encrypt(key *types.Key) (*keydb.DBKey, error) {
 
 // Decrypt decrypts a Knox key.
 func (c *AESCryptor) Decrypt(dbKey *keydb.DBKey) (*types.Key, error) {
+	if dbKey == nil {
+		return nil, errors.New("dbKey cannot be nil")
+	}
 	key := &types.Key{
 		ID:          dbKey.ID,
 		ACL:         dbKey.ACL,

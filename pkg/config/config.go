@@ -10,6 +10,7 @@ import (
 
 	"github.com/hazayan/knox/pkg/storage"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 // ServerConfig holds configuration for the Knox server.
@@ -104,29 +105,29 @@ type LimitsConfig struct {
 
 // ClientConfig holds configuration for the Knox CLI client.
 type ClientConfig struct {
-	CurrentProfile string                   `mapstructure:"current_profile" json:"current_profile"`
-	Profiles       map[string]ClientProfile `mapstructure:"profiles" json:"profiles"`
+	CurrentProfile string                   `mapstructure:"current_profile" json:"current_profile" yaml:"current_profile"`
+	Profiles       map[string]ClientProfile `mapstructure:"profiles" json:"profiles" yaml:"profiles"`
 }
 
 // ClientProfile represents a client connection profile.
 type ClientProfile struct {
-	Server string          `mapstructure:"server" json:"server"`
-	TLS    ClientTLSConfig `mapstructure:"tls" json:"tls"`
-	Cache  CacheConfig     `mapstructure:"cache" json:"cache"`
+	Server string          `mapstructure:"server" json:"server" yaml:"server"`
+	TLS    ClientTLSConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
+	Cache  CacheConfig     `mapstructure:"cache" json:"cache" yaml:"cache"`
 }
 
 // ClientTLSConfig holds client TLS configuration.
 type ClientTLSConfig struct {
-	CACert     string `mapstructure:"ca_cert" json:"ca_cert"`
-	ClientCert string `mapstructure:"client_cert" json:"client_cert"`
-	ClientKey  string `mapstructure:"client_key" json:"client_key"`
+	CACert     string `mapstructure:"ca_cert" json:"ca_cert" yaml:"ca_cert"`
+	ClientCert string `mapstructure:"client_cert" json:"client_cert" yaml:"client_cert"`
+	ClientKey  string `mapstructure:"client_key" json:"client_key" yaml:"client_key"`
 }
 
 // CacheConfig holds cache configuration.
 type CacheConfig struct {
-	Enabled   bool   `mapstructure:"enabled" json:"enabled"`
-	Directory string `mapstructure:"directory" json:"directory"`
-	TTL       string `mapstructure:"ttl" json:"ttl"`
+	Enabled   bool   `mapstructure:"enabled" json:"enabled" yaml:"enabled"`
+	Directory string `mapstructure:"directory" json:"directory" yaml:"directory"`
+	TTL       string `mapstructure:"ttl" json:"ttl" yaml:"ttl"`
 }
 
 // DBusConfig holds configuration for the D-Bus bridge.
@@ -192,9 +193,6 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
 
-	// Set defaults
-	v.SetDefault("current_profile", "default")
-
 	// Try to read config, but don't fail if it doesn't exist
 	if err := v.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
@@ -251,21 +249,20 @@ func LoadDBusConfig(path string) (*DBusConfig, error) {
 
 // SaveClientConfig saves client configuration to a file.
 func SaveClientConfig(path string, cfg *ClientConfig) error {
-	v := viper.New()
-	v.SetConfigFile(path)
-	v.SetConfigType("yaml")
-
-	// Convert config to map for viper
-	v.Set("current_profile", cfg.CurrentProfile)
-	v.Set("profiles", cfg.Profiles)
-
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	if err := v.WriteConfig(); err != nil {
+	// Marshal config to YAML
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Write config to file
+	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 

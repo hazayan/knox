@@ -595,7 +595,7 @@ tail -f /var/log/knox/audit.log | jq '.event'
 ## 🆘 Support
 
 For production support:
-- GitHub Issues: https://github.com/pinterest/knox/issues
+- GitHub Issues: https://github.com/hazayan/knox/issues
 - Security Issues: security@example.com
 - Documentation: https://knox.example.com/docs
 
