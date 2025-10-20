@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/hazayan/knox/pkg/types"
@@ -78,7 +79,7 @@ func runUpdateAccess(_ *Command, args []string) *ErrorStatus {
 		if err != nil {
 			return &ErrorStatus{fmt.Errorf("failed to update access: %s", err.Error()), true}
 		}
-		fmt.Println("Successfully updated Access")
+		log.Println("Successfully updated Access")
 		return nil
 	}
 	if len(args) != 2 {
@@ -120,6 +121,6 @@ func runUpdateAccess(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("failed to update access: %s", err.Error()), true}
 	}
-	fmt.Println("Successfully updated Access")
+	log.Println("Successfully updated Access")
 	return nil
 }
