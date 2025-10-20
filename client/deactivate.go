@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/hazayan/knox/pkg/types"
 )
@@ -37,6 +38,6 @@ func runDeactivate(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("error updating version: %s", err.Error()), true}
 	}
-	fmt.Printf("Deactivated %s successfully.\n", keyVersion)
+	log.Printf("Deactivated %s successfully.\n", keyVersion)
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
+	"github.com/hazayan/knox/pkg/observability/metrics"
 	"github.com/hazayan/knox/pkg/types"
 )
 
@@ -23,6 +24,7 @@ type Item struct {
 	attributes map[string]string
 	created    int64
 	modified   int64
+	locked     bool
 	mu         sync.RWMutex
 }
 
@@ -38,6 +40,7 @@ func NewItem(collection *Collection, itemID, label string, attributes map[string
 		attributes: attributes,
 		created:    now,
 		modified:   now,
+		locked:     false,
 	}
 }
 
@@ -63,6 +66,12 @@ func (i *Item) Unexport(conn *dbus.Conn) {
 
 // Delete deletes the item.
 func (i *Item) Delete() (dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusItem("Delete")
+		metrics.RecordDBusOperation("ItemDelete", "success", duration)
+	}()
 	// Delete from Knox
 	client := i.collection.bridge.knoxClient
 	if err := client.DeleteKey(i.keyID); err != nil {
@@ -71,6 +80,9 @@ func (i *Item) Delete() (dbus.ObjectPath, *dbus.Error) {
 
 	// Remove from collection
 	i.collection.removeItem(i)
+
+	// Emit signal for item deletion
+	i.collection.bridge.signalManager.EmitItemDeleted(i.collection.Path(), i.Path())
 
 	// No prompt needed, return root path
 	return "/", nil
@@ -97,8 +109,14 @@ func (i *Item) GetSecret(sessionPath dbus.ObjectPath) (Secret, *dbus.Error) {
 		return Secret{}, dbus.MakeFailedError(errors.New("no primary version"))
 	}
 
+	// Extract the actual secret from the stored data (which may include metadata)
+	_, secretData, err := ExtractMetadataFromKeyData(primary.Data)
+	if err != nil {
+		return Secret{}, dbus.MakeFailedError(fmt.Errorf("failed to extract secret: %w", err))
+	}
+
 	// Encrypt the secret
-	params, value, err := session.Encrypt(primary.Data)
+	params, value, err := session.Encrypt(secretData)
 	if err != nil {
 		return Secret{}, dbus.MakeFailedError(err)
 	}
@@ -135,6 +153,9 @@ func (i *Item) SetSecret(secret Secret) *dbus.Error {
 	i.modified = time.Now().Unix()
 	i.mu.Unlock()
 
+	// Emit signal for item modification
+	i.collection.bridge.signalManager.EmitItemChanged(i.Path())
+
 	return nil
 }
 
@@ -164,6 +185,12 @@ func (i *Item) Introspect() *introspect.Node {
 							{Name: "secret", Type: "(oayays)", Direction: "in"},
 						},
 					},
+					{
+						Name: "SetProperties",
+						Args: []introspect.Arg{
+							{Name: "properties", Type: "a{sv}", Direction: "in"},
+						},
+					},
 				},
 				Properties: []introspect.Property{
 					{Name: "Locked", Type: "b", Access: "read"},
@@ -178,15 +205,71 @@ func (i *Item) Introspect() *introspect.Node {
 	}
 }
 
+// SetProperties sets properties on the item.
+func (i *Item) SetProperties(properties map[string]dbus.Variant) *dbus.Error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusItem("SetProperties")
+		metrics.RecordDBusOperation("ItemSetProperties", "success", duration)
+	}()
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	// Update label if provided
+	if labelVar, ok := properties["org.freedesktop.Secret.Item.Label"]; ok {
+		if label, ok := labelVar.Value().(string); ok {
+			if err := validateLabel(label); err != nil {
+				return dbus.MakeFailedError(fmt.Errorf("invalid label: %w", err))
+			}
+			i.label = label
+		}
+	}
+
+	// Update attributes if provided
+	if attrsVar, ok := properties["org.freedesktop.Secret.Item.Attributes"]; ok {
+		if attrs, ok := attrsVar.Value().(map[string]string); ok {
+			i.attributes = attrs
+		}
+	}
+
+	i.modified = time.Now().Unix()
+
+	return nil
+}
+
+// Lock locks the item.
+func (i *Item) Lock() {
+	metrics.RecordDBusItem("Lock")
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.locked = true
+}
+
+// Unlock unlocks the item.
+func (i *Item) Unlock() {
+	metrics.RecordDBusItem("Unlock")
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.locked = false
+}
+
+// IsLocked returns whether the item is locked.
+func (i *Item) IsLocked() bool {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return i.locked
+}
+
 // Helper methods
 
-// MatchAttributes checks if the item matches the given attributes.
-func (i *Item) MatchAttributes(attrs map[string]string) bool {
+// MatchesAttributes checks if the item matches the given attributes.
+func (i *Item) MatchesAttributes(attributes map[string]string) bool {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
-	for key, value := range attrs {
-		if i.attributes[key] != value {
+	for key, value := range attributes {
+		if itemValue, ok := i.attributes[key]; !ok || itemValue != value {
 			return false
 		}
 	}
@@ -218,17 +301,33 @@ func createItemFromKnoxKey(collection *Collection, key *types.Key) *Item {
 	// Extract item ID from key ID (remove collection prefix)
 	itemID := key.ID[len(collection.prefix):]
 
-	// TODO: Extract label and attributes from key metadata
-	// For now, use key ID as label and empty attributes
-	label := itemID
-	attributes := make(map[string]string)
-
-	// Get creation time from first version
+	// Extract metadata from key data
+	var label string
+	var attributes map[string]string
 	var created int64
+
 	if len(key.VersionList) > 0 {
-		created = key.VersionList[0].CreationTime / 1e9 // Convert from nanoseconds
+		// Get the primary version data
+		primaryData := key.VersionList.GetPrimary().Data
+
+		// Try to extract metadata
+		metadata, _, err := ExtractMetadataFromKeyData(primaryData)
+		if err == nil && metadata != nil {
+			// Use metadata if available
+			label = metadata.Label
+			attributes = metadata.Attributes
+			created = metadata.Created
+		} else {
+			// Fallback to legacy format
+			label = itemID
+			attributes = make(map[string]string)
+			created = key.VersionList[0].CreationTime / 1e9 // Convert from nanoseconds
+		}
 	} else {
-		created = time.Now().Unix()
+		// No versions available
+		label = itemID
+		attributes = make(map[string]string)
+		created = 0
 	}
 
 	item := NewItem(collection, itemID, label, attributes)
@@ -241,13 +340,23 @@ func createItemFromKnoxKey(collection *Collection, key *types.Key) *Item {
 func saveItemToKnox(_ context.Context, item *Item, data []byte, acl types.ACL) error {
 	client := item.collection.bridge.knoxClient
 
+	// Create metadata for the item
+	metadata := NewItemMetadata(item.label)
+	metadata.Attributes = item.attributes
+	metadata.Created = item.created
+	metadata.Modified = item.modified
+
+	// Combine metadata with secret data
+	combinedData, err := CombineMetadataWithSecret(metadata, data)
+	if err != nil {
+		return fmt.Errorf("failed to combine metadata with secret: %w", err)
+	}
+
 	// Create the key in Knox
-	_, err := client.CreateKey(item.keyID, data, acl)
+	_, err = client.CreateKey(item.keyID, combinedData, acl)
 	if err != nil {
 		return fmt.Errorf("failed to create Knox key: %w", err)
 	}
-
-	// TODO: Store label and attributes as metadata
 
 	return nil
 }

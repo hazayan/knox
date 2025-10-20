@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -95,6 +96,9 @@ func (krm *KeyRotationManager) RemoveOldCryptor(index int) error {
 // ReencryptDB re-encrypts all keys in the database with the current cryptor.
 // This should be run after rotating to a new master key.
 func ReencryptDB(ctx context.Context, db keydb.DB, rotationManager *KeyRotationManager) error {
+	if db == nil {
+		return errors.New("database cannot be nil")
+	}
 	// Get all keys
 	dbKeys, err := db.GetAll()
 	if err != nil {
