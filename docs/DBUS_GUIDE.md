@@ -44,7 +44,7 @@ This means applications like **Firefox**, **Chrome**, **SSH**, **Git**, and many
 ### Build from Source
 
 ```bash
-cd /home/karpal/devel/system/knox
+cd knox
 go build -o bin/knox-dbus ./cmd/knox-dbus
 sudo cp bin/knox-dbus /usr/local/bin/
 ```
