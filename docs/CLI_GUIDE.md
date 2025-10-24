@@ -8,7 +8,7 @@ The Knox CLI (`knox`) is a production-ready command-line interface for managing 
 
 ```bash
 # Build the CLI
-cd /home/karpal/devel/system/knox
+cd knox
 go build -o bin/knox ./cmd/knox
 
 # Optional: Install to your PATH
@@ -217,7 +217,7 @@ profiles:
       ca_cert: ""
       client_cert: ""
       client_key: ""
-  
+
   production:
     server: knox.example.com:9000
     cache:
