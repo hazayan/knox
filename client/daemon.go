@@ -28,7 +28,7 @@ This process will keep running until sent a kill signal or it crashes.
 
 This maintains a file system cache of knox keys that is used for all other knox commands.
 
-For more about knox, see https://github.com/pinterest/types.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox register, knox unregister
 	`,
@@ -255,7 +255,9 @@ func (d daemon) currentRegisteredKeys() ([]string, error) {
 	}
 	var out []string
 	for _, f := range files {
-		out = append(out, f.Name())
+		// Remove .json extension from filename to get key ID
+		keyID := strings.TrimSuffix(f.Name(), ".json")
+		out = append(out, keyID)
 	}
 	return out, nil
 }
@@ -269,7 +271,7 @@ func (d daemon) registerFilename() string {
 }
 
 func (d daemon) keyFilename(id string) string {
-	return path.Join(d.dir, d.keysDir, id)
+	return path.Join(d.dir, d.keysDir, id+".json")
 }
 
 func (d daemon) processKey(keyID string) error {

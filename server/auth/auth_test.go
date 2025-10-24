@@ -54,6 +54,7 @@ func TestPrincipalContext(t *testing.T) {
 			)
 		}
 	}
+
 	defer panicRecovery()
 
 	ctx.SetCurrentPrincipal(newPrincipal)

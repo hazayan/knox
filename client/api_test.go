@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime"
 	"sync/atomic"
 	"testing"
@@ -664,7 +665,7 @@ func TestGetInvalidKeys(t *testing.T) {
 	}
 
 	tempDir := t.TempDir()
-	err = os.WriteFile(path.Join(tempDir, "testkey"), bytes, 0o600)
+	err = os.WriteFile(path.Join(tempDir, "testkey.json"), bytes, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write invalid test key: %s", err)
 	}
@@ -713,4 +714,296 @@ func TestNewFileClient(t *testing.T) {
 	if (err.Error() != "error getting knox key ThisKeyDoesNotExistSoWeExpectAnError. error: exit status 1") && (err.Error() != "error getting knox key ThisKeyDoesNotExistSoWeExpectAnError. error: exec: \"knox\": executable file not found in $PATH") {
 		t.Fatal("Unexpected error", err.Error())
 	}
+}
+
+// TestCacheGetKey tests the cache functionality for GetKey.
+func TestCacheGetKey(t *testing.T) {
+	t.Run("CacheGetKey_WithValidCache", func(t *testing.T) {
+		// Create a temporary directory for cache
+		tmpDir := t.TempDir()
+
+		// Create a test key to cache
+		testKey := &types.Key{
+			ID:          "testkey",
+			ACL:         types.ACL([]types.Access{}),
+			VersionList: types.KeyVersionList{},
+			VersionHash: "VersionHash",
+		}
+
+		// Write key to cache
+		cacheFile := filepath.Join(tmpDir, "testkey.json")
+		data, err := json.Marshal(testKey)
+		if err != nil {
+			t.Fatalf("Failed to marshal test key: %v", err)
+		}
+		if err := os.WriteFile(cacheFile, data, 0o644); err != nil {
+			t.Fatalf("Failed to write cache file: %v", err)
+		}
+
+		// Create client with cache
+		client := &HTTPClient{
+			KeyFolder: tmpDir,
+			UncachedClient: &UncachedHTTPClient{
+				AuthHandlers: []AuthHandler{},
+			},
+		}
+
+		// Test cache retrieval
+		key, err := client.CacheGetKey("testkey")
+		if err != nil {
+			t.Fatalf("CacheGetKey failed: %v", err)
+		}
+		if key.ID != "testkey" {
+			t.Fatalf("Expected key ID 'testkey', got '%s'", key.ID)
+		}
+	})
+
+	t.Run("CacheGetKey_NoCacheFolder", func(t *testing.T) {
+		client := &HTTPClient{
+			KeyFolder: "", // No cache folder
+			UncachedClient: &UncachedHTTPClient{
+				AuthHandlers: []AuthHandler{},
+			},
+		}
+
+		_, err := client.CacheGetKey("testkey")
+		if err == nil {
+			t.Fatal("Expected error when no cache folder is set")
+		}
+		if err.Error() != "no folder set for cached key" {
+			t.Fatalf("Expected 'no folder set for cached key', got '%v'", err)
+		}
+	})
+
+	t.Run("CacheGetKey_CacheFileNotFound", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		client := &HTTPClient{
+			KeyFolder: tmpDir,
+			UncachedClient: &UncachedHTTPClient{
+				AuthHandlers: []AuthHandler{},
+			},
+		}
+
+		_, err := client.CacheGetKey("nonexistent")
+		if err == nil {
+			t.Fatal("Expected error when cache file doesn't exist")
+		}
+	})
+}
+
+// TestCacheGetKeyWithStatus tests the cache functionality for GetKeyWithStatus.
+func TestCacheGetKeyWithStatus(t *testing.T) {
+	t.Run("CacheGetKeyWithStatus_WithValidCache", func(t *testing.T) {
+		// Create a temporary directory for cache
+		tmpDir := t.TempDir()
+
+		// Create a test key to cache
+		testKey := &types.Key{
+			ID:          "testkey",
+			ACL:         types.ACL([]types.Access{}),
+			VersionList: types.KeyVersionList{},
+			VersionHash: "VersionHash",
+		}
+
+		// Write key to cache with status
+		cacheFile := filepath.Join(tmpDir, "testkey_\"Active\".json")
+		data, err := json.Marshal(testKey)
+		if err != nil {
+			t.Fatalf("Failed to marshal test key: %v", err)
+		}
+		if err := os.WriteFile(cacheFile, data, 0o644); err != nil {
+			t.Fatalf("Failed to write cache file: %v", err)
+		}
+
+		// Create client with cache
+		client := &HTTPClient{
+			KeyFolder: tmpDir,
+			UncachedClient: &UncachedHTTPClient{
+				AuthHandlers: []AuthHandler{},
+			},
+		}
+
+		// Test cache retrieval with status
+		key, err := client.CacheGetKeyWithStatus("testkey", types.Active)
+		if err != nil {
+			t.Fatalf("CacheGetKeyWithStatus failed: %v", err)
+		}
+		if key.ID != "testkey" {
+			t.Fatalf("Expected key ID 'testkey', got '%s'", key.ID)
+		}
+	})
+
+	t.Run("CacheGetKeyWithStatus_NoCacheFolder", func(t *testing.T) {
+		client := &HTTPClient{
+			KeyFolder: "", // No cache folder
+			UncachedClient: &UncachedHTTPClient{
+				AuthHandlers: []AuthHandler{},
+			},
+		}
+
+		_, err := client.CacheGetKeyWithStatus("testkey", types.Active)
+		if err == nil {
+			t.Fatal("Expected error when no cache folder is set")
+		}
+		if err.Error() != "no folder set for cached key" {
+			t.Fatalf("Expected 'no folder set for cached key', got '%v'", err)
+		}
+	})
+}
+
+// TestGetKeyFallback tests the fallback behavior from cache to network.
+func TestGetKeyFallback(t *testing.T) {
+	t.Run("GetKey_FallbackToNetwork", func(t *testing.T) {
+		// Create a temporary directory for cache (empty)
+		tmpDir := t.TempDir()
+
+		// Create expected key for network response
+		expected := types.Key{
+			ID:          "testkey",
+			ACL:         types.ACL([]types.Access{}),
+			VersionList: types.KeyVersionList{},
+			VersionHash: "VersionHash",
+		}
+		resp, err := buildGoodResponse(expected)
+		if err != nil {
+			t.Fatalf("%s is not nil", err)
+		}
+		srv := buildServer(200, resp, func(r *http.Request) {
+			if r.Method != "GET" {
+				t.Fatalf("%s is not GET", r.Method)
+			}
+			if r.URL.Path != "/v0/keys/testkey/" {
+				t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/")
+			}
+		})
+		defer srv.Close()
+
+		// Create client with cache and network
+		client := MockClient(srv.Listener.Addr().String(), tmpDir)
+
+		// Test fallback to network when cache is empty
+		key, err := client.GetKey("testkey")
+		if err != nil {
+			t.Fatalf("GetKey failed: %v", err)
+		}
+		if key.ID != "testkey" {
+			t.Fatalf("Expected key ID 'testkey', got '%s'", key.ID)
+		}
+	})
+}
+
+// TestNetworkErrorScenarios tests various network error scenarios.
+func TestNetworkErrorScenarios(t *testing.T) {
+	t.Run("NetworkGetKey_ServerError", func(t *testing.T) {
+		// Create server that returns 500 error
+		resp, err := buildErrorResponse(types.InternalServerErrorCode, nil)
+		if err != nil {
+			t.Fatalf("%s is not nil", err)
+		}
+		srv := buildServer(500, resp, func(_ *http.Request) {})
+		defer srv.Close()
+
+		client := MockClient(srv.Listener.Addr().String(), "")
+
+		_, err = client.NetworkGetKey("testkey")
+		if err == nil {
+			t.Fatal("Expected error for server error")
+		}
+	})
+
+	t.Run("NetworkGetKey_InvalidKeyFormat", func(t *testing.T) {
+		// Create server that returns invalid key format
+		invalidKey := map[string]any{
+			"id": "testkey",
+			// Missing required fields
+		}
+		resp, err := buildGoodResponse(invalidKey)
+		if err != nil {
+			t.Fatalf("%s is not nil", err)
+		}
+		srv := buildServer(200, resp, func(_ *http.Request) {})
+		defer srv.Close()
+
+		client := MockClient(srv.Listener.Addr().String(), "")
+
+		_, err = client.NetworkGetKey("testkey")
+		if err == nil {
+			t.Fatal("Expected error for invalid key format")
+		}
+		if err.Error() != "invalid key content for the remote key" {
+			t.Fatalf("Expected 'invalid key content for the remote key', got '%v'", err)
+		}
+	})
+}
+
+// TestGetACL tests the GetACL method.
+func TestGetACL(t *testing.T) {
+	t.Run("GetACL_Success", func(t *testing.T) {
+		expected := types.ACL{
+			{
+				ID:         "user@example.com",
+				Type:       types.User,
+				AccessType: types.Read,
+			},
+		}
+		resp, err := buildGoodResponse(expected)
+		if err != nil {
+			t.Fatalf("%s is not nil", err)
+		}
+		srv := buildServer(200, resp, func(r *http.Request) {
+			if r.Method != "GET" {
+				t.Fatalf("%s is not GET", r.Method)
+			}
+			if r.URL.Path != "/v0/keys/testkey/access/" {
+				t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/access/")
+			}
+		})
+		defer srv.Close()
+
+		client := MockClient(srv.Listener.Addr().String(), "")
+
+		acl, err := client.GetACL("testkey")
+		if err != nil {
+			t.Fatalf("GetACL failed: %v", err)
+		}
+		if len(*acl) != 1 {
+			t.Fatalf("Expected 1 ACL entry, got %d", len(*acl))
+		}
+		if (*acl)[0].ID != "user@example.com" {
+			t.Fatalf("Expected ACL ID 'user@example.com', got '%s'", (*acl)[0].ID)
+		}
+	})
+}
+
+// TestUpdateVersion tests the UpdateVersion method.
+func TestUpdateVersion(t *testing.T) {
+	t.Run("UpdateVersion_Success", func(t *testing.T) {
+		resp, err := buildGoodResponse("")
+		if err != nil {
+			t.Fatalf("%s is not nil", err)
+		}
+		srv := buildServer(200, resp, func(r *http.Request) {
+			if r.Method != "PUT" {
+				t.Fatalf("%s is not PUT", r.Method)
+			}
+			if r.URL.Path != "/v0/keys/testkey/versions/123/" {
+				t.Fatalf("%s is not %s", r.URL.Path, "/v0/keys/testkey/versions/123/")
+			}
+		})
+		defer srv.Close()
+
+		client := MockClient(srv.Listener.Addr().String(), "")
+
+		err = client.UpdateVersion("testkey", "123", types.Inactive)
+		if err != nil {
+			t.Fatalf("UpdateVersion failed: %v", err)
+		}
+	})
+}
+
+// TestFileClient tests the file-based client implementation.
+// Note: These tests are skipped because they require write access to /var/lib/knox
+// which is not available in most test environments.
+func TestFileClient(t *testing.T) {
+	t.Skip("Skipping file client tests - requires write access to /var/lib/knox")
 }

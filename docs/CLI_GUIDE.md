@@ -454,4 +454,4 @@ knox key list  # Uses production
 - [Architecture Document](../ARCHITECTURE.md)
 - [Server Configuration](SERVER_GUIDE.md) (TODO)
 - [D-Bus Bridge Guide](DBUS_GUIDE.md) (TODO)
-- [Knox API Documentation](https://github.com/pinterest/knox/wiki)
+- [Knox API Documentation](https://github.com/hazayan/knox/wiki)

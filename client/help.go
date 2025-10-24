@@ -2,7 +2,10 @@ package client
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strings"
+	"text/template"
 )
 
 var helpAuth = &Command{
@@ -69,4 +72,21 @@ func help(args []string) {
 
 	fmt.Fprintf(os.Stderr, "Unknown help topic %#q.  Run 'knox help'.\n", arg)
 	os.Exit(2) // failed at 'knox help cmd'
+}
+
+// printUsage prints the usage information for all commands.
+func printUsage(w io.Writer) {
+	tmpl(w, usageTemplate, commands)
+}
+
+// tmpl executes the given template text on data, writing the result to w.
+func tmpl(w io.Writer, text string, data interface{}) {
+	t := template.New("top")
+	t.Funcs(template.FuncMap{
+		"trim": strings.TrimSpace,
+	})
+	template.Must(t.Parse(text))
+	if err := t.Execute(w, data); err != nil {
+		panic(err)
+	}
 }
