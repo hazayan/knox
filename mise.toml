@@ -1,2 +1,8 @@
 [tools]
-golangci-lint = "latest"
+golangci-lint = "2.5.0"
+go = "1.25.3"
+
+[env]
+GOPATH = "{{env.HOME}}/.go"
+GO_DEBUG = true
+

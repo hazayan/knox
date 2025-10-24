@@ -1,145 +1,219 @@
-# Knox -- the high level overview
-Knox is a service for storing and rotation of secrets, keys, and passwords used by other services.
+# Knox - Enterprise Secret Management System (hazayan/knox fork)
+Knox is a production-ready enterprise secret management system for storing and rotating secrets, keys, and passwords with advanced security features and desktop integration.
 
-## The Problem Knox is Meant to Solve
-Pinterest has a plethora of keys or secrets doing things like signing cookies, encrypting data, protecting our network via TLS, accessing our AWS machines, communicating with our third parties, and many more. If these keys become compromised, rotating (or changing our keys) used to be a difficult process generally involving a deploy and likely a code change. Keys/secrets within Pinterest were stored in git repositories. This means they were copied all over our company's infrastructure and present on many of our employees laptops. There was no way to audit who accessed or who has access to the keys. Knox was built to solve these problems.
+## The Problem Knox Solves
 
-The goals of Knox are:
-- Ease of use for developers to access/use confidential secrets, keys, and credentials
-- Confidentiality for secrets, keys, and credentials
-- Provide mechanisms for key rotation in case of compromise
-- Create audit log to keep track of what systems and users access confidential data
+Modern applications require secure storage and management of secrets like API keys, database passwords, TLS certificates, and encryption keys. Traditional approaches like storing secrets in git repositories or configuration files create security risks:
 
-Read more at https://github.com/pinterest/knox/wiki
+- Secrets are copied across infrastructure and developer machines
+- No audit trail for secret access
+- Difficult key rotation process requiring code changes
+- No fine-grained access control
+- Lack of encryption at rest
 
-## Getting knox set up
-The first step is to install Go (or use Docker, see below). We require Go >= 1.6 or Go 1.5 with the vendor flag enabled (`GO15VENDOREXPERIMENT=1`). For instructions on setting up Go, please visit https://golang.org/doc/install
+Knox provides a comprehensive solution with enterprise-grade security features.
 
-After Go is set up (including a `$GOPATH` directory that will store your workspace), please run `go get -d github.com/pinterest/knox` to get the latest version of the knox code.
+## Key Features
 
-To compile the devserver and devclient binaries, run `go install github.com/pinterest/knox/cmd/dev_server` and `go install github.com/pinterest/knox/cmd/dev_client`. These can be directly executed, the dev_client expects the server to be running on a localhost. By default, the client uses mTLS with a hardcoded signed cert given for example.com for machine authentication and had github authentication enabled for users.
+### 🔒 Security First
+- **AES-256-GCM Encryption**: All secrets encrypted at rest with envelope encryption
+- **mTLS Authentication**: Mutual TLS for machine-to-machine authentication  
+- **SPIFFE Support**: Service identity verification with SPIFFE standards
+- **Fine-grained ACLs**: Per-secret access control with Read/Write/Admin permissions
+- **Comprehensive Audit Logging**: All operations logged for compliance
+- **Input Validation**: Strict validation of all inputs to prevent injection attacks
+- **Security Headers**: HTTP security headers to prevent common web vulnerabilities
 
-To start your server run:
-```sh
-$GOPATH/bin/dev_server
+### 🚀 Production Ready
+- **Multiple Storage Backends**: PostgreSQL, filesystem, and in-memory storage
+- **High Availability**: Support for distributed deployments with shared storage
+- **Prometheus Metrics**: Built-in metrics for monitoring and alerting
+- **Health Checks**: /health and /ready endpoints for orchestration
+- **Structured Logging**: JSON and text logging with configurable levels
+- **Rate Limiting**: Configurable rate limiting per principal
+
+### 🖥️ Desktop Integration
+- **FreeDesktop Secret Service**: Native integration with Linux desktop applications
+- **Transparent Usage**: Works with Firefox, Chrome, SSH, Git, and other D-Bus clients
+- **Secure Bridge**: D-Bus to Knox bridge with session encryption
+
+### 🔧 Developer Experience
+- **Modern CLI**: Intuitive command-line interface with shell completion
+- **Multi-profile Support**: Separate configurations for dev/staging/prod environments
+- **JSON Output**: Machine-readable output for scripting and automation
+- **Smart Caching**: Configurable client-side caching with TTL
+
+## Quick Start
+
+### Prerequisites
+- Go 1.21 or later
+- PostgreSQL (optional, for production storage)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/hazayan/knox.git
+cd knox
+
+# Build all components
+go build -o bin/knox ./cmd/knox
+go build -o bin/knox-server ./cmd/knox-server
+go build -o bin/knox-dbus ./cmd/knox-dbus
+
+# Install to PATH (optional)
+sudo cp bin/knox /usr/local/bin/
+sudo cp bin/knox-server /usr/local/bin/
+cp bin/knox-dbus ~/.local/bin/
 ```
 
-For using this client as a user, generate a token via these instructions https://help.github.com/articles/creating-an-access-token-for-command-line-use/ with read:org permissions. This token will be able to get your username and the organization you belong to. With the dev_server running you can now create your first knox key.
+### Running the Server
 
-```sh
-export KNOX_USER_AUTH=<insert generated github token here>
-echo -n "My first knox secret" | $GOPATH/bin/dev_client create test_service:first_secret
+```bash
+# Start with memory backend (development)
+./bin/knox-server --bind-address localhost:9000
+
+# Start with PostgreSQL backend (production)
+./bin/knox-server --bind-address localhost:9000 \
+  --storage-backend postgres \
+  --postgres-connection-string "postgresql://user:password@localhost/knox"
 ```
 
-You can retrieve the secret using:
-```sh
-$GOPATH/bin/dev_client get test_service:first_secret
+### Using the CLI
+
+```bash
+# Initialize configuration
+knox config init --server localhost:9000
+
+# Create your first secret
+echo "super-secret-password" | knox key create myapp:database_password
+
+# Retrieve the secret
+knox key get myapp:database_password
+
+# List all keys
+knox key list
+
+# Manage access control
+knox acl add myapp:database_password User:alice@example.com:Read
 ```
 
----
+### Desktop Integration
 
-# Knox Extension: First Iteration Plan & Architecture Blueprint
+```bash
+# Start D-Bus bridge (for desktop app integration)
+./bin/knox-dbus --config ~/.config/knox/dbus.yaml
 
-## Goals
+# Firefox, Chrome, SSH, and other applications will now use Knox for secret storage
+```
 
-- Deliver robust client and server implementations for secret management.
-- Harden security: authentication, authorization, audit logging, input validation.
-- Modularize code for future extensibility (e.g., protocol support).
-- Document APIs, configuration, and security features.
+## Architecture Overview
 
-## Project Structure
+### Project Structure
 
 ```
 knox/
-  client/         # Knox client implementation
-  server/         # Knox server implementation
-  api/            # Shared API types/interfaces
-  storage/        # Secret storage backend abstraction
-  auth/           # Authentication & authorization logic
-  config/         # Configuration management
-  main.go         # Entry point for server binary
-  README.md       # Documentation
-  tests/          # Integration and unit tests
+├── cmd/
+│   ├── knox/              # Production CLI client
+│   ├── knox-server/       # Production HTTP server
+│   ├── knox-dbus/         # FreeDesktop Secret Service bridge
+│   └── dev_*/            # Legacy development clients/servers
+├── pkg/
+│   ├── auth/              # Authentication providers (mTLS, SPIFFE)
+│   ├── crypto/            # Cryptographic operations (AES-256-GCM)
+│   ├── storage/           # Storage backends (PostgreSQL, filesystem, memory)
+│   ├── config/            # Configuration management
+│   ├── observability/     # Metrics and logging
+│   └── dbus/              # D-Bus protocol implementation
+├── server/                # Core server logic and API routes
+├── client/                # Client library implementation
+└── docs/                  # Comprehensive documentation
 ```
 
-## Client API (Go)
+### Security Features
 
-```go
-type Client struct {
-    // Transport, auth, config
-}
+- **Encryption at Rest**: All secrets encrypted with AES-256-GCM using envelope encryption
+- **Authentication**: Multiple providers including mTLS, SPIFFE, and token-based auth
+- **Authorization**: Fine-grained ACLs with Read/Write/Admin permissions per principal
+- **Audit Logging**: Comprehensive logging of all operations for compliance
+- **Input Validation**: Strict validation of all inputs to prevent injection attacks
+- **Rate Limiting**: Configurable rate limiting per principal to prevent abuse
 
-func (c *Client) GetSecret(name string) (string, error)
-func (c *Client) SetSecret(name, value string) error
-func (c *Client) DeleteSecret(name string) error
-func (c *Client) ListSecrets() ([]string, error)
+### Storage Backends
+
+- **PostgreSQL**: Production-ready with transaction support and high availability
+- **Filesystem**: Simple file-based storage for development and testing
+- **Memory**: In-memory storage for testing and ephemeral deployments
+
+## Configuration
+
+### Server Configuration
+
+Create `server.yaml`:
+```yaml
+server:
+  bind_address: "0.0.0.0:9000"
+  tls:
+    cert_file: "/etc/knox/tls/server.crt"
+    key_file: "/etc/knox/tls/server.key"
+    client_ca: "/etc/knox/tls/ca.crt"
+  
+storage:
+  backend: "postgres"
+  postgres:
+    connection_string: "postgresql://knox:password@localhost/knox"
+    max_connections: 100
+  
+auth:
+  providers:
+    - type: "spiffe"
+      trust_domain: "example.com"
+    - type: "mtls"
+      ca_file: "/etc/knox/ca.crt"
+
+observability:
+  metrics:
+    enabled: true
+    endpoint: "/metrics"
+  logging:
+    level: "info"
+    format: "json"
 ```
 
-- Transport: Support HTTP (REST/gRPC) with TLS.
-- Auth: API key, mTLS, or token-based.
+### Client Configuration
 
-## Server API (Go)
-
-```go
-type Server struct {
-    // Config, storage, auth
-}
-
-func (s *Server) Start() error
-func (s *Server) Stop() error
-// Internal handlers for CRUD, auth, etc.
+Initialize with:
+```bash
+knox config init --server knox.example.com:9000 \
+  --ca-cert /etc/knox/ca.crt \
+  --client-cert /etc/knox/client.crt \
+  --client-key /etc/knox/client.key
 ```
 
-- Endpoints: `/secrets/{name}` for CRUD, `/secrets` for listing.
-- Security: TLS, authentication, authorization, audit logging.
-- Storage: Pluggable backend (file, DB, etc.).
+## Documentation
 
-## Security Hardening
+### Quick Navigation
+- **[Documentation Index](docs/INDEX.md)** - Complete navigation guide for all documentation
 
-- Authentication: API keys, mTLS, or JWT.
-- Authorization: Per-secret or per-user access control.
-- Audit Logging: Log all access and mutation events.
-- Input Validation: Strict checks on all incoming data.
-- Rate Limiting: Prevent abuse.
+### Essential Guides
+- [CLI Guide](docs/CLI_GUIDE.md) - Complete command reference
+- [D-Bus Integration](docs/DBUS_GUIDE.md) - Desktop application integration
+- [Production Guide](docs/PRODUCTION_GUIDE.md) - Deployment and operations
+- [Architecture](docs/ARCHITECTURE.md) - System design and components
 
-## Testing & Documentation
+### Security & Audits
+- [Production Ready](docs/PRODUCTION_READY.md) - Security hardening checklist
+- [Security Audit](docs/FINAL_SECURITY_AUDIT.md) - Comprehensive security assessment
+- [Security Fixes](docs/SECURITY_FIXES_SUMMARY.md) - Security enhancements overview
 
-- Unit Tests: For client, server, and storage logic.
-- Integration Tests: End-to-end flows.
-- Documentation: API usage, configuration, security features.
+## Support
 
-## Iteration Goals
-
-- Deliver a working client and server with secure, robust secret management.
-- Harden against common security threats and edge cases.
-- Document everything for easy onboarding and review.
+For issues, feature requests, and contributions, please refer to the project documentation and security guidelines.
 
 ---
 
-You can see all key IDs using:
-```sh
-$GOPATH/bin/dev_client keys
-```
+**Repository Information**: This is the hazayan/knox repository, an enterprise-grade secret management system with enhanced security features, production readiness, and desktop integration.
 
-To see all available commands run:
-```sh
-$GOPATH/bin/dev_client help
-```
+---
 
-For production usage, I recommend making your own client, renaming it `knox`, and moving it into you $PATH for ease of use.
-
-For more information on interacting with knox, use `knox help` or go to https://github.com/pinterest/knox/wiki/Knox-Client
-
-## Knox with Docker
-
-You can run a Docker container to get knox set up, instead of installing Go on your host.
-
-```sh
-git clone https://github.com/pinterest/knox.git
-cd knox
-docker run --name knox --rm -v "$PWD":/go/src/github.com/pinterest/knox -it golang /bin/bash
-```
-
-This will run a bash shell into the container, mounting a local copy of knox in the go source path.
-
-You can refer back to the section "Getting knox set up" to set up knox.
+*Built with enterprise-grade security and production readiness in mind.*

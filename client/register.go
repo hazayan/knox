@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"path"
 	"strconv"
 	"time"
@@ -31,7 +32,7 @@ Note that knox register will only update the register file and will return succe
 even if the machine does not have access to the key. The daemon will actually retrieve
 the key.
 
-For more about knox, see https://github.com/pinterest/types.
+For more about knox, see https://github.com/hazayan/knox.
 
 See also: knox unregister, knox daemon
 	`,
@@ -61,7 +62,7 @@ func parseTimeout(val string) (time.Duration, error) {
 
 func runRegister(_ *Command, _ []string) *ErrorStatus {
 	if _, ok := cli.(*UncachedHTTPClient); ok {
-		fmt.Println("Cannot Register in No Cache mode")
+		log.Println("Cannot Register in No Cache mode")
 		return nil
 	}
 	timeout, err := parseTimeout(*registerTimeout)
@@ -143,7 +144,7 @@ func runRegister(_ *Command, _ []string) *ErrorStatus {
 		if err != nil {
 			return &ErrorStatus{err, true}
 		}
-		fmt.Printf("%s", string(data))
+		log.Printf("%s", string(data))
 		return nil
 	}
 	logf("Successfully registered keys %v. Keys are updated by the daemon process every %.0f minutes. Check the log for the most recent run.", ks, daemonRefreshTime.Minutes())
