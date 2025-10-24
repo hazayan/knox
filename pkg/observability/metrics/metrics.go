@@ -90,12 +90,101 @@ var (
 		},
 		[]string{"key_id"},
 	)
+
+	// D-Bus specific metrics.
+	DBusOperationsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "knox_dbus_operations_total",
+			Help: "Total number of D-Bus operations",
+		},
+		[]string{"operation", "status"},
+	)
+
+	DBusOperationDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "knox_dbus_operation_duration_seconds",
+			Help:    "D-Bus operation latency in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"operation"},
+	)
+
+	DBusSessionsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "knox_dbus_sessions_total",
+			Help: "Total number of D-Bus sessions created",
+		},
+		[]string{"algorithm"},
+	)
+
+	DBusCollectionsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "knox_dbus_collections_total",
+			Help: "Total number of D-Bus collection operations",
+		},
+		[]string{"operation"},
+	)
+
+	DBusItemsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "knox_dbus_items_total",
+			Help: "Total number of D-Bus item operations",
+		},
+		[]string{"operation"},
+	)
+
+	DBusSecretsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "knox_dbus_secrets_total",
+			Help: "Total number of D-Bus secret operations",
+		},
+		[]string{"operation", "result"},
+	)
+
+	DBusPromptTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "knox_dbus_prompts_total",
+			Help: "Total number of D-Bus prompts",
+		},
+		[]string{"type", "result"},
+	)
 )
 
 // RecordRequest records an HTTP request metric.
 func RecordRequest(method, path, status string, duration float64) {
 	RequestsTotal.WithLabelValues(method, path, status).Inc()
 	RequestDuration.WithLabelValues(method, path).Observe(duration)
+}
+
+// RecordDBusOperation records a D-Bus operation metric.
+func RecordDBusOperation(operation, status string, duration float64) {
+	DBusOperationsTotal.WithLabelValues(operation, status).Inc()
+	DBusOperationDuration.WithLabelValues(operation).Observe(duration)
+}
+
+// RecordDBusSession records D-Bus session metrics.
+func RecordDBusSession(algorithm string) {
+	DBusSessionsTotal.WithLabelValues(algorithm).Inc()
+}
+
+// RecordDBusCollection records D-Bus collection metrics.
+func RecordDBusCollection(operation string) {
+	DBusCollectionsTotal.WithLabelValues(operation).Inc()
+}
+
+// RecordDBusItem records D-Bus item metrics.
+func RecordDBusItem(operation string) {
+	DBusItemsTotal.WithLabelValues(operation).Inc()
+}
+
+// RecordDBusSecret records D-Bus secret access metrics.
+func RecordDBusSecret(operation, result string) {
+	DBusSecretsTotal.WithLabelValues(operation, result).Inc()
+}
+
+// RecordDBusPrompt records D-Bus prompt metrics.
+func RecordDBusPrompt(promptType, result string) {
+	DBusPromptTotal.WithLabelValues(promptType, result).Inc()
 }
 
 // RecordStorageOperation records a storage operation metric.

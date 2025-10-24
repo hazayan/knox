@@ -4,34 +4,63 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/godbus/dbus/v5/introspect"
 	"github.com/godbus/dbus/v5/prop"
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/observability/metrics"
 )
 
 // Bridge represents the D-Bus to Knox bridge.
 type Bridge struct {
-	conn        *dbus.Conn
-	config      *config.DBusConfig
-	knoxClient  client.APIClient
-	sessionMgr  *SessionManager
-	collections map[string]*Collection
-	mu          sync.RWMutex
-	props       *prop.Properties
+	conn          *dbus.Conn
+	config        *config.DBusConfig
+	knoxClient    client.APIClient
+	sessionMgr    *SessionManager
+	authManager   *AuthManager
+	authHandler   *AuthPromptHandler
+	aliasManager  *StandardAliasManager
+	signalManager *SignalManager
+	propertyMgr   *PropertyManager
+	collections   map[string]*Collection
+	aliases       map[string]dbus.ObjectPath
+	mu            sync.RWMutex
+	props         *prop.Properties
 }
 
 // NewBridge creates a new D-Bus to Knox bridge.
 func NewBridge(cfg *config.DBusConfig, knoxClient client.APIClient) (*Bridge, error) {
-	return &Bridge{
+	if cfg == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+	if knoxClient == nil {
+		return nil, errors.New("knoxClient cannot be nil")
+	}
+	if cfg.DBus.BusType == "" {
+		return nil, errors.New("bus type cannot be empty")
+	}
+	if cfg.DBus.ServiceName == "" {
+		return nil, errors.New("service name cannot be empty")
+	}
+
+	bridge := &Bridge{
 		config:      cfg,
 		knoxClient:  knoxClient,
 		sessionMgr:  NewSessionManager(),
+		authManager: NewAuthManager(),
 		collections: make(map[string]*Collection),
-	}, nil
+		aliases:     make(map[string]dbus.ObjectPath),
+	}
+	bridge.authHandler = NewAuthPromptHandler(bridge.authManager)
+	bridge.aliasManager = NewStandardAliasManager(bridge)
+	bridge.signalManager = NewSignalManager(bridge)
+	bridge.propertyMgr = NewPropertyManager(bridge)
+	return bridge, nil
 }
 
 // Start starts the D-Bus bridge.
@@ -96,6 +125,11 @@ func (b *Bridge) Start() error {
 		return fmt.Errorf("failed to create default collections: %w", err)
 	}
 
+	// Initialize alias manager with standard aliases
+	if err := b.aliasManager.Initialize(); err != nil {
+		return fmt.Errorf("failed to initialize alias manager: %w", err)
+	}
+
 	return nil
 }
 
@@ -104,8 +138,18 @@ func (b *Bridge) Stop() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	// If connection was never established, nothing to clean up
+	if b.conn == nil {
+		return nil
+	}
+
 	// Close all sessions
 	b.sessionMgr.CloseAll(b.conn)
+
+	// Clear authentication data
+	if b.authManager != nil {
+		b.authManager.Lock()
+	}
 
 	// Unexport all collections
 	for _, collection := range b.collections {
@@ -158,6 +202,11 @@ func (b *Bridge) createDefaultCollections() error {
 
 // OpenSession opens a new session.
 func (b *Bridge) OpenSession(algorithm string, input dbus.Variant) (dbus.Variant, dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("OpenSession", "success", duration)
+	}()
 	// Parse algorithm
 	var algo EncryptionAlgorithm
 	switch algorithm {
@@ -202,6 +251,22 @@ func (b *Bridge) OpenSession(algorithm string, input dbus.Variant) (dbus.Variant
 
 // CreateCollection creates a new collection.
 func (b *Bridge) CreateCollection(properties map[string]dbus.Variant, alias string) (dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("CreateCollection", "success", duration)
+	}()
+
+	// Check if authentication is required
+	if b.authHandler.IsAuthenticationRequired("CreateCollection") {
+		prompt := b.createAuthenticationPrompt("CreateCollection", func(_ bool) {
+			// Retry the operation after authentication
+			// This would need to be handled differently in a real implementation
+		})
+		return "/", prompt.Path(), nil
+	}
+
+	b.authManager.UpdateActivity()
 	// Extract label with validation
 	label := "Unnamed"
 	if labelVar, ok := properties["org.freedesktop.Secret.Collection.Label"]; ok {
@@ -242,50 +307,181 @@ func (b *Bridge) CreateCollection(properties map[string]dbus.Variant, alias stri
 
 	// Handle alias if specified (with validation)
 	if alias != "" {
-		if err := validateCollectionName(alias); err != nil {
+		if err := b.aliasManager.SetAlias(alias, collection.Path()); err != nil {
 			// Log but don't fail - just ignore invalid alias
 			return collection.Path(), "/", nil
 		}
-		// TODO: Implement alias support
 	}
 
-	// No prompt needed
+	// Notify about collection creation
+	if b.signalManager != nil {
+		b.signalManager.EmitCollectionAdded(collection.Path())
+	}
+
+	// Check if authentication is required for collection creation
+	// For now, we don't require authentication so return "/" (root path)
+	// In a production implementation, this would check the auth manager state
+	if b.authManager != nil && b.authManager.IsLocked() {
+		// Authentication required - create a prompt
+		prompt := NewPrompt(b.conn, func(_ bool) {
+			// Callback executed when prompt completes - no action needed for auto-approval
+		}, WithPromptMessage(fmt.Sprintf("Create new collection '%s'?", label)))
+		if err := prompt.Export(); err != nil {
+			return collection.Path(), "/", dbus.MakeFailedError(fmt.Errorf("failed to create prompt: %w", err))
+		}
+		return collection.Path(), prompt.Path(), nil
+	}
+
+	// No authentication required - return root path
 	return collection.Path(), "/", nil
 }
 
 // SearchItems searches all collections for items matching the given attributes.
 func (b *Bridge) SearchItems(attributes map[string]string) ([]dbus.ObjectPath, []dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("SearchItems", "success", duration)
+	}()
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	var unlocked []dbus.ObjectPath
-	var locked []dbus.ObjectPath // Always empty in our implementation
+	var locked []dbus.ObjectPath
 
 	for _, collection := range b.collections {
 		items, err := collection.SearchItems(attributes)
 		if err != nil {
 			continue
 		}
-		unlocked = append(unlocked, items...)
+
+		// Separate locked and unlocked items
+		for _, itemPath := range items {
+			// Find the item to check its locked state
+			pathStr := string(itemPath)
+			if hasPrefix(pathStr, CollectionPrefix) {
+				remainder := pathStr[len(CollectionPrefix):]
+				parts := splitPath(remainder)
+				if len(parts) == 2 {
+					collectionName := parts[0]
+					if coll, ok := b.collections[collectionName]; ok {
+						coll.mu.RLock()
+						for _, item := range coll.items {
+							if item.Path() == itemPath {
+								if item.IsLocked() {
+									locked = append(locked, itemPath)
+								} else {
+									unlocked = append(unlocked, itemPath)
+								}
+								break
+							}
+						}
+						coll.mu.RUnlock()
+					}
+				}
+			}
+		}
 	}
 
 	return unlocked, locked, nil
 }
 
-// Unlock unlocks objects (no-op in our implementation).
-func (b *Bridge) Unlock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
-	// We don't support locking, so just return the objects as unlocked
-	return objects, "/", nil
+// SearchCollections searches for collections matching the given attributes.
+func (b *Bridge) SearchCollections(attributes map[string]string) ([]dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("SearchCollections", "success", duration)
+	}()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	var matches []dbus.ObjectPath
+
+	for _, collection := range b.collections {
+		// Check if collection matches the attributes
+		// Currently, we only support searching by label
+		if label, ok := attributes["org.freedesktop.Secret.Collection.Label"]; ok {
+			if collection.label == label {
+				matches = append(matches, collection.Path())
+			}
+		} else {
+			// If no specific attributes are provided, return all collections
+			matches = append(matches, collection.Path())
+		}
+	}
+
+	return matches, nil
 }
 
-// Lock locks objects (no-op in our implementation).
-func (b *Bridge) Lock(_ []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
-	// We don't support locking
-	return []dbus.ObjectPath{}, "/", nil
+// processLockUnlock is a helper function that handles the common logic for Lock and Unlock operations.
+func (b *Bridge) processLockUnlock(objects []dbus.ObjectPath, operation string, action func(any)) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation(operation, "success", duration)
+	}()
+
+	processed := b.processObjects(objects, action)
+
+	// Check if authentication is required for this operation
+	// For now, we don't require authentication for Lock/Unlock operations
+	// so we return "/" (root path) to indicate no prompt is needed
+	// In a production implementation, this would check the auth manager state
+	if b.authManager != nil && b.authManager.IsLocked() {
+		// Authentication required - create a prompt
+		prompt := NewPrompt(b.conn, func(_ bool) {
+			// Callback executed when prompt completes
+		}, WithPromptMessage(fmt.Sprintf("%s %d object(s)?", operation, len(objects))))
+		if err := prompt.Export(); err != nil {
+			return processed, "/", dbus.MakeFailedError(fmt.Errorf("failed to create prompt: %w", err))
+		}
+		return processed, prompt.Path(), nil
+	}
+
+	// No authentication required - return root path
+	return processed, "/", nil
+}
+
+// Unlock unlocks objects.
+func (b *Bridge) Unlock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+	return b.processLockUnlock(objects, "Unlock", func(obj any) {
+		switch v := obj.(type) {
+		case *Collection:
+			v.Unlock()
+		case *Item:
+			v.Unlock()
+		}
+	})
+}
+
+// Lock locks objects.
+func (b *Bridge) Lock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+	return b.processLockUnlock(objects, "Lock", func(obj any) {
+		switch v := obj.(type) {
+		case *Collection:
+			v.Lock()
+		case *Item:
+			v.Lock()
+		}
+	})
 }
 
 // GetSecrets retrieves secrets for multiple items.
 func (b *Bridge) GetSecrets(items []dbus.ObjectPath, sessionPath dbus.ObjectPath) (map[dbus.ObjectPath]Secret, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("GetSecrets", "success", duration)
+	}()
+
+	// Check if authentication is required
+	if b.authHandler.IsAuthenticationRequired("GetSecrets") {
+		// Return empty result when locked - clients should handle this appropriately
+		return make(map[dbus.ObjectPath]Secret), nil
+	}
+
+	b.authManager.UpdateActivity()
 	secrets := make(map[dbus.ObjectPath]Secret)
 
 	// Get session
@@ -335,6 +531,11 @@ func (b *Bridge) GetSecrets(items []dbus.ObjectPath, sessionPath dbus.ObjectPath
 			continue
 		}
 
+		// Check if item is locked
+		if item.IsLocked() {
+			continue // Skip locked items
+		}
+
 		// Get secret
 		secret, err := item.GetSecret(session.Path())
 		if err == nil {
@@ -347,10 +548,26 @@ func (b *Bridge) GetSecrets(items []dbus.ObjectPath, sessionPath dbus.ObjectPath
 
 // ReadAlias resolves an alias to a collection.
 func (b *Bridge) ReadAlias(name string) (dbus.ObjectPath, *dbus.Error) {
-	b.mu.RLock()
-	defer b.mu.Unlock()
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("ReadAlias", "success", duration)
+	}()
 
-	// Map aliases to collections
+	b.authManager.UpdateActivity()
+	// Use alias manager to resolve aliases
+	if path, err := b.aliasManager.ReadAlias(name); err == nil {
+		return path, nil
+	}
+
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	if path, ok := b.aliases[name]; ok {
+		return path, nil
+	}
+
+	// Map standard aliases to collections
 	switch name {
 	case DefaultCollection:
 		if coll, ok := b.collections[DefaultCollection]; ok {
@@ -366,9 +583,312 @@ func (b *Bridge) ReadAlias(name string) (dbus.ObjectPath, *dbus.Error) {
 }
 
 // SetAlias sets an alias for a collection.
-func (b *Bridge) SetAlias(_ string, _ dbus.ObjectPath) *dbus.Error {
-	// TODO: Implement alias support
+func (b *Bridge) SetAlias(name string, collectionPath dbus.ObjectPath) *dbus.Error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("SetAlias", "success", duration)
+	}()
+
+	// Check if authentication is required
+	if b.authHandler.IsAuthenticationRequired("SetAlias") {
+		return dbus.MakeFailedError(errors.New("authentication required to set alias"))
+	}
+
+	b.authManager.UpdateActivity()
+	if err := validateCollectionName(name); err != nil {
+		return dbus.MakeFailedError(fmt.Errorf("invalid alias name: %w", err))
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Find the collection by path
+	var targetCollection *Collection
+	for _, coll := range b.collections {
+		if coll.Path() == collectionPath {
+			targetCollection = coll
+			break
+		}
+	}
+
+	if targetCollection == nil {
+		return dbus.MakeFailedError(errors.New("collection not found"))
+	}
+
+	// Update alias
+	if err := b.aliasManager.SetAlias(name, collectionPath); err != nil {
+		return dbus.MakeFailedError(fmt.Errorf("failed to set alias: %w", err))
+	}
+
 	return nil
+}
+
+// DeleteCollection deletes a collection.
+func (b *Bridge) DeleteCollection(collectionPath dbus.ObjectPath) *dbus.Error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("DeleteCollection", "success", duration)
+	}()
+
+	// Check if authentication is required
+	if b.authHandler.IsAuthenticationRequired("DeleteCollection") {
+		return dbus.MakeFailedError(errors.New("authentication required to delete collection"))
+	}
+
+	b.authManager.UpdateActivity()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Find the collection by path
+	var targetCollection *Collection
+	var collectionName string
+	for name, coll := range b.collections {
+		if coll.Path() == collectionPath {
+			targetCollection = coll
+			collectionName = name
+			break
+		}
+	}
+
+	if targetCollection == nil {
+		return dbus.MakeFailedError(errors.New("collection not found"))
+	}
+
+	// Cannot delete default collection
+	if collectionName == DefaultCollection {
+		return dbus.MakeFailedError(errors.New("cannot delete default collection"))
+	}
+
+	// Delete the collection
+	if err := targetCollection.DeleteAllItems(); err != nil {
+		return dbus.MakeFailedError(fmt.Errorf("failed to delete collection items: %w", err))
+	}
+
+	// Unexport the collection
+	targetCollection.Unexport(b.conn)
+
+	// Remove from collections map
+	delete(b.collections, collectionName)
+
+	// Remove any aliases pointing to this collection
+	// Collect aliases to remove first to avoid holding lock during RemoveAlias
+	var aliasesToRemove []string
+	for alias, path := range b.aliases {
+		if path == collectionPath {
+			aliasesToRemove = append(aliasesToRemove, alias)
+		}
+	}
+	b.mu.Unlock() // Release lock before calling RemoveAlias to avoid deadlock
+
+	// Remove aliases without holding the bridge lock
+	for _, alias := range aliasesToRemove {
+		_ = b.aliasManager.RemoveAlias(alias)
+	}
+
+	b.mu.Lock() // Reacquire lock for remaining operations
+
+	// Notify about collection deletion
+	b.signalManager.EmitCollectionDeleted(collectionPath)
+
+	// Update collections property
+	b.updateCollectionsProperty()
+
+	return nil
+}
+
+// GetSession returns session information.
+func (b *Bridge) GetSession(sessionPath dbus.ObjectPath) (EncryptionAlgorithm, []byte, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("GetSession", "success", duration)
+	}()
+
+	b.authManager.UpdateActivity()
+
+	session, err := b.sessionMgr.GetSession(sessionPath)
+	if err != nil {
+		return "", nil, dbus.MakeFailedError(err)
+	}
+
+	var output []byte
+	switch session.algorithm {
+	case AlgorithmDHAES:
+		output = encodeDBusPublicKey(session.dh.GetPublicKey())
+	}
+
+	return session.algorithm, output, nil
+}
+
+// ChangeLock changes the lock state of objects.
+func (b *Bridge) ChangeLock(objects []dbus.ObjectPath) ([]dbus.ObjectPath, dbus.ObjectPath, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("ChangeLock", "success", duration)
+	}()
+
+	// Check if authentication is required
+	if b.authHandler.IsAuthenticationRequired("ChangeLock") {
+		prompt := b.createAuthenticationPrompt("ChangeLock", func(_ bool) {
+			// Callback for authentication result
+		})
+		return []dbus.ObjectPath{}, prompt.Path(), nil
+	}
+
+	b.authManager.UpdateActivity()
+
+	var processed []dbus.ObjectPath
+	var lockedObjects []dbus.ObjectPath
+
+	// Process each object
+	for _, objPath := range objects {
+		obj, err := b.findObjectByPath(objPath)
+		if err != nil {
+			continue
+		}
+
+		switch v := obj.(type) {
+		case *Collection:
+			if v.IsLocked() {
+				v.Unlock()
+				processed = append(processed, objPath)
+			} else {
+				v.Lock()
+				lockedObjects = append(lockedObjects, objPath)
+			}
+		case *Item:
+			if v.IsLocked() {
+				v.Unlock()
+				processed = append(processed, objPath)
+			} else {
+				v.Lock()
+				lockedObjects = append(lockedObjects, objPath)
+			}
+		}
+	}
+
+	// Create prompt for locked objects
+	if len(lockedObjects) > 0 {
+		prompt := NewPrompt(b.conn, func(approved bool) {
+			if approved {
+				// Unlock the objects
+				for _, objPath := range lockedObjects {
+					obj, err := b.findObjectByPath(objPath)
+					if err != nil {
+						continue
+					}
+					switch v := obj.(type) {
+					case *Collection:
+						v.Unlock()
+					case *Item:
+						v.Unlock()
+					}
+				}
+			}
+		}, WithPromptMessage(fmt.Sprintf("Unlock %d object(s)?", len(lockedObjects))))
+		if err := prompt.Export(); err != nil {
+			return processed, "/", dbus.MakeFailedError(fmt.Errorf("failed to create prompt: %w", err))
+		}
+		return processed, prompt.Path(), nil
+	}
+
+	return processed, "/", nil
+}
+
+// GetServiceInfo returns service information and capabilities.
+func (b *Bridge) GetServiceInfo() (string, []string, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("GetServiceInfo", "success", duration)
+	}()
+
+	b.authManager.UpdateActivity()
+
+	// Service vendor and version
+	vendor := "Knox Secret Service Bridge"
+
+	// Supported capabilities
+	capabilities := []string{
+		"service",    // Basic service functionality
+		"collection", // Collection management
+		"item",       // Item management
+		"session",    // Session encryption
+		"lock",       // Locking support
+		"prompt",     // User prompts
+	}
+
+	return vendor, capabilities, nil
+}
+
+// GetProperty gets a service property.
+func (b *Bridge) GetProperty(interfaceName, propertyName string) (dbus.Variant, *dbus.Error) {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("GetProperty", "success", duration)
+	}()
+
+	b.authManager.UpdateActivity()
+
+	if interfaceName != ServiceInterface {
+		return dbus.Variant{}, dbus.MakeFailedError(errors.New("interface not found"))
+	}
+
+	switch propertyName {
+	case "Collections":
+		var paths []dbus.ObjectPath
+		b.mu.RLock()
+		for _, coll := range b.collections {
+			paths = append(paths, coll.Path())
+		}
+		b.mu.RUnlock()
+		return dbus.MakeVariant(paths), nil
+
+	case "Locked":
+		_, locked, _ := b.authManager.GetStatus()
+		return dbus.MakeVariant(locked), nil
+
+	default:
+		return dbus.Variant{}, dbus.MakeFailedError(errors.New("property not found"))
+	}
+}
+
+// SetProperty sets a service property.
+func (b *Bridge) SetProperty(interfaceName, propertyName string, value dbus.Variant) *dbus.Error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("SetProperty", "success", duration)
+	}()
+
+	// Check if authentication is required
+	if b.authHandler.IsAuthenticationRequired("SetProperty") {
+		return dbus.MakeFailedError(errors.New("authentication required to set property"))
+	}
+
+	b.authManager.UpdateActivity()
+
+	if interfaceName != ServiceInterface {
+		return dbus.MakeFailedError(errors.New("interface not found"))
+	}
+
+	// Currently only support setting certain properties
+	switch propertyName {
+	case "AutoLockTimeout":
+		if timeout, ok := value.Value().(uint32); ok {
+			b.authManager.SetAutoLockTimeout(time.Duration(timeout) * time.Second)
+			return nil
+		}
+		return dbus.MakeFailedError(errors.New("invalid timeout value"))
+
+	default:
+		return dbus.MakeFailedError(errors.New("property not writable"))
+	}
 }
 
 // Helper methods
@@ -439,6 +959,23 @@ func (b *Bridge) getMethods() []introspect.Method {
 				{Name: "collection", Type: "o", Direction: "in"},
 			},
 		},
+		{
+			Name: "DeleteCollection",
+			Args: []introspect.Arg{
+				{Name: "collection", Type: "o", Direction: "in"},
+			},
+		},
+		{
+			Name: "SearchCollections",
+			Args: []introspect.Arg{
+				{Name: "attributes", Type: "a{ss}", Direction: "in"},
+				{Name: "collections", Type: "ao", Direction: "out"},
+			},
+		},
+		{
+			Name: "Close",
+			Args: []introspect.Arg{},
+		},
 	}
 }
 
@@ -449,6 +986,11 @@ func (b *Bridge) getProperties() []introspect.Property {
 }
 
 func (b *Bridge) updateCollectionsProperty() {
+	// Skip if props is nil (e.g., in tests)
+	if b.props == nil {
+		return
+	}
+
 	var paths []dbus.ObjectPath
 	for _, collection := range b.collections {
 		paths = append(paths, collection.Path())
@@ -477,4 +1019,160 @@ func splitPath(path string) []string {
 		parts = append(parts, path[start:])
 	}
 	return parts
+}
+
+// Close closes the service and releases all resources.
+func (b *Bridge) Close() *dbus.Error {
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start).Seconds()
+		metrics.RecordDBusOperation("Close", "success", duration)
+	}()
+
+	// Stop the bridge
+	if err := b.Stop(); err != nil {
+		return dbus.MakeFailedError(fmt.Errorf("failed to close service: %w", err))
+	}
+
+	return nil
+}
+
+// createAuthenticationPrompt creates a prompt for authentication.
+func (b *Bridge) createAuthenticationPrompt(operation string, callback func(bool)) *Prompt {
+	message := b.authHandler.GetAuthenticationPromptMessage(operation)
+	prompt := NewPrompt(b.conn, func(approved bool) {
+		if approved {
+			// Show unlock prompt
+			unlockPrompt := NewPrompt(b.conn, func(unlockApproved bool) {
+				if unlockApproved {
+					// Try to authenticate
+					if success, err := b.authHandler.HandleUnlockPrompt(""); success && err == nil {
+						callback(true)
+						return
+					}
+				}
+				callback(false)
+			}, WithPromptMessage("Please unlock the secret service"))
+			_ = unlockPrompt.Export()
+		} else {
+			callback(false)
+		}
+	}, WithPromptMessage(message))
+	_ = prompt.Export()
+	return prompt
+}
+
+// findObjectByPath finds an object by its D-Bus path.
+func (b *Bridge) findObjectByPath(path dbus.ObjectPath) (any, error) {
+	pathStr := string(path)
+
+	// Check for collections
+	if strings.HasPrefix(pathStr, CollectionPrefix) {
+		b.mu.RLock()
+		defer b.mu.RUnlock()
+
+		for _, coll := range b.collections {
+			if coll.Path() == path {
+				return coll, nil
+			}
+		}
+
+		// Check for items within collections
+		for _, coll := range b.collections {
+			coll.mu.RLock()
+			for _, item := range coll.items {
+				if item.Path() == path {
+					coll.mu.RUnlock()
+					return item, nil
+				}
+			}
+			coll.mu.RUnlock()
+		}
+	}
+
+	// Check for sessions
+	if strings.HasPrefix(pathStr, SessionPrefix) {
+		return b.sessionMgr.GetSession(path)
+	}
+
+	return nil, errors.New("object not found")
+}
+
+// GetServiceProperties returns additional service properties including lock status.
+func (b *Bridge) GetServiceProperties() map[string]dbus.Variant {
+	enabled, locked, attempts := b.authManager.GetStatus()
+	return map[string]dbus.Variant{
+		"Locked":                 dbus.MakeVariant(locked),
+		"AuthenticationEnabled":  dbus.MakeVariant(enabled),
+		"AuthenticationAttempts": dbus.MakeVariant(attempts),
+	}
+}
+
+// PropertyManager manages service properties and signals.
+type PropertyManager struct {
+	bridge *Bridge
+}
+
+// NewPropertyManager creates a new property manager.
+func NewPropertyManager(bridge *Bridge) *PropertyManager {
+	return &PropertyManager{
+		bridge: bridge,
+	}
+}
+
+// EmitPropertiesChanged emits a properties changed signal.
+func (pm *PropertyManager) EmitPropertiesChanged(interfaceName string, changedProperties map[string]dbus.Variant, invalidatedProperties []string) {
+	if pm.bridge.conn == nil {
+		return
+	}
+
+	err := pm.bridge.conn.Emit(
+		ServicePath,
+		"org.freedesktop.DBus.Properties.PropertiesChanged",
+		interfaceName,
+		changedProperties,
+		invalidatedProperties,
+	)
+	_ = err // Signals are best effort - ignore errors
+}
+
+func (b *Bridge) processObjects(objects []dbus.ObjectPath, action func(any)) []dbus.ObjectPath {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	var processed []dbus.ObjectPath
+
+	for _, objPath := range objects {
+		// Parse object path to determine type
+		pathStr := string(objPath)
+		if hasPrefix(pathStr, CollectionPrefix) {
+			// Check if it's a collection or an item
+			remainder := pathStr[len(CollectionPrefix):]
+			parts := splitPath(remainder)
+
+			if len(parts) == 1 {
+				// It's a collection
+				collectionName := parts[0]
+				if collection, ok := b.collections[collectionName]; ok {
+					action(collection)
+					processed = append(processed, objPath)
+				}
+			} else if len(parts) == 2 {
+				// It's an item - extract collection and item
+				collectionName := parts[0]
+				itemID := parts[1]
+				if collection, ok := b.collections[collectionName]; ok {
+					collection.mu.RLock()
+					itemPath := makeItemPath(collectionName, itemID)
+					if item, ok := collection.items[string(itemPath)]; ok {
+						action(item)
+						processed = append(processed, objPath)
+					}
+					collection.mu.RUnlock()
+				}
+			}
+		}
+	}
+
+	return processed
 }

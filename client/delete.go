@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"log"
 )
 
 var cmdDelete = &Command{
@@ -27,6 +28,6 @@ func runDelete(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("error deleting key: %s", err.Error()), true}
 	}
-	fmt.Print("Successfully deleted key\n")
+	log.Print("Successfully deleted key\n")
 	return nil
 }

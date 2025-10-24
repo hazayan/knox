@@ -228,7 +228,7 @@ func TestGetKey(t *testing.T) {
 		}
 	}
 
-	_, _ = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "AJSDFLKJlks"})
+	_, err = getKeyHandler(m, u, map[string]string{"keyID": "a1", "status": "AJSDFLKJlks"})
 	if err == nil {
 		t.Fatal("Expected err")
 	}

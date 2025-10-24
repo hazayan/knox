@@ -34,39 +34,29 @@ type Backend struct {
 	opCounts map[string]*int64
 }
 
+// BackendOption defines options for configuring the PostgreSQL backend.
+type BackendOption func(*Backend)
+
+// WithDB allows injecting a custom database connection for testing.
+func WithDB(db *sql.DB) BackendOption {
+	return func(b *Backend) {
+		b.db = db
+	}
+}
+
 // New creates a new PostgreSQL storage backend.
 // The connection string should be in the format:
 // "postgres://user:password@host:port/database?sslmode=require"
-func New(connectionString string, maxConnections int) (*Backend, error) {
-	db, err := sql.Open("postgres", connectionString)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
+func New(connectionString string, maxConnections int, opts ...BackendOption) (*Backend, error) {
+	var db *sql.DB
+	var err error
 
-	// Configure connection pool with production-ready settings
-	if maxConnections <= 0 {
-		maxConnections = 25 // Default: conservative for production
-	}
-
-	// Max open connections: total connections to database
-	db.SetMaxOpenConns(maxConnections)
-
-	// Max idle connections: keep half as idle for quick reuse
-	db.SetMaxIdleConns(maxConnections / 2)
-
-	// Max connection lifetime: rotate connections every hour to prevent stale connections
-	db.SetConnMaxLifetime(1 * time.Hour)
-
-	// Max connection idle time: close idle connections after 10 minutes
-	db.SetConnMaxIdleTime(10 * time.Minute)
-
-	// Verify connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+	// Only open database connection if no custom DB provided
+	if connectionString != "" {
+		db, err = sql.Open("postgres", connectionString)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open database: %w", err)
+		}
 	}
 
 	b := &Backend{
@@ -80,10 +70,44 @@ func New(connectionString string, maxConnections int) (*Backend, error) {
 		},
 	}
 
-	// Initialize schema
-	if err := b.initSchema(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to initialize schema: %w", err)
+	// Apply options
+	for _, opt := range opts {
+		opt(b)
+	}
+
+	// Configure connection pool with production-ready settings (if using real DB)
+	// Skip schema initialization when using WithDB (for testing with mocked DB)
+	if db != nil && connectionString != "" {
+		if maxConnections <= 0 {
+			maxConnections = 25 // Default: conservative for production
+		}
+
+		// Max open connections: total connections to database
+		db.SetMaxOpenConns(maxConnections)
+
+		// Max idle connections: keep half as idle for quick reuse
+		db.SetMaxIdleConns(maxConnections / 2)
+
+		// Max connection lifetime: rotate connections every hour to prevent stale connections
+		db.SetConnMaxLifetime(1 * time.Hour)
+
+		// Max connection idle time: close idle connections after 10 minutes
+		db.SetConnMaxIdleTime(10 * time.Minute)
+
+		// Verify connection
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := db.PingContext(ctx); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("failed to ping database: %w", err)
+		}
+
+		// Initialize schema
+		if err := b.initSchema(ctx); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("failed to initialize schema: %w", err)
+		}
 	}
 
 	return b, nil
@@ -314,6 +338,9 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 
 // Ping checks if the backend is healthy.
 func (b *Backend) Ping(ctx context.Context) error {
+	if b.db == nil {
+		return storage.ErrStorageUnavailable
+	}
 	if err := b.db.PingContext(ctx); err != nil {
 		return storage.ErrStorageUnavailable
 	}

@@ -120,7 +120,7 @@ func NewFileClient(keyID string) (Client, error) {
 		for range time.Tick(refresh) {
 			err := c.update()
 			if err != nil {
-				log.Println("Failed to update knox key ", err.Error())
+				log.Printf("Failed to update knox key: %v", err)
 			}
 		}
 	}()
@@ -189,6 +189,8 @@ func GetBackoffDuration(attempt int) time.Duration {
 }
 
 // APIClient is an interface that talks to the knox server for key management.
+//
+//nolint:dupl // Interface definition is intentionally duplicated in test mocks
 type APIClient interface {
 	GetKey(keyID string) (*types.Key, error)
 	CreateKey(keyID string, data []byte, acl types.ACL) (uint64, error)
@@ -616,7 +618,8 @@ func MockClient(host, keyFolder string) *HTTPClient {
 				return "TESTAUTH", "TESTAUTHTYPE", nil
 			}},
 			DefaultClient: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
-				MinVersion: tls.VersionTLS12,
+				InsecureSkipVerify: true, // #nosec G402 -- test configuration only
+				MinVersion:         tls.VersionTLS12,
 				CipherSuites: []uint16{
 					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,

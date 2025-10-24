@@ -409,7 +409,7 @@ func TestKeyAccessUpdates(t *testing.T) {
 		t.Fatal("Incorrect initial ACL")
 	}
 
-	accessService := types.Access{ID: "spiffe://testservice", Type: types.Service, AccessType: types.Read}
+	accessService := types.Access{ID: "spiffe://example.com/testservice", Type: types.Service, AccessType: types.Read}
 	putAccess(t, keyID, &accessService)
 	acl4 := getAccess(t, keyID)
 	if len(acl4) != 2 {
@@ -418,7 +418,7 @@ func TestKeyAccessUpdates(t *testing.T) {
 	for _, a := range acl {
 		switch a.ID {
 		case "testuser":
-		case "spiffe://testservice":
+		case "spiffe://example.com/testservice":
 			if a.AccessType != accessService.AccessType || a.Type != accessService.Type {
 				t.Fatal("Incorrect updated ACL")
 			}
@@ -459,10 +459,10 @@ func TestKeyAccessUpdatesWithPrincipalValidation(t *testing.T) {
 
 	// Should be *not valid* for user with bad id
 	access = types.Access{ID: invalidPrincipalID, Type: types.User, AccessType: types.Read}
-	putAccessExpectedFailure(t, keyID, &access, "Invalid user: "+invalidPrincipalID)
+	putAccessExpectedFailure(t, keyID, &access, "invalid user: "+invalidPrincipalID)
 
 	// Should be *not valid* for user service with bad SPIFFE ID, even though
 	// we don't have a special extra validator for it (validation is built-in)
 	access = types.Access{ID: "https://ahoy", Type: types.Service, AccessType: types.Read}
-	putAccessExpectedFailure(t, keyID, &access, "Service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format.")
+	putAccessExpectedFailure(t, keyID, &access, "service prefix is invalid URL, must conform to 'spiffe://<domain>/<path>/' format")
 }

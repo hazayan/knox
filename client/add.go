@@ -4,6 +4,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/hazayan/knox/pkg/types"
 )
@@ -54,7 +55,7 @@ func runAdd(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("error adding version: %s", err.Error()), true}
 	}
-	fmt.Printf("Added key version %d\n", versionID)
+	log.Printf("Added key version %d\n", versionID)
 	return nil
 }
 

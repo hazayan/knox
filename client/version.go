@@ -1,6 +1,6 @@
 package client
 
-import "fmt"
+import "log"
 
 // Version represents the compiled version of the client binary. It can be overridden at compile time with:
 // `go build -ldflags "-X github.com/hazayan/knox/client.Version=1.2.3" github.com/hazayan/knox/cmd/dev_client`
@@ -22,6 +22,6 @@ func GetVersion() string {
 }
 
 func runVersion(_ *Command, _ []string) *ErrorStatus {
-	fmt.Printf("Knox CLI version %s\n", Version)
+	log.Printf("Knox CLI version %s\n", Version)
 	return nil
 }

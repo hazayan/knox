@@ -149,6 +149,12 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 	if !keyIDOK {
 		return nil, errF(types.NoKeyIDCode, "Missing parameter 'id'")
 	}
+
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
+
 	data, dataOK := parameters["data"]
 	if !dataOK {
 		return nil, errF(types.NoKeyDataCode, "Missing parameter 'data'")
@@ -169,6 +175,16 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 	decodedData, decodeErr := base64.StdEncoding.DecodeString(data)
 	if decodeErr != nil {
 		return nil, errF(types.BadRequestDataCode, decodeErr.Error())
+	}
+
+	// Validate key data size
+	if err := types.ValidateKeyData(decodedData); err != nil {
+		return nil, errF(types.BadRequestDataCode, err.Error())
+	}
+
+	// Validate ACL
+	if err := types.ValidateACL(acl); err != nil {
+		return nil, errF(types.BadRequestDataCode, fmt.Sprintf("Invalid ACL: %s", err.Error()))
 	}
 
 	// Create and add new key
@@ -192,6 +208,11 @@ func postKeysHandler(m KeyManager, principal types.Principal, parameters map[str
 // The principal must have Read access to the key.
 func getKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
+
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
 
 	status := types.Active
 	statusStr, statusOK := parameters["status"]
@@ -232,6 +253,11 @@ func getKeyHandler(m KeyManager, principal types.Principal, parameters map[strin
 func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
+
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
 		if errors.Is(getErr, types.ErrKeyIDNotFound) {
@@ -263,6 +289,11 @@ func deleteKeyHandler(m KeyManager, principal types.Principal, parameters map[st
 func getAccessHandler(m KeyManager, _ types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
+
 	// Get the key
 	key, getErr := m.GetKey(keyID, types.Primary)
 	if getErr != nil {
@@ -286,6 +317,11 @@ func getAccessHandler(m KeyManager, _ types.Principal, parameters map[string]str
 // The principal needs Admin access.
 func putAccessHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
+
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
 
 	accessStr, accessOK := parameters["access"]
 	aclStr, aclOK := parameters["acl"]
@@ -345,6 +381,14 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 				return nil, errF(types.BadPrincipalIdentifier, principalErr.Error())
 			}
 		}
+
+		// Only validate access entries that are not being removed (None access type)
+		if access.AccessType != types.None {
+			// Validate the access entry using the new validation framework
+			if err := types.ValidateAccess(access); err != nil {
+				return nil, errF(types.BadRequestDataCode, fmt.Sprintf("Invalid access entry: %s", err.Error()))
+			}
+		}
 	}
 
 	// Update Access
@@ -361,6 +405,11 @@ func putAccessHandler(m KeyManager, principal types.Principal, parameters map[st
 // The principal needs Write access.
 func postVersionHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
+
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
 	dataStr, dataOK := parameters["data"]
 	if !dataOK {
 		return nil, errF(types.BadRequestDataCode, "Missing parameter 'data'")
@@ -374,6 +423,11 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 	}
 	if decodedData == nil {
 		return nil, errF(types.BadRequestDataCode, "Parameter 'data' decoded to nil")
+	}
+
+	// Validate key data size
+	if err := types.ValidateKeyData(decodedData); err != nil {
+		return nil, errF(types.BadRequestDataCode, err.Error())
 	}
 
 	// Get the key
@@ -421,6 +475,11 @@ func postVersionHandler(m KeyManager, principal types.Principal, parameters map[
 func putVersionsHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
 	keyID := parameters["keyID"]
 	versionID := parameters["versionID"]
+
+	// Validate key ID
+	if err := types.ValidateKeyID(keyID); err != nil {
+		return nil, errF(types.BadKeyFormatCode, fmt.Sprintf("Invalid key ID: %s", err.Error()))
+	}
 
 	statusStr, statusOK := parameters["status"]
 	if !statusOK {

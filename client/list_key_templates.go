@@ -1,8 +1,6 @@
 package client
 
-import (
-	"fmt"
-)
+import "log"
 
 var cmdListKeyTemplates = &Command{
 	Run:       runListKeyTemplates,
@@ -14,7 +12,7 @@ var cmdListKeyTemplates = &Command{
 }
 
 func runListKeyTemplates(_ *Command, _ []string) *ErrorStatus {
-	fmt.Println("The following tink key templates are supported:")
-	fmt.Println(nameOfSupportedTinkKeyTemplates())
+	log.Println("The following tink key templates are supported:")
+	log.Println(nameOfSupportedTinkKeyTemplates())
 	return nil
 }

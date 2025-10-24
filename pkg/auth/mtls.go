@@ -4,8 +4,11 @@ package auth
 import (
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/hazayan/knox/pkg/types"
 	knoxauth "github.com/hazayan/knox/server/auth"
@@ -48,6 +51,11 @@ func (p *MTLSProvider) Authenticate(_ string, r *http.Request) (types.Principal,
 		return nil, errors.New("TLS handshake not complete")
 	}
 
+	// Validate certificate
+	if err := p.validateCertificate(cert); err != nil {
+		return nil, fmt.Errorf("certificate validation failed: %w", err)
+	}
+
 	// Extract identity from certificate
 	identity := extractIdentity(cert)
 	if identity == "" {
@@ -58,13 +66,25 @@ func (p *MTLSProvider) Authenticate(_ string, r *http.Request) (types.Principal,
 	principalType := determinePrincipalType(cert)
 
 	// Create and return principal
+	// Note: determinePrincipalType only returns Machine, User, or Service
 	switch principalType {
 	case types.Machine:
 		return knoxauth.NewMachine(identity), nil
 	case types.User:
 		return knoxauth.NewUser(identity, []string{}), nil
-	default:
-		return nil, errors.New("unknown principal type")
+	default: // types.Service
+		// Parse SPIFFE URI to extract domain and path
+		// Note: determinePrincipalType only returns Service when cert has SPIFFE URI,
+		// so parsing should always succeed
+		u, err := url.Parse(identity)
+		if err != nil {
+			// This should never happen since extractIdentity returns cert.URIs[0].String()
+			// and determinePrincipalType only returns Service for valid SPIFFE URIs
+			return nil, fmt.Errorf("failed to parse SPIFFE URI: %w", err)
+		}
+		domain := u.Host
+		path := strings.TrimPrefix(u.Path, "/")
+		return knoxauth.NewService(domain, path), nil
 	}
 }
 
@@ -99,11 +119,56 @@ func extractIdentity(cert *x509.Certificate) string {
 	return ""
 }
 
+// validateCertificate performs comprehensive certificate validation.
+func (p *MTLSProvider) validateCertificate(cert *x509.Certificate) error {
+	now := time.Now()
+
+	// Check certificate expiration
+	if now.After(cert.NotAfter) {
+		return errors.New("certificate expired")
+	}
+	if now.Before(cert.NotBefore) {
+		return errors.New("certificate not yet valid")
+	}
+
+	// Check key usage
+	if cert.KeyUsage&x509.KeyUsageDigitalSignature == 0 {
+		return errors.New("certificate missing digital signature key usage")
+	}
+	if cert.KeyUsage&x509.KeyUsageKeyEncipherment == 0 {
+		return errors.New("certificate missing key encipherment key usage")
+	}
+
+	// Check extended key usage for client authentication
+	hasClientAuth := false
+	for _, extKeyUsage := range cert.ExtKeyUsage {
+		if extKeyUsage == x509.ExtKeyUsageClientAuth {
+			hasClientAuth = true
+			break
+		}
+	}
+	if !hasClientAuth {
+		return errors.New("certificate missing client authentication extended key usage")
+	}
+
+	// Basic certificate constraints
+	if cert.BasicConstraintsValid && cert.IsCA {
+		return errors.New("CA certificates not allowed for client authentication")
+	}
+
+	return nil
+}
+
 // determinePrincipalType determines if this is a machine or user certificate.
 func determinePrincipalType(cert *x509.Certificate) types.PrincipalType {
-	// If it has DNS SANs or EmailAddresses, likely a machine
+	// If it has DNS SANs, likely a machine
 	if len(cert.DNSNames) > 0 {
 		return types.Machine
+	}
+
+	// If it has URI SANs with spiffe scheme, treat as service
+	if len(cert.URIs) > 0 && cert.URIs[0].Scheme == "spiffe" {
+		return types.Service
 	}
 
 	// If it has email addresses, likely a user

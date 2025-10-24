@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/hazayan/knox/pkg/types"
@@ -62,12 +63,12 @@ func runCreate(_ *Command, args []string) *ErrorStatus {
 	if err != nil {
 		return &ErrorStatus{fmt.Errorf("error adding version: %s", err.Error()), true}
 	}
-	fmt.Printf("Created key with initial version %d\n", versionID)
+	log.Printf("Created key with initial version %d\n", versionID)
 	return nil
 }
 
 func readDataFromStdin() ([]byte, error) {
-	fmt.Println("Reading from stdin...")
+	log.Println("Reading from stdin...")
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return data, fmt.Errorf("problem reading key data: %s", err.Error())
