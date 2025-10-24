@@ -40,6 +40,11 @@ func (e *EncryptedBackend) Get(keyID string) (*keydb.DBKey, error) {
 		return nil, fmt.Errorf("backend get failed: %w", err)
 	}
 
+	// Check if we have a version to deserialize
+	if len(wrapper.VersionList) == 0 {
+		return nil, errors.New("invalid stored key: no versions")
+	}
+
 	// Deserialize the DBKey from the wrapper's Data field
 	var dbKey keydb.DBKey
 	if err := json.Unmarshal(wrapper.VersionList[0].Data, &dbKey); err != nil {

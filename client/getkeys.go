@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"log"
 )
 
 var cmdGetKeys = &Command{
@@ -31,7 +32,7 @@ func runGetKeys(_ *Command, args []string) *ErrorStatus {
 		return &ErrorStatus{fmt.Errorf("error getting keys: %s", err.Error()), true}
 	}
 	for _, k := range l {
-		fmt.Println(k)
+		log.Println(k)
 	}
 	return nil
 }

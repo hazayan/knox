@@ -22,6 +22,26 @@ var (
 	ErrStorageUnavailable = errors.New("storage backend unavailable")
 )
 
+// IsKeyNotFound checks if an error is ErrKeyNotFound.
+func IsKeyNotFound(err error) bool {
+	return errors.Is(err, ErrKeyNotFound)
+}
+
+// IsKeyExists checks if an error is ErrKeyExists.
+func IsKeyExists(err error) bool {
+	return errors.Is(err, ErrKeyExists)
+}
+
+// IsStorageUnavailable checks if an error is ErrStorageUnavailable.
+func IsStorageUnavailable(err error) bool {
+	return errors.Is(err, ErrStorageUnavailable)
+}
+
+// IsTransactionNotSupported checks if an error is ErrTransactionNotSupported.
+func IsTransactionNotSupported(err error) bool {
+	return errors.Is(err, ErrTransactionNotSupported)
+}
+
 // Backend defines the interface that all Knox storage backends must implement.
 // Implementations must be safe for concurrent use by multiple goroutines.
 type Backend interface {
@@ -123,6 +143,9 @@ func NewBackend(cfg Config) (Backend, error) {
 	factory, exists := backendRegistry[cfg.Backend]
 	if !exists {
 		return nil, errors.New("unknown storage backend: " + cfg.Backend)
+	}
+	if factory == nil {
+		return nil, errors.New("nil factory for backend: " + cfg.Backend)
 	}
 	return factory(cfg)
 }
