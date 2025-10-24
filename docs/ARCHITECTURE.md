@@ -11,29 +11,27 @@ This document describes the enhanced Knox architecture with three major addition
 
 ```
 knox/
-├── client/                 # Client CLI commands (existing)
-├── server/                 # Server core logic (existing)
+├── client/                # Client CLI commands (existing)
+├── server/                # Server core logic (existing)
 │   ├── api.go
 │   ├── auth/
 │   ├── keydb/
 │   └── ...
 ├── cmd/
-│   ├── dev_client/        # Development client (existing)
-│   ├── dev_server/        # Development server (existing)
-│   ├── knox/              # NEW: Production CLI client
-│   ├── knox-server/       # NEW: Production server
-│   └── knox-dbus/         # NEW: FreeDesktop Secret Service bridge
+│   ├── client/            # CLI client
+│   ├── server/            # Server
+│   └── dbus/              # FreeDesktop Secret Service bridge
 ├── pkg/
-│   ├── config/            # NEW: Configuration management
-│   ├── storage/           # NEW: Storage backend abstraction
+│   ├── config/            # Configuration management
+│   ├── storage/           # Storage backend abstraction
 │   │   ├── memory/
 │   │   ├── filesystem/
 │   │   ├── postgres/
 │   │   └── etcd/
-│   ├── observability/     # NEW: Metrics, logging, tracing
+│   ├── observability/     # Metrics, logging, tracing
 │   │   ├── metrics/
 │   │   └── logging/
-│   ├── dbus/              # NEW: D-Bus Secret Service implementation
+│   ├── dbus/              # D-Bus Secret Service implementation
 │   │   ├── service.go     # Service interface
 │   │   ├── collection.go  # Collection interface
 │   │   ├── item.go        # Item interface
@@ -67,13 +65,13 @@ server:
     cert_file: "/etc/knox/tls/server.crt"
     key_file: "/etc/knox/tls/server.key"
     client_ca: "/etc/knox/tls/ca.crt"
-  
+
 storage:
   backend: "postgres"  # memory, filesystem, postgres, etcd
   postgres:
     connection_string: "postgresql://knox:password@localhost/knox"
     max_connections: 100
-  
+
 auth:
   providers:
     - type: "spiffe"
@@ -150,7 +148,7 @@ profiles:
     cache:
       enabled: true
       directory: "~/.knox/cache/dev"
-  
+
   production:
     server: "knox.example.com:9000"
     tls:
@@ -253,10 +251,10 @@ type Backend interface {
     PutKey(ctx context.Context, key *knox.Key) error
     DeleteKey(ctx context.Context, keyID string) error
     ListKeys(ctx context.Context, prefix string) ([]string, error)
-    
+
     // Transaction support
     BeginTx(ctx context.Context) (Transaction, error)
-    
+
     // Health check
     Ping(ctx context.Context) error
 }
