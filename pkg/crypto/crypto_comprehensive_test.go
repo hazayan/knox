@@ -3,7 +3,6 @@ package crypto
 
 import (
 	"context"
-
 	"errors"
 	"os"
 	"testing"
