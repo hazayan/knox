@@ -1,7 +1,6 @@
 package orm
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -49,7 +48,7 @@ func TestBackend_PutAndGetKey(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create a test key
 	key := createTestKey("test:key1", []byte("secret-data"))
@@ -70,7 +69,7 @@ func TestBackend_GetKeyNotFound(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, err := backend.GetKey(ctx, "nonexistent")
 	assert.ErrorIs(t, err, storage.ErrKeyNotFound)
@@ -80,7 +79,7 @@ func TestBackend_DeleteKey(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create and store a key
 	key := createTestKey("test:key2", []byte("data"))
@@ -99,7 +98,7 @@ func TestBackend_ListKeys(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create multiple keys
 	keys := []string{"app1:secret1", "app1:secret2", "app2:secret1"}
@@ -125,7 +124,7 @@ func TestBackend_UpdateKey(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Create initial key
 	key := createTestKey("test:update", []byte("v1"))
@@ -155,7 +154,7 @@ func TestBackend_Transaction(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Start transaction
 	tx, err := backend.BeginTx(ctx)
@@ -178,7 +177,7 @@ func TestBackend_TransactionRollback(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Start transaction
 	tx, err := backend.BeginTx(ctx)
@@ -200,10 +199,10 @@ func TestBackend_Stats(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Add some keys
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		key := createTestKey(fmt.Sprintf("stats:key%d", i), []byte("data"))
 		require.NoError(t, backend.PutKey(ctx, key))
 	}
@@ -220,7 +219,7 @@ func TestBackend_Ping(t *testing.T) {
 	backend := setupTestBackend(t)
 	defer backend.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := backend.Ping(ctx)
 	assert.NoError(t, err)
