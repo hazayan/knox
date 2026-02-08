@@ -1,8 +1,13 @@
 [tools]
 golangci-lint = "2.5.0"
 go = "1.25.3"
+java = "graalvm-community-25.0.1"
+podman = "5.6.2"
 
 [env]
 GOPATH = "{{env.HOME}}/.go"
 GO_DEBUG = true
-
+java_version = 21
+java_runtime = "graalvm/graalvm-community"
+tla_version = "1.8.0"
+tla_hash = "a9838c8bc62a7d6570a67fa6cd379e19cbd31702"
