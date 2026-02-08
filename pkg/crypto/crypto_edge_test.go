@@ -3,7 +3,6 @@ package crypto_test
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"testing"
 
@@ -452,7 +451,7 @@ func TestRotation_EdgeCases(t *testing.T) {
 		rotationManager := crypto.NewKeyRotationManager(oldCryptor)
 		rotationManager.RotateToNewKey(newCryptor)
 
-		err := crypto.ReencryptDB(context.Background(), mockDB, rotationManager)
+		err := crypto.ReencryptDB(t.Context(), mockDB, rotationManager)
 		assert.NoError(t, err)
 	})
 
@@ -460,7 +459,7 @@ func TestRotation_EdgeCases(t *testing.T) {
 		rotationManager := crypto.NewKeyRotationManager(oldCryptor)
 		rotationManager.RotateToNewKey(newCryptor)
 
-		err := crypto.ReencryptDB(context.Background(), nil, rotationManager)
+		err := crypto.ReencryptDB(t.Context(), nil, rotationManager)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "database cannot be nil")
 	})
@@ -486,7 +485,7 @@ func TestRotation_EdgeCases(t *testing.T) {
 		rotationManager := crypto.NewKeyRotationManager(oldCryptor)
 		rotationManager.RotateToNewKey(newCryptor)
 
-		err := crypto.ReencryptDB(context.Background(), mockDB, rotationManager)
+		err := crypto.ReencryptDB(t.Context(), mockDB, rotationManager)
 		assert.Error(t, err)
 	})
 }
