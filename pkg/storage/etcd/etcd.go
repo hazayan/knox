@@ -72,7 +72,7 @@ func New(endpoints []string, prefix string, readOnly bool) (*Backend, error) {
 	// Create session for distributed locks
 	session, err := concurrency.NewSession(client, concurrency.WithTTL(30))
 	if err != nil {
-		client.Close()
+		_ = client.Close()
 		return nil, fmt.Errorf("failed to create etcd session: %w", err)
 	}
 
@@ -95,7 +95,7 @@ func New(endpoints []string, prefix string, readOnly bool) (*Backend, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := backend.Ping(ctx); err != nil {
-		backend.Close()
+		_ = backend.Close()
 		return nil, fmt.Errorf("etcd connectivity test failed: %w", err)
 	}
 
@@ -396,7 +396,7 @@ func (b *Backend) Ping(ctx context.Context) error {
 // Close releases etcd client resources.
 func (b *Backend) Close() error {
 	if b.session != nil {
-		b.session.Close()
+		_ = b.session.Close()
 	}
 	if b.client != nil {
 		return b.client.Close()
