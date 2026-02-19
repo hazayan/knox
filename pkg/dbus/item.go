@@ -26,6 +26,7 @@ type Item struct {
 	modified   int64
 	locked     bool
 	mu         sync.RWMutex
+	props      *prop.Properties
 }
 
 // NewItem creates a new item.
@@ -51,7 +52,66 @@ func (i *Item) Path() dbus.ObjectPath {
 
 // Export exports the item to D-Bus.
 func (i *Item) Export(conn *dbus.Conn, _ *prop.Properties) error {
-	return conn.Export(i, i.path, ItemInterface)
+	// Create properties for the item
+	var err error
+	i.props, err = prop.Export(conn, i.path, map[string]map[string]*prop.Prop{
+		ItemInterface: {
+			"Locked": {
+				Value:    i.locked,
+				Writable: false,
+				Emit:     prop.EmitTrue,
+				Callback: nil,
+			},
+			"Attributes": {
+				Value:    i.attributes,
+				Writable: true,
+				Emit:     prop.EmitTrue,
+				Callback: i.onAttributesChanged,
+			},
+			"Label": {
+				Value:    i.label,
+				Writable: true,
+				Emit:     prop.EmitTrue,
+				Callback: i.onLabelChanged,
+			},
+			"Created": {
+				Value:    uint64(i.created),
+				Writable: false,
+				Emit:     prop.EmitTrue,
+				Callback: nil,
+			},
+			"Modified": {
+				Value:    uint64(i.modified),
+				Writable: false,
+				Emit:     prop.EmitTrue,
+				Callback: nil,
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to export item properties: %w", err)
+	}
+
+	// Export the item interface
+	if err := conn.Export(i, i.path, ItemInterface); err != nil {
+		return err
+	}
+
+	// Export introspection
+	introspectNode := i.Introspect()
+	introspectNode.Name = string(i.path)
+	// Ensure prop.IntrospectData is included
+	hasPropIntrospect := false
+	for _, iface := range introspectNode.Interfaces {
+		if iface.Name == "org.freedesktop.DBus.Properties" {
+			hasPropIntrospect = true
+			break
+		}
+	}
+	if !hasPropIntrospect {
+		introspectNode.Interfaces = append([]introspect.Interface{prop.IntrospectData}, introspectNode.Interfaces...)
+	}
+	return conn.Export(introspect.NewIntrospectable(introspectNode), i.path, "org.freedesktop.DBus.Introspectable")
 }
 
 // Unexport removes the item from D-Bus.
@@ -60,6 +120,11 @@ func (i *Item) Unexport(conn *dbus.Conn) {
 		// Log error but don't return - this is best effort cleanup
 		log.Printf("failed to unexport item: %v", err)
 	}
+	if err := conn.Export(nil, i.path, "org.freedesktop.DBus.Introspectable"); err != nil {
+		// Log error but don't return - this is best effort cleanup
+		log.Printf("failed to unexport introspectable: %v", err)
+	}
+	i.props = nil
 }
 
 // D-Bus methods
@@ -205,6 +270,39 @@ func (i *Item) Introspect() *introspect.Node {
 	}
 }
 
+// Property callbacks
+func (i *Item) onLabelChanged(change *prop.Change) *dbus.Error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	label, ok := change.Value.(string)
+	if !ok {
+		return dbus.MakeFailedError(errors.New("invalid label type"))
+	}
+
+	if err := validateLabel(label); err != nil {
+		return dbus.MakeFailedError(fmt.Errorf("invalid label: %w", err))
+	}
+
+	i.label = label
+	i.modified = time.Now().Unix()
+	return nil
+}
+
+func (i *Item) onAttributesChanged(change *prop.Change) *dbus.Error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	attributes, ok := change.Value.(map[string]string)
+	if !ok {
+		return dbus.MakeFailedError(errors.New("invalid attributes type"))
+	}
+
+	i.attributes = attributes
+	i.modified = time.Now().Unix()
+	return nil
+}
+
 // SetProperties sets properties on the item.
 func (i *Item) SetProperties(properties map[string]dbus.Variant) *dbus.Error {
 	start := time.Now()
@@ -223,6 +321,9 @@ func (i *Item) SetProperties(properties map[string]dbus.Variant) *dbus.Error {
 				return dbus.MakeFailedError(fmt.Errorf("invalid label: %w", err))
 			}
 			i.label = label
+			if i.props != nil {
+				i.props.SetMust(ItemInterface, "Label", label)
+			}
 		}
 	}
 
@@ -230,10 +331,16 @@ func (i *Item) SetProperties(properties map[string]dbus.Variant) *dbus.Error {
 	if attrsVar, ok := properties["org.freedesktop.Secret.Item.Attributes"]; ok {
 		if attrs, ok := attrsVar.Value().(map[string]string); ok {
 			i.attributes = attrs
+			if i.props != nil {
+				i.props.SetMust(ItemInterface, "Attributes", attrs)
+			}
 		}
 	}
 
 	i.modified = time.Now().Unix()
+	if i.props != nil {
+		i.props.SetMust(ItemInterface, "Modified", uint64(i.modified))
+	}
 
 	return nil
 }
@@ -244,6 +351,9 @@ func (i *Item) Lock() {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.locked = true
+	if i.props != nil {
+		i.props.SetMust(ItemInterface, "Locked", true)
+	}
 }
 
 // Unlock unlocks the item.
@@ -252,6 +362,9 @@ func (i *Item) Unlock() {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.locked = false
+	if i.props != nil {
+		i.props.SetMust(ItemInterface, "Locked", false)
+	}
 }
 
 // IsLocked returns whether the item is locked.
