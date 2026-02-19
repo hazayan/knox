@@ -1,13 +1,11 @@
-bin/
-prompt.md
 .idea
 .envrc
 .rules
-meta
-todo
 
-# Coverage files
+bin/
+agent/
+build-dir/
+
 *.out
 *coverage.html
 *coverage.out
-coverage.out

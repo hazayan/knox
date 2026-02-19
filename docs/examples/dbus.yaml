@@ -13,14 +13,26 @@ knox:
 
   # TLS configuration
   tls:
-    ca_cert: ""  # Path to CA certificate (optional)
-    client_cert: ""  # Path to client certificate for mTLS (optional)
-    client_key: ""  # Path to client key for mTLS (optional)
+    ca_cert: "" # Path to CA certificate (optional)
+    client_cert: "" # Path to client certificate for mTLS (optional)
+    client_key: "" # Path to client key for mTLS (optional)
 
   # Namespace prefix for D-Bus keys in Knox
   # All D-Bus secrets will be stored as: prefix:collection:item
   # Example: "dbus:default:firefox_password"
+  # This is used for default collections (default, session) when no prefix mapping exists
   namespace_prefix: "dbus"
+
+  # Prefix mappings from Knox key prefixes to D-Bus collection names
+  # Format: "knox_prefix": "dbus_collection_name"
+  # Example: "service:auth": "service_auth" means:
+  #   - Knox keys starting with "service:auth:" get exposed in D-Bus collection "service_auth"
+  #   - Knox keys are filtered to only those matching configured prefixes
+  #   - Provides configurable way to expose Knox secrets via D-Bus
+  prefix_mappings:
+    # "service:auth": "service_auth"      # Example: Knox keys "service:auth:*" → D-Bus collection "service_auth"
+    # "app:database": "database_creds"    # Example: Knox keys "app:database:*" → D-Bus collection "database_creds"
+    # "infra:secrets": "infrastructure"   # Example: Knox keys "infra:secrets:*" → D-Bus collection "infrastructure"
 
 encryption:
   # Supported encryption algorithms
@@ -29,3 +41,22 @@ encryption:
   algorithms:
     - "plain"
     - "dh-ietf1024-sha256-aes128-cbc-pkcs7"
+
+# Usage Notes:
+# 1. Default collections (default, session) use namespace_prefix:
+#    - Keys stored as "dbus:default:*" appear in D-Bus "Default" collection
+#    - Keys stored as "dbus:session:*" appear in D-Bus "Session" collection
+#
+# 2. Prefix mappings enable selective exposure of Knox secrets:
+#    - Only keys matching configured prefixes are exposed via D-Bus
+#    - Each prefix maps to a separate D-Bus collection
+#    - Example configuration (uncomment to use):
+#      prefix_mappings:
+#        "service:auth": "service_auth"
+#        "app:database": "database_credentials"
+#      This would expose:
+#        - Knox keys "service:auth:*" as D-Bus collection "service_auth"
+#        - Knox keys "app:database:*" as D-Bus collection "database_credentials"
+#
+# 3. The bridge automatically creates D-Bus collections for mapped prefixes
+#    and loads corresponding Knox keys as D-Bus secret items.

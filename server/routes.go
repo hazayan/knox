@@ -10,7 +10,7 @@ import (
 
 	"github.com/hazayan/knox/log"
 	"github.com/hazayan/knox/pkg/types"
-	"github.com/hazayan/knox/server/auth"
+
 )
 
 var routes = [...]Route{
@@ -138,12 +138,9 @@ func getKeysHandler(m KeyManager, _ types.Principal, parameters map[string]strin
 // key ID, base64 encoded data, and JSON encoded ACL.
 // It returns the key version ID of the original Primary key version.
 // The route for this handler is POST /v0/keys/
-// The postKeysHandler must be a User.
+// The postKeysHandler can be a User or Machine.
 func postKeysHandler(m KeyManager, principal types.Principal, parameters map[string]string) (any, *HTTPError) {
-	// Authorize
-	if !auth.IsUser(principal) {
-		return nil, errF(types.UnauthorizedCode, fmt.Sprintf("Must be a user to create keys, principal is %s", principal.GetID()))
-	}
+	// Authorize (machines can now create keys)
 
 	keyID, keyIDOK := parameters["id"]
 	if !keyIDOK {

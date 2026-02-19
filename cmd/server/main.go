@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,9 +25,14 @@ import (
 	"github.com/hazayan/knox/pkg/observability/logging"
 	"github.com/hazayan/knox/pkg/observability/metrics"
 	"github.com/hazayan/knox/pkg/storage"
+	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
+	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
+	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
+	_ "github.com/hazayan/knox/pkg/storage/etcd"       // Register etcd backend
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server"
 	"github.com/hazayan/knox/server/auth"
+	pkgauth "github.com/hazayan/knox/pkg/auth"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"golang.org/x/time/rate"
@@ -458,24 +464,45 @@ func runServer(_ *cobra.Command, _ []string) error {
 func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 	var providers []auth.Provider
 
+	logging.Debugf("Auth config: providers=%+v", cfg.Auth.Providers)
 	for _, providerCfg := range cfg.Auth.Providers {
 		switch providerCfg.Type {
 		case "spiffe":
-			// Create SPIFFE auth provider
-			provider := auth.NewSpiffeAuthProvider(nil) // TODO: Load CA pool from config
+			// Load CA pool for SPIFFE auth provider
+			caPool, err := loadCAPool(providerCfg.CAFile)
+			if err != nil {
+				logging.Errorf("Failed to load CA pool for SPIFFE provider (CA file: %s): %v", providerCfg.CAFile, err)
+				continue
+			}
+			provider := auth.NewSpiffeAuthProvider(caPool)
 			providers = append(providers, provider)
+			logging.Debugf("Added SPIFFE auth provider to list")
 			logging.Infof("✓ Configured SPIFFE auth provider (trust domain: %s)", providerCfg.TrustDomain)
 
 		case "mtls":
-			// Create mTLS auth provider
-			provider := auth.NewMTLSAuthProvider(nil) // TODO: Load CA pool from config
+			// Load CA pool to validate CA file exists (still used for TLS config)
+			_, err := loadCAPool(providerCfg.CAFile)
+			if err != nil {
+				logging.Errorf("Failed to load CA pool for mTLS provider (CA file: %s): %v", providerCfg.CAFile, err)
+				continue
+			}
+			provider := pkgauth.NewMTLSProvider()
 			providers = append(providers, provider)
+			logging.Debugf("Added mTLS auth provider to list")
 			logging.Infof("✓ Configured mTLS auth provider (CA: %s)", providerCfg.CAFile)
+
+		case "github":
+			// Create GitHub OAuth token auth provider
+			provider := auth.NewGitHubProvider(10 * time.Second)
+			providers = append(providers, provider)
+			logging.Debugf("Added GitHub auth provider to list")
+			logging.Info("✓ Configured GitHub OAuth auth provider")
 
 		case "mock":
 			// Create mock auth provider for testing
 			provider := auth.MockGitHubProvider()
 			providers = append(providers, provider)
+			logging.Debugf("Added mock auth provider to list")
 			logging.Info("✓ Configured mock auth provider for testing")
 
 		default:
@@ -483,6 +510,7 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 		}
 	}
 
+	logging.Debugf("Total providers configured: %d", len(providers))
 	if len(providers) == 0 {
 		logging.Error("CRITICAL: No authentication providers configured - server will reject all requests!")
 		logging.Error("Configure at least one auth provider in config file")
@@ -491,7 +519,122 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 	return providers
 }
 
-// createTLSConfig creates a TLS configuration from config.
+// loadCAPool loads a CA certificate pool from a file.
+func loadCAPool(caFile string) (*x509.CertPool, error) {
+	if caFile == "" {
+		return nil, errors.New("CA file path is empty")
+	}
+
+	// Check if file exists and is readable
+	if info, err := os.Stat(caFile); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("CA certificate file does not exist: %s", caFile)
+		}
+		if os.IsPermission(err) {
+			return nil, fmt.Errorf("permission denied reading CA certificate file: %s", caFile)
+		}
+		return nil, fmt.Errorf("cannot access CA certificate file %s: %w", caFile, err)
+	} else if info.IsDir() {
+		return nil, fmt.Errorf("CA certificate path is a directory, not a file: %s", caFile)
+	}
+
+	// Read CA certificate file
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate file %s: %w", caFile, err)
+	}
+
+	// Check if file is empty
+	if len(caCert) == 0 {
+		return nil, fmt.Errorf("CA certificate file is empty: %s", caFile)
+	}
+
+	// Create certificate pool
+	caCertPool := x509.NewCertPool()
+
+	// First try to parse as PEM format
+	if caCertPool.AppendCertsFromPEM(caCert) {
+		return caCertPool, nil
+	}
+
+	// If PEM parsing failed, try to parse as a single DER certificate
+	derCert, err := x509.ParseCertificate(caCert)
+	if err != nil {
+		// Neither PEM nor single DER worked - provide detailed analysis
+		formatHint := analyzeCertificateFormat(caCert)
+		return nil, fmt.Errorf("failed to parse CA certificate file %s: invalid certificate format%s", caFile, formatHint)
+	}
+
+	// Successfully parsed as single DER certificate
+	caCertPool.AddCert(derCert)
+	return caCertPool, nil
+}
+
+// analyzeCertificateFormat analyzes certificate bytes and returns a helpful error hint.
+func analyzeCertificateFormat(data []byte) string {
+	if len(data) == 0 {
+		return " (file is empty)"
+	}
+
+	// Check for PEM format markers
+	dataStr := string(data)
+	if strings.Contains(dataStr, "-----BEGIN") {
+		if !strings.Contains(dataStr, "-----END") {
+			return " (PEM format detected but missing END marker)"
+		}
+		// Check for common PEM types
+		if strings.Contains(dataStr, "CERTIFICATE") {
+			return " (PEM CERTIFICATE detected but parsing failed - may be corrupt or unsupported format)"
+		}
+		if strings.Contains(dataStr, "RSA PRIVATE KEY") {
+			return " (file appears to be a private key, not a CA certificate)"
+		}
+		return " (PEM format detected but unknown type)"
+	}
+
+	// Check if it looks like binary/DER
+	isLikelyBinary := false
+	if len(data) > 0 {
+		// DER certificates typically start with 0x30 (SEQUENCE)
+		if data[0] == 0x30 && len(data) > 4 {
+			isLikelyBinary = true
+		}
+		// Also check for common ASN.1 tags
+		if len(data) > 1 && (data[0] == 0x30 || data[0] == 0x31 || data[0] == 0x32) {
+			isLikelyBinary = true
+		}
+	}
+
+	if isLikelyBinary {
+		return " (DER/binary format detected but parsing failed - may be corrupt or unsupported)"
+	}
+
+	// Check if it looks like plain text but not PEM
+	if len(data) < 1024 && strings.Contains(dataStr, "\n") {
+		// Might be base64 without PEM headers
+		if _, err := base64.StdEncoding.DecodeString(strings.TrimSpace(dataStr)); err == nil {
+			return " (file appears to be base64-encoded without PEM headers)"
+		}
+		return " (text format detected but not valid PEM)"
+	}
+
+	b1 := byte(0)
+	b2 := byte(0)
+	b3 := byte(0)
+	if len(data) > 1 {
+		b1 = data[1]
+	}
+	if len(data) > 2 {
+		b2 = data[2]
+	}
+	if len(data) > 3 {
+		b3 = data[3]
+	}
+	return fmt.Sprintf(" (file size: %d bytes, first bytes: %02x %02x %02x %02x)",
+		len(data), data[0], b1, b2, b3)
+}
+
+// createTLSConfig creates TLS configuration for the server.
 func createTLSConfig(cfg *config.TLSConfig) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
@@ -603,7 +746,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 					"path":        r.URL.Path,
 					"remote_addr": r.RemoteAddr,
 				})
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				server.WriteErr(&server.HTTPError{Subcode: types.UnauthenticatedCode, Message: "User or machine is not authenticated"})(w, r)
 				return
 			}
 
@@ -627,7 +770,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 					"remote_addr": r.RemoteAddr,
 					"error":       "principal is nil",
 				})
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				server.WriteErr(&server.HTTPError{Subcode: types.UnauthenticatedCode, Message: "User or machine is not authenticated"})(w, r)
 				return
 			}
 			if err != nil {
@@ -637,7 +780,7 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 					"remote_addr": r.RemoteAddr,
 					"error":       err.Error(),
 				})
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				server.WriteErr(&server.HTTPError{Subcode: types.UnauthenticatedCode, Message: "User or machine is not authenticated"})(w, r)
 				return
 			}
 

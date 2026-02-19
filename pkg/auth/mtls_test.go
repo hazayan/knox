@@ -186,7 +186,8 @@ func TestMTLSProvider_Authenticate_MissingClientAuth(t *testing.T) {
 		NotBefore: time.Now().Add(-24 * time.Hour),
 		NotAfter:  time.Now().Add(24 * time.Hour),
 		KeyUsage:  x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		// Missing ExtKeyUsageClientAuth
+		// Missing ExtKeyUsageClientAuth, but has other extended key usages
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		Subject: pkix.Name{CommonName: "machine.example.com"},
 	}
 
@@ -376,8 +377,8 @@ func TestMTLSProvider_DeterminePrincipalType_EmailAddress(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, principal)
 	assert.Equal(t, "user", principal.Type())
-	// extractIdentity prioritizes CN over email, so we get "user"
-	assert.Equal(t, "user", principal.GetID())
+	// extractIdentity prioritizes email over CN, so we get "user@example.com"
+	assert.Equal(t, "user@example.com", principal.GetID())
 }
 
 // TestMTLSProvider_DeterminePrincipalType_SimpleUser tests user detection via simple CN.

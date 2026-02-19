@@ -99,9 +99,14 @@ func (p *MTLSProvider) Type() byte {
 }
 
 // extractIdentity extracts the identity from a certificate.
-// Priority: SAN DNS > SAN URI > CN.
+// Priority: SAN Email > SAN DNS > SAN URI > CN.
 func extractIdentity(cert *x509.Certificate) string {
-	// Try DNS SANs first (for machines)
+	// Try Email SANs first (for users)
+	if len(cert.EmailAddresses) > 0 {
+		return cert.EmailAddresses[0]
+	}
+
+	// Try DNS SANs (for machines)
 	if len(cert.DNSNames) > 0 {
 		return cert.DNSNames[0]
 	}
@@ -139,16 +144,18 @@ func (p *MTLSProvider) validateCertificate(cert *x509.Certificate) error {
 		return errors.New("certificate missing key encipherment key usage")
 	}
 
-	// Check extended key usage for client authentication
-	hasClientAuth := false
-	for _, extKeyUsage := range cert.ExtKeyUsage {
-		if extKeyUsage == x509.ExtKeyUsageClientAuth {
-			hasClientAuth = true
-			break
+	// Check extended key usage for client authentication (only if extension is present)
+	if len(cert.ExtKeyUsage) > 0 {
+		hasClientAuth := false
+		for _, extKeyUsage := range cert.ExtKeyUsage {
+			if extKeyUsage == x509.ExtKeyUsageClientAuth {
+				hasClientAuth = true
+				break
+			}
 		}
-	}
-	if !hasClientAuth {
-		return errors.New("certificate missing client authentication extended key usage")
+		if !hasClientAuth {
+			return errors.New("certificate missing client authentication extended key usage")
+		}
 	}
 
 	// Basic certificate constraints
@@ -159,8 +166,13 @@ func (p *MTLSProvider) validateCertificate(cert *x509.Certificate) error {
 	return nil
 }
 
-// determinePrincipalType determines if this is a machine or user certificate.
+// determinePrincipalType determines if this is a machine, user, or service certificate.
 func determinePrincipalType(cert *x509.Certificate) types.PrincipalType {
+	// If it has email addresses, likely a user
+	if len(cert.EmailAddresses) > 0 {
+		return types.User
+	}
+
 	// If it has DNS SANs, likely a machine
 	if len(cert.DNSNames) > 0 {
 		return types.Machine
@@ -169,11 +181,6 @@ func determinePrincipalType(cert *x509.Certificate) types.PrincipalType {
 	// If it has URI SANs with spiffe scheme, treat as service
 	if len(cert.URIs) > 0 && cert.URIs[0].Scheme == "spiffe" {
 		return types.Service
-	}
-
-	// If it has email addresses, likely a user
-	if len(cert.EmailAddresses) > 0 {
-		return types.User
 	}
 
 	// Check CN format

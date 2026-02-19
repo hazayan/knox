@@ -125,6 +125,11 @@ func (b *Bridge) Start() error {
 		return fmt.Errorf("failed to create default collections: %w", err)
 	}
 
+	// Create mapped collections from prefix mappings
+	if err := b.createMappedCollections(); err != nil {
+		return fmt.Errorf("failed to create mapped collections: %w", err)
+	}
+
 	// Initialize alias manager with standard aliases
 	if err := b.aliasManager.Initialize(); err != nil {
 		return fmt.Errorf("failed to initialize alias manager: %w", err)
@@ -191,6 +196,44 @@ func (b *Bridge) createDefaultCollections() error {
 	b.mu.Lock()
 	b.collections[SessionCollection] = sessionColl
 	b.mu.Unlock()
+
+	// Update Collections property
+	b.updateCollectionsProperty()
+
+	return nil
+}
+
+// createMappedCollections creates collections based on prefix mappings configuration.
+func (b *Bridge) createMappedCollections() error {
+	if b.config.Knox.PrefixMappings == nil {
+		return nil // No mappings configured
+	}
+
+	for knoxPrefix, dbusCollectionName := range b.config.Knox.PrefixMappings {
+		if dbusCollectionName == "" {
+			continue // Skip empty collection names
+		}
+
+		// Check if collection already exists
+		b.mu.Lock()
+		_, exists := b.collections[dbusCollectionName]
+		b.mu.Unlock()
+		if exists {
+			continue // Collection already created
+		}
+
+		// Create collection with custom prefix mapping
+		// Use knoxPrefix directly as the custom prefix
+		collection := NewCollection(b, dbusCollectionName, dbusCollectionName, knoxPrefix)
+		if err := collection.Export(b.conn); err != nil {
+			return fmt.Errorf("failed to export mapped collection %s (prefix %s): %w",
+				dbusCollectionName, knoxPrefix, err)
+		}
+
+		b.mu.Lock()
+		b.collections[dbusCollectionName] = collection
+		b.mu.Unlock()
+	}
 
 	// Update Collections property
 	b.updateCollectionsProperty()

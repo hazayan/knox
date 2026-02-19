@@ -126,7 +126,9 @@ func (a *DBAdapter) Update(dbKey *keydb.DBKey) error {
 		VersionList: types.KeyVersionList{
 			{ID: 1, Data: data}, // Encrypted DBKey serialized here
 		},
+		VersionHash: "", // Will be set below
 	}
+	wrapper.VersionHash = wrapper.VersionList.Hash()
 
 	// Store using backend
 	if err := a.backend.PutKey(ctx, wrapper); err != nil {
@@ -168,7 +170,9 @@ func (a *DBAdapter) Add(keys ...*keydb.DBKey) error {
 			VersionList: types.KeyVersionList{
 				{ID: 1, Data: data}, // Encrypted DBKey serialized here
 			},
+			VersionHash: "", // Will be set below
 		}
+		wrapper.VersionHash = wrapper.VersionList.Hash()
 
 		// Store using backend
 		if err := a.backend.PutKey(ctx, wrapper); err != nil {

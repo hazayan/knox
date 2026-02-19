@@ -346,7 +346,21 @@ func newKey(id string, acl types.ACL, d []byte, u types.Principal) types.Key {
 	key := types.Key{}
 	key.ID = id
 
-	creatorAccess := types.Access{ID: u.GetID(), AccessType: types.Admin, Type: types.User}
+	// Determine principal type from principal
+	var principalType types.PrincipalType
+	switch u.Type() {
+	case "user":
+		principalType = types.User
+	case "machine":
+		principalType = types.Machine
+	case "service":
+		principalType = types.Service
+	default:
+		// Default to User for backward compatibility
+		principalType = types.User
+	}
+
+	creatorAccess := types.Access{ID: u.GetID(), AccessType: types.Admin, Type: principalType}
 	key.ACL = acl.Add(creatorAccess)
 	for _, a := range defaultAccess {
 		key.ACL = key.ACL.Add(a)

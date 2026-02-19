@@ -141,12 +141,11 @@ knox/
 
 Create `server.yaml`:
 ```yaml
-server:
-  bind_address: "0.0.0.0:9000"
-  tls:
-    cert_file: "/etc/knox/tls/server.crt"
-    key_file: "/etc/knox/tls/server.key"
-    client_ca: "/etc/knox/tls/ca.crt"
+bind_address: "0.0.0.0:9000"
+tls:
+  cert_file: "/etc/knox/tls/server.crt"
+  key_file: "/etc/knox/tls/server.key"
+  client_ca: "/etc/knox/tls/ca.crt"
 
 storage:
   backend: "postgres"
