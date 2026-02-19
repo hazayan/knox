@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hazayan/knox/pkg/storage"
+	"github.com/hazayan/knox/pkg/xdg"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v2"
 )
@@ -145,9 +146,10 @@ type DBusConnectionConfig struct {
 
 // DBusKnoxConfig holds Knox server configuration for the D-Bus bridge.
 type DBusKnoxConfig struct {
-	Server          string          `mapstructure:"server"`
-	TLS             ClientTLSConfig `mapstructure:"tls"`
-	NamespacePrefix string          `mapstructure:"namespace_prefix"`
+	Server          string            `mapstructure:"server"`
+	TLS             ClientTLSConfig   `mapstructure:"tls"`
+	NamespacePrefix string            `mapstructure:"namespace_prefix"`
+	PrefixMappings  map[string]string `mapstructure:"prefix_mappings"`
 }
 
 // EncryptionConfig holds D-Bus encryption configuration.
@@ -198,6 +200,10 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if errors.As(err, &configFileNotFoundError) {
 			// Return default config
+			cacheDir, err := getDefaultCacheDir("default")
+			if err != nil {
+				return nil, fmt.Errorf("failed to get default cache directory: %w", err)
+			}
 			return &ClientConfig{
 				CurrentProfile: "default",
 				Profiles: map[string]ClientProfile{
@@ -205,7 +211,7 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 						Server: "localhost:9000",
 						Cache: CacheConfig{
 							Enabled:   true,
-							Directory: filepath.Join(os.Getenv("HOME"), ".knox", "cache"),
+							Directory: cacheDir,
 							TTL:       "5m",
 						},
 					},
@@ -247,6 +253,12 @@ func LoadDBusConfig(path string) (*DBusConfig, error) {
 	return &cfg, nil
 }
 
+// GetDefaultClientConfigPath returns the default path for client configuration file.
+// It follows XDG Base Directory Specification.
+func GetDefaultClientConfigPath() (string, error) {
+	return xdg.ConfigFile("config.yaml")
+}
+
 // SaveClientConfig saves client configuration to a file.
 func SaveClientConfig(path string, cfg *ClientConfig) error {
 	// Ensure directory exists
@@ -272,4 +284,10 @@ func SaveClientConfig(path string, cfg *ClientConfig) error {
 // ParseDuration parses a duration string with units (e.g., "5m", "1h").
 func ParseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s)
+}
+
+// getDefaultCacheDir returns the default cache directory for a profile.
+// Uses XDG Base Directory Specification.
+func getDefaultCacheDir(profileName string) (string, error) {
+	return xdg.ProfileCacheDir(profileName)
 }

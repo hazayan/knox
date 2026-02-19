@@ -66,6 +66,17 @@ knox:
     client_key: ""
   namespace_prefix: "dbus"  # Keys stored as dbus:collection:item
 
+  # Prefix mappings from Knox key prefixes to D-Bus collection names (optional)
+  # Format: "knox_prefix": "dbus_collection_name"
+  # Example: "service:auth": "service_auth" means Knox keys starting with "service:auth:"
+  # get exposed in D-Bus collection "service_auth"
+  prefix_mappings: {}
+  # Example mappings (uncomment and modify as needed):
+  # prefix_mappings:
+  #   "service:auth": "service_auth"
+  #   "app:database": "database_credentials"
+  #   "infra:secrets": "infrastructure"
+
 encryption:
   algorithms:
     - "plain"  # Knox handles encryption
@@ -194,6 +205,67 @@ Each secret item becomes a Knox key:
 
 - **default**: Persistent secrets (stored in Knox)
 - **session**: Temporary secrets (in-memory, lost on restart)
+
+### Prefix Mappings (Advanced Configuration)
+
+For more granular control over which Knox keys are exposed via D-Bus and how they're organized, you can use **prefix mappings** in your D-Bus bridge configuration.
+
+Prefix mappings allow you to:
+1. **Filter which Knox keys are exported** to D-Bus (only keys matching configured prefixes)
+2. **Map Knox key prefixes to D-Bus collection names** for customizable organization
+3. **Selectively expose subsets** of your Knox secrets to D-Bus applications
+
+#### Configuration Example
+
+```yaml
+knox:
+  server: "localhost:9000"
+  namespace_prefix: "dbus"  # For default collections
+  
+  # Prefix mappings from Knox key prefixes to D-Bus collection names
+  prefix_mappings:
+    "service:auth": "service_auth"      # Knox keys "service:auth:*" → D-Bus collection "service_auth"
+    "app:database": "database_creds"    # Knox keys "app:database:*" → D-Bus collection "database_creds"
+    "infra:secrets": "infrastructure"   # Knox keys "infra:secrets:*" → D-Bus collection "infrastructure"
+```
+
+#### How It Works
+
+1. **Default Collections**: Use the `namespace_prefix` (e.g., `dbus:default:*`, `dbus:session:*`)
+2. **Mapped Collections**: Use custom prefixes defined in `prefix_mappings`
+
+**Example Knox Keys and Their D-Bus Mapping:**
+
+| Knox Key | D-Bus Collection | D-Bus Item | Exposed? |
+|----------|------------------|------------|----------|
+| `dbus:default:firefox_password` | `Default` | `firefox_password` | ✅ Yes |
+| `dbus:session:temp_token` | `Session` | `temp_token` | ✅ Yes |
+| `service:auth:github_token` | `service_auth` | `github_token` | ✅ Yes |
+| `app:database:prod_password` | `database_creds` | `prod_password` | ✅ Yes |
+| `other:prefix:should_not_appear` | *(none)* | *(none)* | ❌ No |
+
+#### Key Benefits
+
+- **Security**: Only expose specific Knox namespaces to D-Bus
+- **Organization**: Group related secrets into logical D-Bus collections
+- **Compatibility**: Maintain separate collections for different applications/teams
+- **Migration**: Gradually migrate secrets to D-Bus without exposing everything
+
+#### Migration Example
+
+If you have existing Knox keys with various prefixes and want to expose them via D-Bus:
+
+```yaml
+prefix_mappings:
+  "legacy:passwords": "legacy_passwords"
+  "new:api:keys": "api_keys"
+  "team:infra:secrets": "infrastructure"
+```
+
+The D-Bus bridge will:
+1. Create collections `legacy_passwords`, `api_keys`, `infrastructure`
+2. Load all matching Knox keys into their respective collections
+3. Expose them via the D-Bus Secret Service API
 
 ## Security Model
 

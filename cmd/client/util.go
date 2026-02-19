@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/xdg"
 	"github.com/spf13/cobra"
 )
 
@@ -195,6 +197,49 @@ func createHTTPClient(prof *config.ClientProfile) (*http.Client, error) {
 	}, nil
 }
 
+// extractCertCN extracts the identity from a client certificate.
+// Priority: email SAN > DNS SAN > URI SAN > Common Name.
+func extractCertCN(certPath string) (string, error) {
+	// Read the certificate file
+	certData, err := os.ReadFile(certPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read certificate file: %w", err)
+	}
+
+	// Parse the certificate
+	block, _ := pem.Decode(certData)
+	if block == nil {
+		return "", errors.New("failed to parse certificate PEM")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse certificate: %w", err)
+	}
+
+	// Extract email SAN if present
+	if len(cert.EmailAddresses) > 0 {
+		return cert.EmailAddresses[0], nil
+	}
+
+	// Extract DNS SAN if present
+	if len(cert.DNSNames) > 0 {
+		return cert.DNSNames[0], nil
+	}
+
+	// Extract URI SAN if present
+	if len(cert.URIs) > 0 {
+		return cert.URIs[0].String(), nil
+	}
+
+	// Fall back to Common Name
+	if cert.Subject.CommonName == "" {
+		return "", errors.New("certificate has no email SAN, DNS SAN, URI SAN, or Common Name")
+	}
+
+	return cert.Subject.CommonName, nil
+}
+
 // createAuthHandlers creates authentication handlers for the client.
 func createAuthHandlers(prof *config.ClientProfile) []client.AuthHandler {
 	var handlers []client.AuthHandler
@@ -202,9 +247,14 @@ func createAuthHandlers(prof *config.ClientProfile) []client.AuthHandler {
 	// mTLS auth handler (if client cert is configured)
 	if prof.TLS.ClientCert != "" {
 		handlers = append(handlers, func() (string, string, client.HTTP) {
-			// mTLS auth is handled by the HTTP client
-			// Return a marker token to indicate mTLS is being used
-			return "0m", "mtls", nil
+			// Extract CN from client certificate for mTLS authentication
+			cn, err := extractCertCN(prof.TLS.ClientCert)
+			if err != nil {
+				// If we can't extract CN, return empty string to skip this handler
+				return "", "mtls", nil
+			}
+			// Return CN as token (server expects Authorization header to match cert CN)
+			return cn, "mtls", nil
 		})
 	}
 
@@ -223,14 +273,12 @@ func createAuthHandlers(prof *config.ClientProfile) []client.AuthHandler {
 		return "", "", nil
 	})
 
-	// File-based auth handler (check for token in ~/.knox/token)
+	// File-based auth handler (check for token in XDG config directory)
 	handlers = append(handlers, func() (string, string, client.HTTP) {
-		homeDir, err := os.UserHomeDir()
+		tokenFile, err := xdg.ConfigFile("token")
 		if err != nil {
 			return "", "", nil
 		}
-
-		tokenFile := filepath.Join(homeDir, ".knox", "token")
 		// Defensive: Only allow absolute paths, forbid traversal
 		if !filepath.IsAbs(tokenFile) || strings.Contains(tokenFile, "..") {
 			return "", "", nil

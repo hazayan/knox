@@ -18,6 +18,7 @@ import (
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/dbus"
 	"github.com/hazayan/knox/pkg/observability/logging"
+	"github.com/hazayan/knox/pkg/xdg"
 	"github.com/spf13/cobra"
 )
 
@@ -36,8 +37,12 @@ allowing desktop applications (Firefox, Chrome, SSH, etc.) to store secrets in K
 		RunE:    runDaemon,
 	}
 
-	homeDir, _ := os.UserHomeDir()
-	defaultCfgFile := filepath.Join(homeDir, ".config", "knox", "dbus.yaml")
+	defaultCfgFile, err := xdg.ConfigFile("dbus.yaml")
+	if err != nil {
+		// If we can't determine XDG config path, use empty string
+		// This will cause an error if user doesn't specify --config
+		defaultCfgFile = ""
+	}
 
 	rootCmd.Flags().StringVarP(&cfgFile, "config", "c", defaultCfgFile, "Path to configuration file")
 
@@ -202,20 +207,10 @@ func createAuthHandlers(cfg *config.DBusConfig) []client.AuthHandler {
 		return "", "", nil
 	})
 
-	// File-based auth handler
+	// File-based auth handler (check for token in XDG config directory)
 	handlers = append(handlers, func() (string, string, client.HTTP) {
-		homeDir, err := os.UserHomeDir()
+		tokenFile, err := xdg.ConfigFile("token")
 		if err != nil {
-			return "", "", nil
-		}
-
-		tokenFile := filepath.Join(homeDir, ".knox", "token")
-
-		// Validate token file path for security
-		if !filepath.IsAbs(tokenFile) {
-			return "", "", nil
-		}
-		if strings.Contains(tokenFile, "..") {
 			return "", "", nil
 		}
 

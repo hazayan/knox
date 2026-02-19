@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/hazayan/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/xdg"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +42,7 @@ func newConfigInitCmd() *cobra.Command {
 		Short: "Initialize Knox configuration",
 		Long: `Create a new Knox configuration file with a default profile.
 
-This will create ~/.knox/config.yaml with a default profile configuration.
+This will create a configuration file in the XDG config directory (typically ~/.config/knox/config.yaml) with a default profile configuration.
 
 Examples:
   knox config init
@@ -58,8 +59,10 @@ Examples:
 			}
 
 			// Create default config
-			homeDir, _ := os.UserHomeDir()
-			cacheDir := filepath.Join(homeDir, ".knox", "cache")
+			cacheDir, err := xdg.ProfileCacheDir("default")
+			if err != nil {
+				return fmt.Errorf("failed to get cache directory: %w", err)
+			}
 
 			cfg := &config.ClientConfig{
 				CurrentProfile: "default",
@@ -214,8 +217,11 @@ Examples:
 
 			// Set default cache dir if not specified
 			if cacheDir == "" {
-				homeDir, _ := os.UserHomeDir()
-				cacheDir = filepath.Join(homeDir, ".knox", "cache", profileName)
+				var err error
+				cacheDir, err = xdg.ProfileCacheDir(profileName)
+				if err != nil {
+					return fmt.Errorf("failed to get cache directory: %w", err)
+				}
 			}
 
 			// Add new profile
@@ -501,6 +507,17 @@ knox:
 
   # Namespace prefix for D-Bus keys in Knox
   namespace_prefix: "dbus"
+
+  # Prefix mappings from Knox key prefixes to D-Bus collection names (optional)
+  # Format: "knox_prefix": "dbus_collection_name"
+  # Example: "service:auth": "service_auth" means Knox keys starting with "service:auth:"
+  # get exposed in D-Bus collection "service_auth"
+  prefix_mappings: {}
+  # Example mappings (uncomment and modify as needed):
+  # prefix_mappings:
+  #   "service:auth": "service_auth"
+  #   "app:database": "database_credentials"
+  #   "infra:secrets": "infrastructure"
 
 encryption:
   # Supported encryption algorithms
