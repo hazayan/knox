@@ -34,12 +34,22 @@ type Collection struct {
 }
 
 // NewCollection creates a new collection.
-func NewCollection(bridge *Bridge, name, label string) *Collection {
+func NewCollection(bridge *Bridge, name, label string, customPrefix ...string) *Collection {
 	now := time.Now().Unix()
+	prefix := ""
+	if len(customPrefix) > 0 && customPrefix[0] != "" {
+		// Use custom prefix directly (e.g., "service:auth")
+		// Strip trailing colon if present to avoid double colons
+		knoxPrefix := strings.TrimSuffix(customPrefix[0], ":")
+		prefix = knoxPrefix + ":"
+	} else {
+		// Use default pattern: namespace:collection:
+		prefix = bridge.config.Knox.NamespacePrefix + ":" + name + ":"
+	}
 	return &Collection{
 		name:     name,
 		path:     makeCollectionPath(name),
-		prefix:   bridge.config.Knox.NamespacePrefix + ":" + name + ":",
+		prefix:   prefix,
 		label:    label,
 		bridge:   bridge,
 		items:    make(map[string]*Item),
@@ -105,6 +115,24 @@ func (c *Collection) Export(conn *dbus.Conn) error {
 	// Export the collection
 	if err := conn.Export(c, c.path, CollectionInterface); err != nil {
 		return err
+	}
+
+	// Export introspection
+	introspectNode := c.Introspect()
+	introspectNode.Name = string(c.path)
+	// Ensure prop.IntrospectData is included
+	hasPropIntrospect := false
+	for _, iface := range introspectNode.Interfaces {
+		if iface.Name == "org.freedesktop.DBus.Properties" {
+			hasPropIntrospect = true
+			break
+		}
+	}
+	if !hasPropIntrospect {
+		introspectNode.Interfaces = append([]introspect.Interface{prop.IntrospectData}, introspectNode.Interfaces...)
+	}
+	if err := conn.Export(introspect.NewIntrospectable(introspectNode), c.path, "org.freedesktop.DBus.Introspectable"); err != nil {
+		return fmt.Errorf("failed to export introspection: %w", err)
 	}
 
 	// Load items from Knox

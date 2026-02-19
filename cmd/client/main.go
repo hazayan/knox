@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/observability/logging"
@@ -49,11 +48,10 @@ access control and comprehensive audit logging.`,
 		},
 	}
 
-	// Global flags
-	homeDir, _ := os.UserHomeDir()
-	defaultCfgFile := filepath.Join(homeDir, ".knox", "config.yaml")
+	// Global flags - use XDG Base Directory Specification (with legacy fallback)
+	defaultCfgFile := getDefaultConfigPath()
 
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", defaultCfgFile, "Path to config file")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", defaultCfgFile, "Path to config file (default follows XDG Base Directory Specification)")
 	rootCmd.PersistentFlags().StringVarP(&profile, "profile", "p", "", "Profile to use (overrides config)")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
 
@@ -135,4 +133,16 @@ func getProfileNames(cfg *config.ClientConfig) []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+// getDefaultConfigPath returns the default configuration file path.
+// It uses XDG Base Directory Specification.
+func getDefaultConfigPath() string {
+	path, err := config.GetDefaultClientConfigPath()
+	if err != nil {
+		// No fallback - return error
+		logger.Error("Failed to get XDG config path", err)
+		os.Exit(1)
+	}
+	return path
 }
