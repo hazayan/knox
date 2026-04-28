@@ -1,10 +1,10 @@
-# Knox - Home-Network Secret Management
+# Knox - Personal Secret Management
 
 Knox is a personal secret management service forked from
 [pinterest/knox](https://github.com/pinterest/knox). The target for this fork is
 not enterprise Vault parity. The target is a sturdy, self-hosted "poor man's
-Vault" for a trusted home network: FreeBSD servers, Artix Linux workstations and
-laptops, CLI workflows, and optional FreeDesktop Secret Service integration.
+Vault" for personal Unix systems, CLI workflows, and optional FreeDesktop Secret
+Service integration.
 
 ## Current Status
 
@@ -19,24 +19,24 @@ Knox is under active stabilization. The codebase has meaningful pieces in place:
 
 The implementation does not yet live up to the older production/enterprise
 claims in the documentation. Treat it as alpha software until the full test suite
-is green and the home-network operational path is documented end to end.
+is green and the personal-use operational path is documented end to end.
 
 ## Intended Use
 
 The practical deployment model is:
 
 ```text
-FreeBSD or Linux host
+Unix server or workstation
   knox-server
   filesystem or PostgreSQL storage
   master key from /etc/knox/master.key or KNOX_MASTER_KEY_FILE
-  TLS and simple auth suitable for a trusted LAN
+  TLS and simple auth suitable for a private environment
 
-Artix Linux workstation/laptop
+Unix workstation or laptop
   knox CLI
-  optional knox-dbus launched by dinit or an XDG autostart entry
+  optional knox-dbus launched by a user service or XDG autostart entry
 
-FreeBSD/Linux servers
+local scripts and services
   scripts and services using knox CLI or the HTTP API
 ```
 
@@ -49,10 +49,10 @@ These are not primary goals for this fork:
 - enterprise compliance claims
 - multi-region/high-availability operation
 - 10k requests/sec benchmarks
-- systemd-only setup instructions
+- single-init-system setup instructions
 
 etcd, SPIFFE, GitHub auth, and other advanced pieces may remain in the tree, but
-they are secondary to a simple, recoverable home-network deployment.
+they are secondary to a simple, recoverable personal deployment.
 
 ## Build
 
@@ -146,9 +146,9 @@ behavior. See [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) for current command details
 
 ## Desktop Integration
 
-`knox-dbus` implements a FreeDesktop Secret Service bridge. The intended Artix
-Linux path is to launch it with dinit or an XDG session/autostart mechanism, not
-systemd.
+`knox-dbus` implements a FreeDesktop Secret Service bridge. The intended Unix
+desktop path is to launch it with a user service manager or an XDG
+session/autostart mechanism.
 
 Current D-Bus limitations are documented in
 [docs/DBUS_GUIDE.md](docs/DBUS_GUIDE.md). Browser/libsecret compatibility should
@@ -157,14 +157,14 @@ for daily use.
 
 ## Stabilization Checklist
 
-Knox should not be considered sturdy for home-network use until:
+Knox should not be considered sturdy for personal use until:
 
 - `go test ./...` passes
 - the server has one canonical route path
 - storage backend create/update semantics are consistent
 - audit logging covers key and ACL operations without logging secret values
 - master-key rotation cannot remove old cryptors while data still needs them
-- FreeBSD rc.d and Artix dinit examples exist
+- generic service-manager examples exist
 - backup and restore are documented and tested
 - D-Bus behavior is verified with `secret-tool`
 
@@ -173,5 +173,5 @@ Knox should not be considered sturdy for home-network use until:
 - [Architecture](docs/ARCHITECTURE.md)
 - [CLI Guide](docs/CLI_GUIDE.md)
 - [D-Bus Guide](docs/DBUS_GUIDE.md)
-- [Home Operations](docs/HOME_OPERATIONS.md)
+- [Personal Operations](docs/HOME_OPERATIONS.md)
 - [Documentation Index](docs/INDEX.md)
