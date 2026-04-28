@@ -42,8 +42,8 @@ var (
 
 var (
 	lockTimeout                       = 10 * time.Second
-	defaultFilePermission os.FileMode = 0o666
-	defaultDirPermission  os.FileMode = 0o777
+	defaultFilePermission os.FileMode = 0o600
+	defaultDirPermission  os.FileMode = 0o700
 )
 
 var daemonRefreshTime = 10 * time.Minute
@@ -133,20 +133,18 @@ func (d *daemon) initialize() error {
 		return fmt.Errorf("failed to initialize /var/lib/knox (run 'sudo mkdir /var/lib/knox'?): %s", err.Error())
 	}
 
-	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.dir, defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("failed to open up directory permissions: %s", err.Error())
+		return fmt.Errorf("failed to secure daemon directory permissions: %s", err.Error())
 	}
 	err = os.MkdirAll(d.keyDir(), defaultDirPermission)
 	if err != nil {
 		return fmt.Errorf("failed to make key folders: %s", err.Error())
 	}
 
-	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.keyDir(), defaultDirPermission)
 	if err != nil {
-		return fmt.Errorf("failed to open up directory permissions: %s", err.Error())
+		return fmt.Errorf("failed to secure key directory permissions: %s", err.Error())
 	}
 	_, err = os.Stat(d.registerFilename())
 	if os.IsNotExist(err) {
@@ -158,10 +156,9 @@ func (d *daemon) initialize() error {
 		return err
 	}
 
-	// Need to chmod due to a umask set on masterless puppet machines
 	err = os.Chmod(d.registerFilename(), defaultFilePermission)
 	if err != nil {
-		return fmt.Errorf("failed to open up register file permissions: %s", err.Error())
+		return fmt.Errorf("failed to secure register file permissions: %s", err.Error())
 	}
 	d.registerKeyFile = NewKeysFile(d.registerFilename())
 	return nil
