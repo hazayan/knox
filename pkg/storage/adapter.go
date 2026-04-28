@@ -57,7 +57,7 @@ func (a *DBAdapter) Get(keyID string) (*keydb.DBKey, error) {
 	wrapper, err := a.backend.GetKey(ctx, keyID)
 	if err != nil {
 		if errors.Is(err, ErrKeyNotFound) {
-			return nil, nil // Knox convention: nil for not found
+			return nil, types.ErrKeyIDNotFound
 		}
 		return nil, fmt.Errorf("backend get failed: %w", err)
 	}
@@ -151,7 +151,7 @@ func (a *DBAdapter) Add(keys ...*keydb.DBKey) error {
 		// Check if key already exists
 		_, err := a.backend.GetKey(ctx, dbKey.ID)
 		if err == nil {
-			return fmt.Errorf("key already exists: %s", dbKey.ID)
+			return types.ErrKeyExists
 		}
 		if !errors.Is(err, ErrKeyNotFound) {
 			return fmt.Errorf("backend check failed: %w", err)

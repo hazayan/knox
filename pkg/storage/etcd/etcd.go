@@ -177,17 +177,7 @@ func (b *Backend) PutKey(ctx context.Context, key *types.Key) error {
 		}
 	}()
 
-	// Check if key already exists for proper error reporting
-	resp, err := b.client.Get(ctx, b.buildKeyPath(key.ID))
-	if err != nil {
-		return fmt.Errorf("etcd get failed during put: %w", err)
-	}
-
-	if len(resp.Kvs) > 0 {
-		return storage.ErrKeyExists
-	}
-
-	// Put the key with lease to enable automatic cleanup if needed
+	// PutKey is an upsert across storage backends.
 	_, err = b.client.Put(ctx, b.buildKeyPath(key.ID), string(data))
 	if err != nil {
 		return fmt.Errorf("etcd put failed: %w", err)
@@ -340,9 +330,15 @@ func (b *Backend) UpdateKey(ctx context.Context, keyID string, updateFn func(*ty
 		return fmt.Errorf("failed to marshal updated key: %w", err)
 	}
 
-	// Use transaction for atomic update
+	version := int64(0)
+	if len(resp.Kvs) > 0 {
+		version = resp.Kvs[0].Version
+	}
+
+	// Use transaction for atomic update. Version 0 means the key must not
+	// exist, which covers create-through-update without indexing an empty result.
 	txnResp, err := b.client.Txn(ctx).
-		If(clientv3.Compare(clientv3.Version(b.buildKeyPath(keyID)), "=", resp.Kvs[0].Version)).
+		If(clientv3.Compare(clientv3.Version(b.buildKeyPath(keyID)), "=", version)).
 		Then(clientv3.OpPut(b.buildKeyPath(keyID), string(data))).
 		Commit()
 	if err != nil {

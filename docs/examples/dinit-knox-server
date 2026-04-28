@@ -1,0 +1,4 @@
+type = process
+command = /usr/local/bin/knox-server --config /etc/knox/server.yaml
+restart = true
+logfile = /var/log/knox/knox-server.log

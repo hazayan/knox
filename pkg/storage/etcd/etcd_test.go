@@ -64,9 +64,14 @@ func TestBackend_PutKey(t *testing.T) {
 	err := backend.PutKey(ctx, key)
 	assert.NoError(t, err)
 
-	// Test storing duplicate key
+	// Test storing duplicate key updates in place
+	key.VersionHash = "updated-hash"
 	err = backend.PutKey(ctx, key)
-	assert.ErrorIs(t, err, storage.ErrKeyExists)
+	assert.NoError(t, err)
+
+	updated, err := backend.GetKey(ctx, key.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "updated-hash", updated.VersionHash)
 
 	// Test storing invalid key
 	invalidKey := &types.Key{

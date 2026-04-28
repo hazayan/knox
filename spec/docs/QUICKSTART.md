@@ -128,4 +128,5 @@ If you need to modify the specs:
 
 ---
 
-**Pro Tip**: Keep this window open while developing Knox features. Run `make check-all` before every commit. It's faster than debugging production issues! 🚀
+Tip: run `make check-all` when changing code that should match these models, then
+run the Go tests that exercise the implementation path.

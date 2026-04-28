@@ -191,7 +191,7 @@ func TestDBAdapter_Get(t *testing.T) {
 		adapter := NewDBAdapter(mockBackend, nil)
 
 		result, err := adapter.Get("non-existent")
-		require.NoError(t, err)
+		require.ErrorIs(t, err, types.ErrKeyIDNotFound)
 		assert.Nil(t, result, "Should return nil for non-existent key")
 	})
 
@@ -501,8 +501,7 @@ func TestDBAdapter_Add(t *testing.T) {
 
 		// Try to add again
 		err = adapter.Add(testDBKey)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "key already exists")
+		assert.ErrorIs(t, err, types.ErrKeyExists)
 	})
 
 	t.Run("Add_BackendFailure", func(t *testing.T) {
@@ -550,7 +549,7 @@ func TestDBAdapter_Remove(t *testing.T) {
 
 		// Verify it's gone
 		result, err = adapter.Get("test-key")
-		require.NoError(t, err)
+		require.ErrorIs(t, err, types.ErrKeyIDNotFound)
 		assert.Nil(t, result)
 	})
 

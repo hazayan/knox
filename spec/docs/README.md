@@ -4,7 +4,13 @@ This directory contains formal specifications and verification for Knox's core f
 
 ## Overview
 
-Knox is a production secret key management and rotation system. Formal verification helps us prove critical safety and liveness properties that are difficult to test exhaustively with traditional testing approaches.
+Knox is a home-network secret key management and rotation system. These TLA+
+models document and check intended safety and liveness properties that are
+difficult to test exhaustively with traditional tests.
+
+Important: TLA+ verifies the model, not the Go implementation. Claims in this
+directory are only valid when the implementation is kept in sync with the specs
+and covered by tests.
 
 We've formalized three core aspects of Knox:
 
@@ -396,7 +402,8 @@ jobs:
           make check-all TLC_JAR=/tmp/tla2tools.jar
 ```
 
-This ensures every commit is formally verified.
+This ensures every commit reruns the model checks. It does not prove that the Go
+implementation refines the TLA+ models.
 
 ## Resources
 
