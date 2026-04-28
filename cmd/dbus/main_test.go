@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -590,7 +591,7 @@ func TestDBusBridgeCreateAuthHandlersComprehensive(t *testing.T) {
 	})
 
 	t.Run("WithEnvironmentTokens", func(t *testing.T) {
-		t.Setenv("KNOX_USER_AUTH", "user-token")
+		t.Setenv("KNOX_USER_AUTH", " user-token\n")
 		t.Setenv("KNOX_MACHINE_AUTH", "machine-token")
 		defer func() {
 			t.Setenv("KNOX_USER_AUTH", "")
@@ -616,19 +617,15 @@ func TestDBusBridgeCreateAuthHandlersComprehensive(t *testing.T) {
 
 	t.Run("WithFileToken", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		tokenFile := filepath.Join(tmpDir, ".config", "knox", "token")
+		tokenFile := filepath.Join(tmpDir, "knox", "token")
 
-		err := os.MkdirAll(filepath.Dir(tokenFile), 0o755)
+		err := os.MkdirAll(filepath.Dir(tokenFile), 0o700)
 		require.NoError(t, err)
 
-		err = os.WriteFile(tokenFile, []byte("file-token"), 0o600)
+		err = os.WriteFile(tokenFile, []byte("file-token\n"), 0o600)
 		require.NoError(t, err)
 
-		oldHome := os.Getenv("HOME")
-		t.Setenv("HOME", tmpDir)
-		defer func() {
-			t.Setenv("HOME", oldHome)
-		}()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 		cfg := &config.DBusConfig{
 			Knox: config.DBusKnoxConfig{},
@@ -647,6 +644,38 @@ func TestDBusBridgeCreateAuthHandlersComprehensive(t *testing.T) {
 			}
 		}
 		assert.True(t, foundFileToken, "Should have found file token")
+	})
+
+	t.Run("RejectsInsecureFileToken", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Unix permission checks do not apply on Windows")
+		}
+
+		tmpDir := t.TempDir()
+		tokenFile := filepath.Join(tmpDir, "knox", "token")
+
+		err := os.MkdirAll(filepath.Dir(tokenFile), 0o700)
+		require.NoError(t, err)
+
+		err = os.WriteFile(tokenFile, []byte("file-token\n"), 0o644)
+		require.NoError(t, err)
+
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		t.Setenv("KNOX_USER_AUTH", "")
+		t.Setenv("KNOX_MACHINE_AUTH", "")
+
+		cfg := &config.DBusConfig{
+			Knox: config.DBusKnoxConfig{},
+		}
+
+		handlers := createAuthHandlers(cfg)
+
+		for _, handler := range handlers {
+			token, authType, httpClient := handler()
+			assert.Empty(t, token)
+			assert.Empty(t, authType)
+			assert.Nil(t, httpClient)
+		}
 	})
 }
 

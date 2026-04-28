@@ -53,6 +53,26 @@ func TestCommandStructure(t *testing.T) {
 		}
 	})
 
+	t.Run("auth_command_structure", func(t *testing.T) {
+		cmd := newAuthCmd()
+		assert.NotNil(t, cmd)
+		assert.Equal(t, "auth", cmd.Use)
+		assert.Contains(t, cmd.Short, "auth")
+
+		subcommands := cmd.Commands()
+		assert.Greater(t, len(subcommands), 0, "Auth command should have subcommands")
+
+		subcommandNames := make(map[string]bool)
+		for _, subcmd := range subcommands {
+			subcommandNames[subcmd.Name()] = true
+		}
+
+		expectedSubcommands := []string{"login", "logout", "status"}
+		for _, expected := range expectedSubcommands {
+			assert.True(t, subcommandNames[expected], "Auth command should have %s subcommand", expected)
+		}
+	})
+
 	t.Run("config_command_structure", func(t *testing.T) {
 		cmd := newConfigCmd()
 		assert.NotNil(t, cmd)
@@ -71,6 +91,26 @@ func TestCommandStructure(t *testing.T) {
 		expectedSubcommands := []string{"init", "show", "profile"}
 		for _, expected := range expectedSubcommands {
 			assert.True(t, subcommandNames[expected], "Config command should have %s subcommand", expected)
+		}
+	})
+
+	t.Run("server_command_structure", func(t *testing.T) {
+		cmd := newServerCmd()
+		assert.NotNil(t, cmd)
+		assert.Equal(t, "server", cmd.Use)
+		assert.Contains(t, cmd.Short, "server")
+
+		subcommands := cmd.Commands()
+		assert.Greater(t, len(subcommands), 0, "Server command should have subcommands")
+
+		subcommandNames := make(map[string]bool)
+		for _, subcmd := range subcommands {
+			subcommandNames[subcmd.Name()] = true
+		}
+
+		expectedSubcommands := []string{"health", "ready", "info"}
+		for _, expected := range expectedSubcommands {
+			assert.True(t, subcommandNames[expected], "Server command should have %s subcommand", expected)
 		}
 	})
 

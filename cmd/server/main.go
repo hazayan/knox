@@ -64,6 +64,20 @@ func (ts *TestServer) Shutdown(_ context.Context) error {
 // createTestServer creates a test server instance for integration testing
 // This function is exported for use in test files.
 func createTestServer(cfg *config.ServerConfig) (*TestServer, error) {
+	masterKey, err := crypto.GenerateMasterKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate test master key: %w", err)
+	}
+	defer func() {
+		for i := range masterKey {
+			masterKey[i] = 0
+		}
+	}()
+
+	return createTestServerWithMasterKey(cfg, masterKey)
+}
+
+func createTestServerWithMasterKey(cfg *config.ServerConfig, masterKey []byte) (*TestServer, error) {
 	// Initialize logging
 	if err := logging.Initialize(logging.Config{
 		Level:  cfg.Observability.Logging.Level,
@@ -91,18 +105,10 @@ func createTestServer(cfg *config.ServerConfig) (*TestServer, error) {
 	}
 	logging.Infof("Created storage backend: %s", cfg.Storage.Backend)
 
-	masterKey, err := crypto.GenerateMasterKey()
-	if err != nil {
-		_ = backend.Close()
-		return nil, fmt.Errorf("failed to generate test master key: %w", err)
-	}
 	cryptor, err := crypto.NewAESCryptor(masterKey)
 	if err != nil {
 		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create test cryptor: %w", err)
-	}
-	for i := range masterKey {
-		masterKey[i] = 0
 	}
 
 	db := storage.NewDBAdapter(backend, cryptor)
@@ -565,6 +571,94 @@ func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			"duration_ms": duration.Milliseconds(),
 			"remote_addr": r.RemoteAddr,
 		}).Info("HTTP request")
+
+		auditRouteOperation(
+			server.GetRouteID(r),
+			server.GetPrincipal(r),
+			server.GetParams(r),
+			server.GetAPIError(r),
+			wrapped.statusCode,
+			r.URL.Path,
+		)
+	}
+}
+
+func auditRouteOperation(routeID string, principal types.Principal, params map[string]string, apiErr *server.HTTPError, statusCode int, path string) {
+	keyID, ok := auditKeyID(routeID, params)
+	if !ok {
+		return
+	}
+
+	principalID := ""
+	principalType := ""
+	if principal != nil {
+		principalID = principal.GetID()
+		principalType = principal.Type()
+	}
+
+	metadata := map[string]any{
+		"route_id":    routeID,
+		"path":        path,
+		"status_code": statusCode,
+		"result":      auditResult(apiErr),
+	}
+	if versionID := params["versionID"]; versionID != "" {
+		metadata["version_id"] = versionID
+	}
+
+	switch routeID {
+	case "getkey":
+		logging.AuditKeyAccess(keyID, principalID, principalType, "read", auditResult(apiErr), metadata)
+	case "postkeys":
+		if apiErr == nil {
+			logging.AuditKeyCreate(keyID, principalID, principalType, metadata)
+		}
+	case "deletekey":
+		if apiErr == nil {
+			logging.AuditKeyDelete(keyID, principalID, principalType, metadata)
+		}
+	case "putaccess":
+		if apiErr == nil {
+			logging.AuditACLChange(keyID, principalID, principalType, "update", metadata)
+		}
+	case "postversion":
+		if apiErr == nil {
+			logging.AuditKeyAccess(keyID, principalID, principalType, "add_version", "success", metadata)
+		}
+	case "putversion":
+		if apiErr == nil {
+			logging.AuditKeyAccess(keyID, principalID, principalType, "update_version", "success", metadata)
+		}
+	}
+}
+
+func auditKeyID(routeID string, params map[string]string) (string, bool) {
+	if params == nil {
+		return "", false
+	}
+	switch routeID {
+	case "postkeys":
+		keyID := params["id"]
+		return keyID, keyID != ""
+	case "getkey", "deletekey", "putaccess", "postversion", "putversion":
+		keyID := params["keyID"]
+		return keyID, keyID != ""
+	default:
+		return "", false
+	}
+}
+
+func auditResult(apiErr *server.HTTPError) string {
+	if apiErr == nil {
+		return "success"
+	}
+	switch apiErr.Subcode {
+	case types.UnauthenticatedCode:
+		return "unauthenticated"
+	case types.UnauthorizedCode:
+		return "denied"
+	default:
+		return "error"
 	}
 }
 
