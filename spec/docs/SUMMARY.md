@@ -203,7 +203,7 @@ git push
 
 ### Why This Matters for Knox
 
-Knox manages production secrets. A bug could:
+Knox manages sensitive home-network secrets. A bug could:
 - 💣 Leak sensitive credentials
 - 💣 Cause permanent data loss
 - 💣 Allow unauthorized access
@@ -296,7 +296,7 @@ formal-verification/
 
 - **TLA+**: Created by Leslie Lamport (Turing Award 2013)
 - **Inspiration**: AWS's use of TLA+ for critical systems
-- **Knox**: Built by the Knox team for production secret management
+- **Knox**: Maintained here as a home-network secret management project
 
 ## Questions?
 
@@ -306,10 +306,10 @@ formal-verification/
 
 ---
 
-**Status**: ✅ Complete and ready for use  
+**Status**: Design models available; implementation conformance still requires tests and review  
 **Created**: 2025-10-24  
 **Total Effort**: 3 TLA+ specs, 5 docs, 1 Makefile, 1 CI workflow  
 **State Space Verified**: ~1.5 million states across all specs  
 **Properties Proven**: 15 safety invariants, 6 liveness properties  
 
-🚀 **Knox is now formally verified!**
+The TLA+ models are useful design checks, not a blanket formal-verification claim for the Go implementation.

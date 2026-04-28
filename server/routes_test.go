@@ -88,9 +88,9 @@ func TestGetKeys(t *testing.T) {
 func TestPostKeys(t *testing.T) {
 	m, db := makeDB()
 	machine := auth.NewMachine("MrRoboto")
-	_, err := postKeysHandler(m, machine, map[string]string{"id": "a1", "data": "MQ=="})
-	if err == nil {
-		t.Fatal("Expected err")
+	_, err := postKeysHandler(m, machine, map[string]string{"id": "machine_key", "data": "MQ=="})
+	if err != nil {
+		t.Fatal("Expected machine key creation to succeed", err)
 	}
 
 	u := auth.NewUser("testuser", []string{})

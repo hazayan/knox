@@ -1,399 +1,185 @@
-# Knox Architecture: Enhanced Implementation
+# Knox Architecture
 
-## Overview
+## Scope
 
-This document describes the enhanced Knox architecture with three major additions:
-1. Production-ready server implementation
-2. Production-ready CLI client
-3. FreeDesktop Secret Service D-Bus bridge
+This fork is scoped as a home-network secret manager. It should be simple enough
+to run on a FreeBSD host, usable from Artix Linux workstations and laptops, and
+recoverable without specialized infrastructure.
 
-## Project Structure
+The design priority is:
 
-```
-knox/
-├── client/                # Client CLI commands (existing)
-├── server/                # Server core logic (existing)
-│   ├── api.go
-│   ├── auth/
-│   ├── keydb/
-│   └── ...
-├── cmd/
-│   ├── client/            # CLI client
-│   ├── server/            # Server
-│   └── dbus/              # FreeDesktop Secret Service bridge
-├── pkg/
-│   ├── config/            # Configuration management
-│   ├── storage/           # Storage backend abstraction
-│   │   ├── memory/
-│   │   ├── filesystem/
-│   │   ├── postgres/
-│   │   └── etcd/
-│   ├── observability/     # Metrics, logging, tracing
-│   │   ├── metrics/
-│   │   └── logging/
-│   ├── dbus/              # D-Bus Secret Service implementation
-│   │   ├── service.go     # Service interface
-│   │   ├── collection.go  # Collection interface
-│   │   ├── item.go        # Item interface
-│   │   └── session.go     # Session interface
-│   └── client/            # NEW: Enhanced client library
-├── knox.go                # Core types (existing)
-├── client.go              # Client library (existing)
-└── docs/                  # NEW: Documentation
-```
+1. Correct secret storage and retrieval
+2. Clear master-key and backup handling
+3. Small, auditable operational surface
+4. CLI usability for scripts and daily administration
+5. Optional Linux desktop integration through FreeDesktop Secret Service
 
-## Component Design
+Enterprise features such as high availability, Kubernetes automation, cloud KMS,
+and compliance reporting are not part of the main maturity target.
 
-### 1. Production Server (cmd/knox-server)
+## Runtime Components
 
-**Features:**
-- Multi-backend storage support (filesystem, PostgreSQL, etcd)
-- High availability with leader election
-- Prometheus metrics endpoint
-- Structured JSON logging
-- Health check endpoints (/health, /ready)
-- Graceful shutdown
-- TLS with certificate rotation support
-- Rate limiting per principal
-- Audit logging to separate stream
+```text
+knox-server
+  HTTP API
+  authentication middleware
+  ACL enforcement
+  key manager
+  encryption layer
+  storage backend
 
-**Configuration:**
-```yaml
-server:
-  bind_address: "0.0.0.0:9000"
-  tls:
-    cert_file: "/etc/knox/tls/server.crt"
-    key_file: "/etc/knox/tls/server.key"
-    client_ca: "/etc/knox/tls/ca.crt"
-
-storage:
-  backend: "postgres"  # memory, filesystem, postgres, etcd
-  postgres:
-    connection_string: "postgresql://knox:password@localhost/knox"
-    max_connections: 100
-
-auth:
-  providers:
-    - type: "spiffe"
-      trust_domain: "example.com"
-    - type: "mtls"
-      ca_file: "/etc/knox/ca.crt"
-
-observability:
-  metrics:
-    enabled: true
-    endpoint: "/metrics"
-  logging:
-    level: "info"
-    format: "json"
-  audit:
-    enabled: true
-    output: "/var/log/knox/audit.log"
-
-limits:
-  rate_limit_per_principal: 100  # requests per second
-  max_key_size: "1MB"
-  max_keys_per_list: 1000
-```
-
-### 2. Production CLI Client (cmd/knox)
-
-**Features:**
-- Unified command interface (replacing dev_client)
-- Configuration file support (~/.knox/config.yaml)
-- Multiple profile support (dev, staging, prod)
-- Interactive mode for sensitive operations
-- Shell completion (bash, zsh, fish)
-- JSON output mode for scripting
-- Key version awareness and caching
-- Offline mode with cached keys
-
-**Command structure:**
-```
 knox
-├── server        # Server management
-│   ├── info      # Get server info
-│   └── health    # Check server health
-├── key           # Key operations
-│   ├── create    # Create a new key
-│   ├── get       # Get key value
-│   ├── list      # List keys
-│   ├── delete    # Delete a key
-│   ├── rotate    # Rotate key (add version)
-│   └── versions  # List key versions
-├── acl           # ACL operations
-│   ├── get       # Get key ACL
-│   ├── add       # Add ACL entry
-│   └── remove    # Remove ACL entry
-├── config        # Configuration management
-│   ├── init      # Initialize config
-│   ├── profile   # Manage profiles
-│   └── show      # Show current config
-└── auth          # Authentication
-    ├── login     # Authenticate user
-    └── logout    # Clear credentials
+  CLI for key, ACL, and config workflows
+
+knox-dbus
+  FreeDesktop Secret Service bridge
+  maps D-Bus collections/items to Knox keys
 ```
 
-**Configuration (~/.knox/config.yaml):**
-```yaml
-current_profile: "production"
+## Recommended Home Deployment
 
-profiles:
-  development:
-    server: "localhost:9000"
-    tls:
-      ca_cert: "/etc/knox/ca.crt"
-      client_cert: "/etc/knox/dev-client.crt"
-      client_key: "/etc/knox/dev-client.key"
-    cache:
-      enabled: true
-      directory: "~/.knox/cache/dev"
+```text
+FreeBSD or Linux server
+  /usr/local/bin/knox-server
+  /etc/knox/server.yaml
+  /etc/knox/master.key
+  /var/lib/knox/keys
 
-  production:
-    server: "knox.example.com:9000"
-    tls:
-      ca_cert: "/etc/knox/prod/ca.crt"
-      client_cert: "/etc/knox/prod/client.crt"
-      client_key: "/etc/knox/prod/client.key"
-    cache:
-      enabled: true
-      directory: "~/.knox/cache/prod"
+Artix workstation/laptop
+  /usr/local/bin/knox
+  ~/.config/knox/config.yaml
+  optional /usr/local/bin/knox-dbus
 ```
 
-### 3. FreeDesktop Secret Service Bridge (cmd/knox-dbus)
+For the first sturdy home-network release, prefer filesystem storage unless
+PostgreSQL is already part of the local environment. etcd is not recommended for
+the home profile because it adds operational complexity that does not help the
+single-server use case.
 
-**Architecture:**
-```
-┌─────────────────────────────────────────────┐
-│         Desktop Applications                │
-│  (Firefox, Chrome, SSH, Git, etc.)          │
-└─────────────────┬───────────────────────────┘
-                  │ D-Bus
-                  │ (org.freedesktop.secrets)
-┌─────────────────▼───────────────────────────┐
-│         knox-dbus Bridge                    │
-│  - Implements Secret Service API            │
-│  - Session management & encryption          │
-│  - Maps Collections ↔ Knox namespaces       │
-│  - Maps Items ↔ Knox secrets                │
-└─────────────────┬───────────────────────────┘
-                  │ HTTPS
-                  │ (Knox API)
-┌─────────────────▼───────────────────────────┐
-│         Knox Server                         │
-│  - Stores secrets                           │
-│  - Enforces ACLs                            │
-│  - Audit logging                            │
-└─────────────────────────────────────────────┘
+## Data Flow
+
+```text
+client or knox-dbus
+  -> Knox HTTP API
+  -> auth middleware identifies principal
+  -> route handler validates request
+  -> key manager checks ACLs
+  -> crypto layer encrypts/decrypts versions
+  -> storage adapter persists encrypted DBKey payload
 ```
 
-**D-Bus Interfaces to Implement:**
+Storage backends should not receive plaintext secret data in the production
+server path. The current stabilization work must keep one canonical server route
+path so tests and real deployments exercise the same encryption and ACL logic.
 
-1. **org.freedesktop.Secret.Service**
-   - `/org/freedesktop/secrets`
-   - Methods: OpenSession, CreateCollection, SearchItems, Unlock, Lock, GetSecrets
-   - Properties: Collections
+## Storage
 
-2. **org.freedesktop.Secret.Collection**
-   - `/org/freedesktop/secrets/collection/<name>`
-   - Methods: Delete, SearchItems, CreateItem
-   - Properties: Items, Label, Locked, Created, Modified
+The storage abstraction lives under `pkg/storage`.
 
-3. **org.freedesktop.Secret.Item**
-   - `/org/freedesktop/secrets/collection/<name>/<id>`
-   - Methods: Delete, GetSecret, SetSecret
-   - Properties: Locked, Attributes, Label, Created, Modified
+Supported packages in the tree:
 
-4. **org.freedesktop.Secret.Session**
-   - Methods: Close
-   - Handles encryption negotiation
+- `memory`: tests and ephemeral development
+- `filesystem`: recommended first home-network backend
+- `postgres`: optional if a local PostgreSQL server is already maintained
+- `etcd`: advanced/experimental for this fork's scope
 
-**Mapping Strategy:**
+Backend behavior must be made consistent before the project can be considered
+sturdy. In particular, create/update semantics should be identical across
+backends, and backend conformance tests should cover key creation, replacement,
+deletion, listing, and atomic update behavior.
 
-| FreeDesktop Concept | Knox Mapping |
-|---------------------|--------------|
-| Collection | Key namespace (e.g., `dbus:collection_name:*`) |
-| Item | Individual Knox key (e.g., `dbus:collection_name:item_id`) |
-| Item Attributes | Stored in Knox key metadata (new field) |
-| Item Label | Stored in Knox key metadata (new field) |
-| Locked state | Mapped to Knox ACL (user must authenticate) |
-| Session encryption | Handled by D-Bus layer before sending to Knox |
+## Encryption
 
-**Configuration (/etc/knox/dbus-bridge.yaml):**
-```yaml
-dbus:
-  bus_type: "session"  # or "system"
-  service_name: "org.freedesktop.secrets"
+Knox uses AES-256-GCM envelope encryption. Each secret version is encrypted with
+a data encryption key, and that key is encrypted with the master key.
 
-knox:
-  server: "localhost:9000"
-  tls:
-    ca_cert: "/etc/knox/ca.crt"
-    client_cert: "/etc/knox/dbus-client.crt"
-    client_key: "/etc/knox/dbus-client.key"
-  namespace_prefix: "dbus"  # All keys prefixed with "dbus:"
+Master key sources:
 
-encryption:
-  algorithms:
-    - "plain"       # No encryption (if Knox handles it)
-    - "dh-ietf1024-sha256-aes128-cbc-pkcs7"  # Standard D-Bus encryption
-```
+1. `KNOX_MASTER_KEY`
+2. `KNOX_MASTER_KEY_FILE`
+3. `/etc/knox/master.key`
 
-## Storage Backend Abstraction
+The home-network target should document and test:
 
-**Interface:**
-```go
-package storage
+- generating a master key
+- file permission checks
+- server restart behavior
+- backup and restore
+- rotation without data loss
 
-type Backend interface {
-    // Key operations
-    GetKey(ctx context.Context, keyID string) (*knox.Key, error)
-    PutKey(ctx context.Context, key *knox.Key) error
-    DeleteKey(ctx context.Context, keyID string) error
-    ListKeys(ctx context.Context, prefix string) ([]string, error)
+The TLA+ specs under `spec/tla` describe intended safety properties. They verify
+models, not the Go implementation. Any formal-verification claim must stay in
+sync with code and tests.
 
-    // Transaction support
-    BeginTx(ctx context.Context) (Transaction, error)
+## Authentication
 
-    // Health check
-    Ping(ctx context.Context) error
-}
+The home profile should prefer a small set of boring authentication options:
 
-type Transaction interface {
-    GetKey(ctx context.Context, keyID string) (*knox.Key, error)
-    PutKey(ctx context.Context, key *knox.Key) error
-    DeleteKey(ctx context.Context, keyID string) error
-    Commit() error
-    Rollback() error
-}
-```
+- token-based auth for humans and scripts
+- mTLS for machines where host identity matters
 
-**Implementations:**
-1. **Memory** - For testing and development
-2. **Filesystem** - Compatible with existing Knox file cache
-3. **PostgreSQL** - Production database backend
-4. **etcd** - Distributed coordination and storage
+SPIFFE and GitHub auth may remain available, but they are not core to the home
+network use case and should not drive the default setup.
+
+## Authorization
+
+Knox keys use ACLs with these access levels:
+
+- `Read`: retrieve secret versions
+- `Write`: add/rotate versions
+- `Admin`: modify ACLs and delete keys
+
+ACL behavior belongs in the key manager and server route handlers. Any direct
+storage route that bypasses this path is test-only at best and should not be
+part of the production router.
 
 ## Observability
 
-**Metrics (Prometheus):**
-- `knox_requests_total{method, path, status}` - Request counts
-- `knox_request_duration_seconds{method, path}` - Request latency
-- `knox_keys_total` - Total number of keys
-- `knox_storage_operations_total{backend, operation, status}` - Storage ops
-- `knox_auth_attempts_total{provider, status}` - Auth attempts
+For home use, useful observability is:
 
-**Logging (structured JSON):**
-```json
-{
-  "timestamp": "2025-10-17T11:00:00Z",
-  "level": "info",
-  "msg": "key accessed",
-  "key_id": "service:api_key",
-  "principal": "user@example.com",
-  "principal_type": "User",
-  "access_type": "Read",
-  "request_id": "abc123",
-  "duration_ms": 15
-}
-```
+- clear structured logs
+- health and readiness endpoints
+- audit records for key and ACL operations
+- metrics where they do not complicate setup
 
-**Audit Log:**
-```json
-{
-  "timestamp": "2025-10-17T11:00:00Z",
-  "event": "key.access",
-  "key_id": "service:api_key",
-  "principal": {"id": "user@example.com", "type": "User"},
-  "action": "Read",
-  "result": "success",
-  "metadata": {
-    "version_id": 42,
-    "client_ip": "192.168.1.100",
-    "user_agent": "knox-cli/2.0"
-  }
-}
-```
+Audit logs must never include secret values.
 
-## Security Enhancements
+## D-Bus Bridge
 
-1. **Rate Limiting**: Per-principal rate limiting to prevent abuse
-2. **Input Validation**: Strict validation of all inputs (key IDs, ACLs, etc.)
-3. **Audit Trail**: All operations logged for compliance
-4. **Encryption at Rest**: Storage backend encryption support
-5. **TLS Everywhere**: All communication encrypted
-6. **Principle of Least Privilege**: Minimal default permissions
+`knox-dbus` maps FreeDesktop Secret Service concepts to Knox:
 
-## Deployment Models
+| D-Bus Concept | Knox Mapping |
+|---------------|--------------|
+| Collection | Key namespace prefix |
+| Item | Individual Knox key |
+| Item attributes | Metadata packed with stored secret data |
+| Item label | Metadata packed with stored secret data |
+| Session | D-Bus-side encryption/session object |
 
-### Single Server
-- Suitable for small deployments
-- Filesystem or PostgreSQL backend
-- Simple to operate
+For Artix Linux, the operational examples should use dinit or desktop session
+startup mechanisms instead of systemd.
 
-### High Availability
-- Multiple Knox servers behind load balancer
-- Shared PostgreSQL or etcd backend
-- Leader election for maintenance tasks
-- Horizontal scaling for read operations
+## Stabilization Milestones
 
-### Desktop Integration
-- knox-dbus runs as user service (systemd user unit)
-- Connects to local or remote Knox server
-- Provides transparent secret management for desktop apps
+1. Documentation truth pass
+2. `go test ./...` green
+3. One canonical server route path
+4. Backend conformance tests and storage semantics cleanup
+5. Master-key and rotation safety fixes
+6. CLI workflow alignment
+7. FreeBSD rc.d and Artix dinit examples
+8. D-Bus verification with `secret-tool`
 
-## Implementation Phases
+## Definition Of Sturdy
 
-### Phase 1: Foundation (Week 1-2)
-- [ ] Storage backend abstraction
-- [ ] Configuration management
-- [ ] Observability infrastructure
-- [ ] Enhanced server with multi-backend support
+Knox is sturdy enough for the target use case when this workflow is tested:
 
-### Phase 2: CLI Client (Week 3)
-- [ ] Unified CLI command structure
-- [ ] Configuration file support
-- [ ] Profile management
-- [ ] Enhanced UX (colors, progress bars, etc.)
-
-### Phase 3: D-Bus Bridge (Week 4-5)
-- [ ] D-Bus interface implementation
-- [ ] Knox API client integration
-- [ ] Session and encryption handling
-- [ ] Collection/Item mapping
-
-### Phase 4: Testing & Documentation (Week 6)
-- [ ] Integration tests
-- [ ] Performance benchmarks
-- [ ] User documentation
-- [ ] Operator documentation
-
-## Dependencies
-
-**New dependencies needed:**
-```
-github.com/godbus/dbus/v5              # D-Bus implementation
-github.com/prometheus/client_golang    # Metrics
-github.com/sirupsen/logrus             # Structured logging
-github.com/spf13/cobra                 # CLI framework
-github.com/spf13/viper                 # Configuration
-github.com/lib/pq                      # PostgreSQL driver
-go.etcd.io/etcd/client/v3             # etcd client
-github.com/stretchr/testify           # Testing utilities
-```
-
-## Success Metrics
-
-1. **Server**: Can handle 10k+ requests/sec with <10ms p99 latency
-2. **CLI**: All operations complete in <100ms for cached keys
-3. **D-Bus**: Transparent compatibility with GNOME Keyring/KWallet clients
-4. **Storage**: Support at least 100k keys per server
-5. **HA**: Zero downtime during server restarts with shared backend
-
-## Future Considerations
-
-- Kubernetes operator for automated deployment
-- Secrets rotation automation (integrating with external systems)
-- Knox plugin system for custom auth providers
-- Web UI for key management
-- Integration with cloud KMS (AWS KMS, Google Cloud KMS, Azure Key Vault)
+1. Start `knox-server` on FreeBSD or Linux with filesystem storage.
+2. Connect from an Artix workstation using the CLI.
+3. Create, read, rotate, list, and delete a secret.
+4. Restart the server and verify secrets persist.
+5. Back up storage plus master key.
+6. Restore on another host and read secrets.
+7. Run `knox-dbus` without systemd.
+8. Store and retrieve a secret with `secret-tool`.
+9. Run the full Go test suite successfully.

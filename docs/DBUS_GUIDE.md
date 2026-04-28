@@ -4,16 +4,17 @@
 
 The Knox D-Bus bridge (`knox-dbus`) implements the [FreeDesktop Secret Service API](https://specifications.freedesktop.org/secret-service-spec/latest/), allowing desktop applications to store secrets in Knox transparently.
 
-This means applications like **Firefox**, **Chrome**, **SSH**, **Git**, and many others can use Knox as their secret storage backend without any modifications!
+The goal is to let applications that already use libsecret or the Secret
+Service API store secrets in Knox without application-specific plugins. This
+must be verified per desktop session and application before relying on it for
+daily use.
 
 ## Why This Is Cool 🎉
 
-- **Universal Secret Management**: All your desktop secrets in one place
-- **Enterprise Integration**: Desktop apps use your enterprise Knox server
-- **Zero Application Changes**: Apps don't know they're using Knox
-- **Centralized Audit**: All secret access logged in Knox
-- **Policy Enforcement**: Knox ACLs control desktop secret access
-- **Cloud Native**: Works with Knox in Kubernetes/cloud environments
+- **Single home-network backend**: Keep workstation secrets in your Knox server
+- **Zero application plugins**: Use the standard Secret Service API where apps support it
+- **Centralized backup target**: Back up Knox storage and master key instead of many desktop stores
+- **Consistent ACL model**: Let Knox enforce access for D-Bus-created keys
 
 ## How It Works
 
@@ -82,22 +83,33 @@ encryption:
     - "plain"  # Knox handles encryption
 ```
 
-### Systemd User Service
+### Artix Linux With Dinit
 
-Install as a user service (recommended):
+For Artix Linux, prefer a dinit user service or an XDG session autostart entry.
+Exact service dependencies vary by desktop session, so treat this as a starting
+template.
+
+Example user service at `~/.config/dinit.d/knox-dbus`:
+
+```text
+type = process
+command = /usr/local/bin/knox-dbus --config /home/USER/.config/knox/dbus.yaml
+restart = true
+logfile = /home/USER/.local/state/knox/knox-dbus.log
+```
+
+Replace `USER` with the account that owns the desktop session. A standalone
+template is also available at [examples/dinit-knox-dbus](examples/dinit-knox-dbus).
+
+Start and inspect it with:
 
 ```bash
-# Copy service file
-mkdir -p ~/.config/systemd/user
-cp docs/examples/knox-dbus.service ~/.config/systemd/user/
-
-# Enable and start
-systemctl --user enable knox-dbus
-systemctl --user start knox-dbus
-
-# Check status
-systemctl --user status knox-dbus
+dinitctl --user start knox-dbus
+dinitctl --user status knox-dbus
 ```
+
+If your desktop session does not run a dinit user instance, launch `knox-dbus`
+from your session startup files instead.
 
 ## Usage
 
@@ -107,8 +119,8 @@ systemctl --user status knox-dbus
 # Foreground (for testing)
 knox-dbus --config ~/.config/knox/dbus.yaml
 
-# Background (via systemd)
-systemctl --user start knox-dbus
+# Background (via dinit user service)
+dinitctl --user start knox-dbus
 ```
 
 ### Verify It's Running
@@ -198,8 +210,8 @@ Each secret item becomes a Knox key:
 
 **Knox Key:**
 - ID: `dbus:default:github_personal_access_token`
-- Data: `ghp_xxxxxxxxxxxx`
-- Metadata: Label and attributes (TODO: implement)
+- Data: structured payload containing metadata plus the secret value
+- Metadata: label and attributes packed with the D-Bus secret payload
 
 ### Default Collections
 
@@ -355,8 +367,8 @@ gdbus introspect --session \
   --dest org.freedesktop.secrets \
   --object-path /org/freedesktop/secrets
 
-# Check logs
-journalctl --user -u knox-dbus -f
+# Check logs from the dinit service template
+tail -f ~/.local/state/knox/knox-dbus.log
 ```
 
 ### Knox Connection Fails
@@ -481,19 +493,18 @@ Typical usage:
 |---------|-----------|---------------|---------|
 | Backend | Knox server | Local encrypted file | Local encrypted file |
 | Remote storage | ✅ Yes | ❌ No | ❌ No |
-| Centralized audit | ✅ Yes | ❌ No | ❌ No |
-| Enterprise integration | ✅ Yes | ❌ No | ❌ No |
+| Knox-side audit path | Partial | ❌ No | ❌ No |
+| Home-network server | ✅ Yes | ❌ No | ❌ No |
 | ACL enforcement | ✅ Yes (Knox) | ⚠️ Limited | ⚠️ Limited |
-| Cloud native | ✅ Yes | ❌ No | ❌ No |
 | Offline access | ❌ No | ✅ Yes | ✅ Yes |
 
 ## Known Limitations
 
 1. **No offline mode**: Requires Knox server connectivity
 2. **Session encryption**: Currently uses "plain" mode (Knox encrypts)
-3. **Metadata**: Labels/attributes not yet stored in Knox
-4. **Locking**: All secrets treated as unlocked
-5. **Prompts**: User prompts not implemented (auto-approve)
+3. **Metadata**: Labels/attributes are packed with the stored secret data, not stored as first-class Knox fields
+4. **Locking**: Lock state is local to the bridge and is not durable Knox policy
+5. **Prompts**: User prompts are incomplete and should not be treated as a security boundary
 
 ## Future Enhancements
 
@@ -551,10 +562,9 @@ Found a bug? Want to add a feature?
 - [FreeDesktop Secret Service Specification](https://specifications.freedesktop.org/secret-service-spec/latest/)
 - [Knox Architecture](../ARCHITECTURE.md)
 - [Knox CLI Guide](CLI_GUIDE.md)
-- [Knox Server Guide](SERVER_GUIDE.md) (TODO)
 
 ---
 
-**Status**: ✅ **Working** - Ready for testing and feedback!
-
-The knox-dbus bridge is fully functional and can be used with real applications. It's been tested with manual secret-tool operations and should work with any application that uses the FreeDesktop Secret Service API.
+**Status**: Alpha. The bridge has real implementation and package tests, but it
+still needs repeatable `secret-tool`, Python `secretstorage`, and browser/libsecret
+verification before it should be described as a dependable desktop secret store.
