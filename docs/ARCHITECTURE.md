@@ -48,10 +48,10 @@ Unix workstation or laptop
   optional /usr/local/bin/knox-dbus
 ```
 
-For the first sturdy release, prefer filesystem storage unless PostgreSQL is
-already part of the local environment. etcd is not recommended for the default
-profile because it adds operational complexity that does not help a simple
-single-server use case.
+For the first sturdy release, prefer filesystem storage. SQLite is available
+through the ORM backend when a single database file is preferable. etcd is not
+recommended for the default profile because it adds operational complexity that
+does not help a simple single-server use case.
 
 ## Data Flow
 
@@ -77,7 +77,7 @@ Supported packages in the tree:
 
 - `memory`: tests and ephemeral development
 - `filesystem`: recommended first default backend
-- `postgres`: optional if a local PostgreSQL server is already maintained
+- `sqlite`: ORM-backed single-file SQL storage
 - `etcd`: advanced/experimental for this fork's scope
 
 Backend behavior must be made consistent before the project can be considered

@@ -27,7 +27,7 @@ import (
 	_ "github.com/hazayan/knox/pkg/storage/etcd"       // Register etcd backend
 	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
 	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
-	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
+	_ "github.com/hazayan/knox/pkg/storage/orm"        // Register SQLite backend
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server"
 	"github.com/hazayan/knox/server/auth"
@@ -94,9 +94,11 @@ func createTestServerWithMasterKey(cfg *config.ServerConfig, masterKey []byte) (
 	switch cfg.Storage.Backend {
 	case "filesystem":
 		storageCfg.FilesystemDir = cfg.Storage.FilesystemDir
-	case "postgres":
-		storageCfg.PostgresConnectionString = cfg.Storage.PostgresConnectionString
-		storageCfg.PostgresMaxConnections = cfg.Storage.PostgresMaxConnections
+	case "sqlite":
+		storageCfg.SQLitePath = cfg.Storage.SQLitePath
+	case "etcd":
+		storageCfg.EtcdEndpoints = cfg.Storage.EtcdEndpoints
+		storageCfg.EtcdPrefix = cfg.Storage.EtcdPrefix
 	}
 
 	backend, err := storage.NewBackend(storageCfg)

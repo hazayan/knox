@@ -759,6 +759,40 @@ func TestStorageBackends(t *testing.T) {
 		client := createTestClient(t, testServer.Server)
 		testBasicKeyOperations(t, client, testServer.Server.URL)
 	})
+
+	t.Run("SQLiteBackend", func(t *testing.T) {
+		cfg := &config.ServerConfig{
+			BindAddress: "localhost:0",
+			Storage: config.StorageConfig{
+				Backend:    "sqlite",
+				SQLitePath: filepath.Join(t.TempDir(), "knox.db"),
+			},
+			Auth: config.AuthConfig{
+				Providers: []config.AuthProviderConfig{
+					{
+						Type: "mock",
+					},
+				},
+			},
+			Observability: config.ObservabilityConfig{
+				Logging: config.LoggingConfig{
+					Level:  "error",
+					Format: "text",
+				},
+			},
+		}
+
+		testServer, err := createTestServer(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, testServer)
+
+		err = testServer.Start()
+		require.NoError(t, err)
+		defer testServer.Close()
+
+		client := createTestClient(t, testServer.Server)
+		testBasicKeyOperations(t, client, testServer.Server.URL)
+	})
 }
 
 func TestFilesystemBackendPersistsAcrossRestartWithSameMasterKey(t *testing.T) {
@@ -1090,26 +1124,31 @@ func testBasicKeyOperations(t *testing.T, client *http.Client, baseURL string) {
 
 	createResp, err := makeAuthenticatedRequest(client, baseURL+"/v0/keys/", "POST", authToken, reqBody)
 	require.NoError(t, err)
-	createResp.Body.Close()
-	assert.Equal(t, http.StatusOK, createResp.StatusCode)
+	assertResponseStatus(t, createResp, http.StatusOK)
 
 	// Get key
 	getResp, err := makeAuthenticatedRequest(client, baseURL+"/v0/keys/"+keyID+"/", "GET", authToken, nil)
 	require.NoError(t, err)
-	defer getResp.Body.Close()
-	assert.Equal(t, http.StatusOK, getResp.StatusCode)
+	assertResponseStatus(t, getResp, http.StatusOK)
 
 	// Delete key
 	deleteResp, err := makeAuthenticatedRequest(client, baseURL+"/v0/keys/"+keyID+"/", "DELETE", authToken, nil)
 	require.NoError(t, err)
-	defer deleteResp.Body.Close()
-	assert.Equal(t, http.StatusOK, deleteResp.StatusCode)
+	assertResponseStatus(t, deleteResp, http.StatusOK)
 
 	// Verify key is gone
 	getResp, err = makeAuthenticatedRequest(client, baseURL+"/v0/keys/"+keyID+"/", "GET", authToken, nil)
 	require.NoError(t, err)
-	defer getResp.Body.Close()
-	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
+	assertResponseStatus(t, getResp, http.StatusNotFound)
+}
+
+func assertResponseStatus(t *testing.T, resp *http.Response, want int) {
+	t.Helper()
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equalf(t, want, resp.StatusCode, "response body: %s", string(body))
 }
 
 func createTestKeyViaHTTP(t *testing.T, client *http.Client, baseURL, authToken, keyID string, secret []byte) {

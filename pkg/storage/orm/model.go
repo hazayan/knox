@@ -1,5 +1,4 @@
-// Package orm provides a database-agnostic ORM-based storage backend for Knox.
-// This package uses GORM to abstract away SQL differences between PostgreSQL, MySQL, SQLite, etc.
+// Package orm provides an ORM-based SQLite storage backend for Knox.
 package orm
 
 import (
@@ -16,7 +15,7 @@ type KeyRecord struct {
 	KeyID string `gorm:"primaryKey;type:varchar(500);index:idx_key_id_prefix" json:"key_id"`
 
 	// KeyData stores the serialized types.Key as JSON
-	// PostgreSQL: jsonb, MySQL: json, SQLite: text
+	// SQLite stores these JSON fields as text.
 	KeyData []byte `gorm:"type:jsonb;not null" json:"key_data"`
 
 	// CreatedAt is automatically managed by GORM

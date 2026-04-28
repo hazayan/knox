@@ -34,14 +34,13 @@ type TLSConfig struct {
 
 // StorageConfig holds storage backend configuration.
 type StorageConfig struct {
-	Backend string `mapstructure:"backend"` // memory, filesystem, postgres, etcd
+	Backend string `mapstructure:"backend"` // memory, filesystem, sqlite, etcd
 
 	// Filesystem backend
 	FilesystemDir string `mapstructure:"filesystem_dir"`
 
-	// PostgreSQL backend
-	PostgresConnectionString string `mapstructure:"postgres_connection_string"`
-	PostgresMaxConnections   int    `mapstructure:"postgres_max_connections"`
+	// SQLite backend
+	SQLitePath string `mapstructure:"sqlite_path"`
 
 	// etcd backend
 	EtcdEndpoints []string `mapstructure:"etcd_endpoints"`
@@ -51,12 +50,11 @@ type StorageConfig struct {
 // ToStorageConfig converts to storage.Config.
 func (c StorageConfig) ToStorageConfig() storage.Config {
 	return storage.Config{
-		Backend:                  c.Backend,
-		FilesystemDir:            c.FilesystemDir,
-		PostgresConnectionString: c.PostgresConnectionString,
-		PostgresMaxConnections:   c.PostgresMaxConnections,
-		EtcdEndpoints:            c.EtcdEndpoints,
-		EtcdPrefix:               c.EtcdPrefix,
+		Backend:       c.Backend,
+		FilesystemDir: c.FilesystemDir,
+		SQLitePath:    c.SQLitePath,
+		EtcdEndpoints: c.EtcdEndpoints,
+		EtcdPrefix:    c.EtcdPrefix,
 	}
 }
 
@@ -166,7 +164,7 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 	v.SetDefault("bind_address", "0.0.0.0:9000")
 	v.SetDefault("storage.backend", "filesystem")
 	v.SetDefault("storage.filesystem_dir", "/var/lib/knox/keys")
-	v.SetDefault("storage.postgres_max_connections", 25)
+	v.SetDefault("storage.sqlite_path", "/var/lib/knox/knox.db")
 	v.SetDefault("observability.metrics.enabled", true)
 	v.SetDefault("observability.metrics.endpoint", "/metrics")
 	v.SetDefault("observability.logging.level", "info")
