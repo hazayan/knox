@@ -46,7 +46,7 @@ func (krm *KeyRotationManager) Decrypt(dbKey *keydb.DBKey) (*types.Key, error) {
 		return key, nil
 	}
 
-	// Try old cryptors in reverse order (newest to oldest)
+	// Try old cryptors against the whole key in reverse order (newest to oldest)
 	for i := len(krm.oldCryptors) - 1; i >= 0; i-- {
 		key, err := krm.oldCryptors[i].Decrypt(dbKey)
 		if err == nil {
@@ -54,7 +54,22 @@ func (krm *KeyRotationManager) Decrypt(dbKey *keydb.DBKey) (*types.Key, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("failed to decrypt with any available cryptor: %w", err)
+	cryptors := krm.decryptCryptorsLocked()
+	versions := make(types.KeyVersionList, len(dbKey.VersionList))
+	for i := range dbKey.VersionList {
+		version, versionErr := decryptVersionWithCryptors(dbKey, &dbKey.VersionList[i], cryptors)
+		if versionErr != nil {
+			return nil, fmt.Errorf("failed to decrypt version %d with any available cryptor: %w", i, versionErr)
+		}
+		versions[i] = *version
+	}
+
+	return &types.Key{
+		ID:          dbKey.ID,
+		ACL:         dbKey.ACL,
+		VersionList: versions,
+		VersionHash: dbKey.VersionHash,
+	}, nil
 }
 
 // EncryptVersion encrypts a single version using the current cryptor.
@@ -98,8 +113,10 @@ func (krm *KeyRotationManager) RemoveOldCryptor(db keydb.DB, index int) error {
 
 	oldCryptor := krm.oldCryptors[index]
 	for _, dbKey := range dbKeys {
-		if _, err := oldCryptor.Decrypt(&dbKey); err == nil {
-			return fmt.Errorf("cannot remove old cryptor %d: key %s still decrypts with it", index, dbKey.ID)
+		for _, version := range dbKey.VersionList {
+			if decryptsVersionWithCryptor(&dbKey, &version, oldCryptor) {
+				return fmt.Errorf("cannot remove old cryptor %d: key %s still has a version that decrypts with it", index, dbKey.ID)
+			}
 		}
 	}
 
@@ -107,6 +124,48 @@ func (krm *KeyRotationManager) RemoveOldCryptor(db keydb.DB, index int) error {
 	krm.oldCryptors = append(krm.oldCryptors[:index], krm.oldCryptors[index+1:]...)
 
 	return nil
+}
+
+func (krm *KeyRotationManager) decryptCryptorsLocked() []keydb.Cryptor {
+	cryptors := make([]keydb.Cryptor, 0, len(krm.oldCryptors)+1)
+	cryptors = append(cryptors, krm.currentCryptor)
+	for i := len(krm.oldCryptors) - 1; i >= 0; i-- {
+		cryptors = append(cryptors, krm.oldCryptors[i])
+	}
+	return cryptors
+}
+
+func decryptVersionWithCryptors(dbKey *keydb.DBKey, version *keydb.EncKeyVersion, cryptors []keydb.Cryptor) (*types.KeyVersion, error) {
+	var lastErr error
+	for _, cryptor := range cryptors {
+		singleVersionKey := singleVersionDBKey(dbKey, version)
+		key, err := cryptor.Decrypt(singleVersionKey)
+		if err == nil && len(key.VersionList) == 1 {
+			return &key.VersionList[0], nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, errors.New("no cryptors available")
+}
+
+func decryptsVersionWithCryptor(dbKey *keydb.DBKey, version *keydb.EncKeyVersion, cryptor keydb.Cryptor) bool {
+	key, err := cryptor.Decrypt(singleVersionDBKey(dbKey, version))
+	return err == nil && len(key.VersionList) == 1
+}
+
+func singleVersionDBKey(dbKey *keydb.DBKey, version *keydb.EncKeyVersion) *keydb.DBKey {
+	return &keydb.DBKey{
+		ID:          dbKey.ID,
+		ACL:         dbKey.ACL,
+		VersionList: []keydb.EncKeyVersion{*version},
+		VersionHash: dbKey.VersionHash,
+		DBVersion:   dbKey.DBVersion,
+	}
 }
 
 // ReencryptDB re-encrypts all keys in the database with the current cryptor.
