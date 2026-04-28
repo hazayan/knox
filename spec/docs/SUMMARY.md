@@ -203,7 +203,7 @@ git push
 
 ### Why This Matters for Knox
 
-Knox manages sensitive home-network secrets. A bug could:
+Knox manages sensitive personal secrets. A bug could:
 - 💣 Leak sensitive credentials
 - 💣 Cause permanent data loss
 - 💣 Allow unauthorized access
@@ -296,7 +296,7 @@ formal-verification/
 
 - **TLA+**: Created by Leslie Lamport (Turing Award 2013)
 - **Inspiration**: AWS's use of TLA+ for critical systems
-- **Knox**: Maintained here as a home-network secret management project
+- **Knox**: Maintained here as a personal secret management project
 
 ## Questions?
 

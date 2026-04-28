@@ -2,9 +2,9 @@
 
 ## Scope
 
-This fork is scoped as a home-network secret manager. It should be simple enough
-to run on a FreeBSD host, usable from Artix Linux workstations and laptops, and
-recoverable without specialized infrastructure.
+This fork is scoped as a personal Unix secret manager. It should be simple
+enough to run on ordinary servers, workstations, and laptops, and recoverable
+without specialized infrastructure.
 
 The design priority is:
 
@@ -12,7 +12,7 @@ The design priority is:
 2. Clear master-key and backup handling
 3. Small, auditable operational surface
 4. CLI usability for scripts and daily administration
-5. Optional Linux desktop integration through FreeDesktop Secret Service
+5. Optional desktop integration through FreeDesktop Secret Service
 
 Enterprise features such as high availability, Kubernetes automation, cloud KMS,
 and compliance reporting are not part of the main maturity target.
@@ -36,25 +36,25 @@ knox-dbus
   maps D-Bus collections/items to Knox keys
 ```
 
-## Recommended Home Deployment
+## Recommended Personal Deployment
 
 ```text
-FreeBSD or Linux server
+Unix server or workstation
   /usr/local/bin/knox-server
   /etc/knox/server.yaml
   /etc/knox/master.key
   /var/lib/knox/keys
 
-Artix workstation/laptop
+Unix workstation or laptop
   /usr/local/bin/knox
   ~/.config/knox/config.yaml
   optional /usr/local/bin/knox-dbus
 ```
 
-For the first sturdy home-network release, prefer filesystem storage unless
+For the first sturdy personal release, prefer filesystem storage unless
 PostgreSQL is already part of the local environment. etcd is not recommended for
-the home profile because it adds operational complexity that does not help the
-single-server use case.
+the personal profile because it adds operational complexity that does not help a
+simple single-server use case.
 
 ## Data Flow
 
@@ -79,7 +79,7 @@ The storage abstraction lives under `pkg/storage`.
 Supported packages in the tree:
 
 - `memory`: tests and ephemeral development
-- `filesystem`: recommended first home-network backend
+- `filesystem`: recommended first personal-use backend
 - `postgres`: optional if a local PostgreSQL server is already maintained
 - `etcd`: advanced/experimental for this fork's scope
 
@@ -99,7 +99,7 @@ Master key sources:
 2. `KNOX_MASTER_KEY_FILE`
 3. `/etc/knox/master.key`
 
-The home-network target should document and test:
+The personal-use target should document and test:
 
 - generating a master key
 - file permission checks
@@ -113,13 +113,13 @@ sync with code and tests.
 
 ## Authentication
 
-The home profile should prefer a small set of boring authentication options:
+The personal profile should prefer a small set of boring authentication options:
 
 - token-based auth for humans and scripts
 - mTLS for machines where host identity matters
 
-SPIFFE and GitHub auth may remain available, but they are not core to the home
-network use case and should not drive the default setup.
+SPIFFE and GitHub auth may remain available, but they are not core to the
+personal-use case and should not drive the default setup.
 
 ## Authorization
 
@@ -135,7 +135,7 @@ part of the production router.
 
 ## Observability
 
-For home use, useful observability is:
+For personal use, useful observability is:
 
 - clear structured logs
 - health and readiness endpoints
@@ -156,8 +156,8 @@ Audit logs must never include secret values.
 | Item label | Metadata packed with stored secret data |
 | Session | D-Bus-side encryption/session object |
 
-For Artix Linux, the operational examples should use dinit or desktop session
-startup mechanisms instead of systemd.
+Operational examples should cover common Unix service-manager and desktop
+session startup patterns without making any one init system a requirement.
 
 ## Stabilization Milestones
 
@@ -167,19 +167,19 @@ startup mechanisms instead of systemd.
 4. Backend conformance tests and storage semantics cleanup
 5. Master-key and rotation safety fixes
 6. CLI workflow alignment
-7. FreeBSD rc.d and Artix dinit examples
+7. Unix service-manager examples
 8. D-Bus verification with `secret-tool`
 
 ## Definition Of Sturdy
 
 Knox is sturdy enough for the target use case when this workflow is tested:
 
-1. Start `knox-server` on FreeBSD or Linux with filesystem storage.
-2. Connect from an Artix workstation using the CLI.
+1. Start `knox-server` on a Unix system with filesystem storage.
+2. Connect from another Unix workstation using the CLI.
 3. Create, read, rotate, list, and delete a secret.
 4. Restart the server and verify secrets persist.
 5. Back up storage plus master key.
 6. Restore on another host and read secrets.
-7. Run `knox-dbus` without systemd.
+7. Run `knox-dbus` from a user service or session startup entry.
 8. Store and retrieve a secret with `secret-tool`.
 9. Run the full Go test suite successfully.

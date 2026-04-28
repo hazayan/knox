@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Knox CLI (`knox`) is the main interface for administering a home-network
+The Knox CLI (`knox`) is the main interface for administering a personal
 Knox server. It currently exposes these command groups:
 
 - `key`: create, get, list, delete, rotate, and inspect versions
@@ -71,7 +71,7 @@ Create with ACL entries:
 ```bash
 knox key create home:api_key --data "secret123" \
   --acl "User:alice:Read" \
-  --acl "Machine:freebsd-server:Write"
+  --acl "Machine:server-01:Write"
 ```
 
 Read a key:
@@ -117,7 +117,7 @@ Add access:
 
 ```bash
 knox acl add home:api_key User:alice:Read
-knox acl add home:api_key Machine:freebsd-server:Write
+knox acl add home:api_key Machine:server-01:Write
 knox acl add home:api_key User:admin:Admin
 ```
 

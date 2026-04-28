@@ -9,9 +9,9 @@ Service API store secrets in Knox without application-specific plugins. This
 must be verified per desktop session and application before relying on it for
 daily use.
 
-## Why This Is Cool 🎉
+## Why This Is Useful
 
-- **Single home-network backend**: Keep workstation secrets in your Knox server
+- **Single personal backend**: Keep workstation secrets in your Knox server
 - **Zero application plugins**: Use the standard Secret Service API where apps support it
 - **Centralized backup target**: Back up Knox storage and master key instead of many desktop stores
 - **Consistent ACL model**: Let Knox enforce access for D-Bus-created keys
@@ -83,13 +83,12 @@ encryption:
     - "plain"  # Knox handles encryption
 ```
 
-### Artix Linux With Dinit
+### User Service
 
-For Artix Linux, prefer a dinit user service or an XDG session autostart entry.
-Exact service dependencies vary by desktop session, so treat this as a starting
-template.
+Prefer a user service or an XDG session autostart entry. Exact service
+dependencies vary by desktop session, so treat this as a starting template.
 
-Example user service at `~/.config/dinit.d/knox-dbus`:
+Example user service:
 
 ```text
 type = process
@@ -98,17 +97,17 @@ restart = true
 logfile = /home/USER/.local/state/knox/knox-dbus.log
 ```
 
-Replace `USER` with the account that owns the desktop session. A standalone
-template is also available at [examples/dinit-knox-dbus](examples/dinit-knox-dbus).
+Replace `USER` with the account that owns the desktop session. The directory and
+service syntax may need to be adapted for your service manager.
 
 Start and inspect it with:
 
 ```bash
-dinitctl --user start knox-dbus
-dinitctl --user status knox-dbus
+service-manager --user start knox-dbus
+service-manager --user status knox-dbus
 ```
 
-If your desktop session does not run a dinit user instance, launch `knox-dbus`
+If your desktop session does not run a user service instance, launch `knox-dbus`
 from your session startup files instead.
 
 ## Usage
@@ -119,8 +118,8 @@ from your session startup files instead.
 # Foreground (for testing)
 knox-dbus --config ~/.config/knox/dbus.yaml
 
-# Background (via dinit user service)
-dinitctl --user start knox-dbus
+# Background (via user service)
+service-manager --user start knox-dbus
 ```
 
 ### Verify It's Running
@@ -367,7 +366,7 @@ gdbus introspect --session \
   --dest org.freedesktop.secrets \
   --object-path /org/freedesktop/secrets
 
-# Check logs from the dinit service template
+# Check logs from the user service template
 tail -f ~/.local/state/knox/knox-dbus.log
 ```
 

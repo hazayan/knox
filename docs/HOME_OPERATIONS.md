@@ -1,13 +1,13 @@
-# Home Operations
+# Personal Operations
 
-This guide describes a practical Knox setup for a small trusted home network:
-FreeBSD servers, Artix Linux workstations, and no systemd dependency.
+This guide describes a practical Knox setup for personal Unix systems without
+assuming a specific distribution, init system, or desktop session.
 
 ## Server Layout
 
 Recommended default:
 
-- run one Knox server on a trusted LAN host
+- run one Knox server in a private environment
 - bind to a private address or loopback behind a local reverse proxy
 - use the filesystem backend first, then Postgres if multi-host access becomes
   necessary
@@ -22,45 +22,30 @@ Example filesystem paths:
 /var/log/knox/
 ```
 
-## FreeBSD rc.d
+## System Service
 
 Install the server binary as `/usr/local/bin/knox-server`, write a config file
-at `/usr/local/etc/knox/server.yaml`, and copy
-[examples/freebsd-knox-server.rc](examples/freebsd-knox-server.rc) to:
+at `/usr/local/etc/knox/server.yaml`, and adapt one of the service templates
+under [examples](examples) for the target host.
 
-```text
-/usr/local/etc/rc.d/knox_server
-```
-
-Then enable it:
+Then enable and start it with the host's service manager:
 
 ```sh
-sysrc knox_server_enable=YES
-service knox_server start
-service knox_server status
+service knox-server start
+service knox-server status
 ```
 
-## Artix Linux With Dinit
+## User Service
 
-For an Artix server, copy [examples/dinit-knox-server](examples/dinit-knox-server)
-to the system service directory used by your installation and start it with:
+For a workstation Secret Service bridge, adapt a user-service template or launch
+`knox-dbus` from the desktop session's autostart mechanism.
 
 ```sh
-dinitctl start knox-server
-dinitctl status knox-server
+service-manager --user start knox-dbus
+service-manager --user status knox-dbus
 ```
 
-For a workstation Secret Service bridge, copy
-[examples/dinit-knox-dbus](examples/dinit-knox-dbus) to
-`~/.config/dinit.d/knox-dbus`, replace `USER` with your login name, and start it:
-
-```sh
-dinitctl --user start knox-dbus
-dinitctl --user status knox-dbus
-```
-
-If your session does not run a dinit user instance, launch `knox-dbus` from the
-desktop session's autostart mechanism instead.
+Exact user-service commands vary by service manager.
 
 ## Backup And Restore
 
