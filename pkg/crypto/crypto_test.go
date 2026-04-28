@@ -245,6 +245,44 @@ func TestAESCryptor_DifferentKeys(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestNewAESCryptorCopiesMasterKey(t *testing.T) {
+	masterKey, err := crypto.GenerateMasterKey()
+	assert.NoError(t, err)
+
+	cryptor, err := crypto.NewAESCryptor(masterKey)
+	assert.NoError(t, err)
+
+	for i := range masterKey {
+		masterKey[i] = 0
+	}
+
+	key := &types.Key{
+		ID: "copy-test-key",
+		ACL: types.ACL{
+			{
+				ID:         "user@example.com",
+				Type:       types.User,
+				AccessType: types.Read,
+			},
+		},
+		VersionList: types.KeyVersionList{
+			{
+				ID:           1,
+				Data:         []byte("copy-test-secret"),
+				Status:       types.Primary,
+				CreationTime: 1234567890,
+			},
+		},
+		VersionHash: "copy-test-hash",
+	}
+	encrypted, err := cryptor.Encrypt(key)
+	assert.NoError(t, err)
+
+	decrypted, err := cryptor.Decrypt(encrypted)
+	assert.NoError(t, err)
+	assert.Equal(t, key.VersionList[0].Data, decrypted.VersionList[0].Data)
+}
+
 // TestDeriveKey tests key derivation from password.
 func TestDeriveKey(t *testing.T) {
 	password := []byte("test-password")

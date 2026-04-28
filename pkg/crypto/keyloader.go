@@ -80,23 +80,24 @@ func decodeMasterKey(keyStr string) ([]byte, error) {
 
 // loadMasterKeyFromFile loads the master key from a file.
 func loadMasterKeyFromFile(path string) ([]byte, error) {
-	// Check file permissions (should be 0600 or stricter)
-	info, err := os.Stat(path)
+	if err := validateMasterKeyFilePath(path); err != nil {
+		return nil, err
+	}
+
+	info, err := os.Lstat(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat key file: %w", err)
 	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("key file must not be a symlink")
+	}
+	if info.IsDir() {
+		return nil, errors.New("key file path must be a regular file")
+	}
 
-	mode := info.Mode()
+	mode := info.Mode().Perm()
 	if mode&0o077 != 0 {
 		return nil, fmt.Errorf("key file has insecure permissions %o (should be 0600)", mode)
-	}
-
-	// Validate file path for security
-	if !filepath.IsAbs(path) {
-		return nil, errors.New("key file path must be absolute")
-	}
-	if strings.Contains(path, "..") {
-		return nil, errors.New("key file path cannot contain parent directory references")
 	}
 
 	// #nosec G304 -- path is strictly validated above (absolute, no traversal, permissions checked)
@@ -122,15 +123,36 @@ func SaveMasterKeyToFile(key []byte, path string) error {
 	if len(key) != 32 {
 		return errors.New("key must be 32 bytes")
 	}
+	if err := validateMasterKeyFilePath(path); err != nil {
+		return err
+	}
 
 	// Encode as base64
 	encoded := base64.StdEncoding.EncodeToString(key)
 
-	// Write with secure permissions (owner read/write only)
-	if err := os.WriteFile(path, []byte(encoded), 0o600); err != nil {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
 		return fmt.Errorf("failed to write key file: %w", err)
 	}
+	defer file.Close()
 
+	if _, err := file.WriteString(encoded); err != nil {
+		return fmt.Errorf("failed to write key file: %w", err)
+	}
+	if err := file.Chmod(0o600); err != nil {
+		return fmt.Errorf("failed to set key file permissions: %w", err)
+	}
+
+	return nil
+}
+
+func validateMasterKeyFilePath(path string) error {
+	if !filepath.IsAbs(path) {
+		return errors.New("key file path must be absolute")
+	}
+	if strings.Contains(path, "..") {
+		return errors.New("key file path cannot contain parent directory references")
+	}
 	return nil
 }
 

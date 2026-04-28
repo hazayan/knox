@@ -30,8 +30,11 @@ func NewAESCryptor(masterKey []byte) (*AESCryptor, error) {
 		return nil, fmt.Errorf("master key must be 32 bytes (256 bits), got %d", len(masterKey))
 	}
 
+	kek := make([]byte, len(masterKey))
+	copy(kek, masterKey)
+
 	return &AESCryptor{
-		kek: masterKey,
+		kek: kek,
 	}, nil
 }
 

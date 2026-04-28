@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/hazayan/knox/pkg/xdg"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -41,11 +44,11 @@ func NewAuthManager() *AuthManager {
 		enabled:           true,
 	}
 
-	// Try to load existing master password or generate new one
+	// Try to load existing master password or generate new one.
+	// Fail closed: if auth state cannot be initialized, keep the bridge locked.
 	if err := am.loadOrGenerateMasterPassword(); err != nil {
-		// If we can't load/generate, disable authentication
-		am.enabled = false
-		am.locked = false // Allow access without authentication
+		am.enabled = true
+		am.locked = true
 	}
 
 	return am
@@ -192,22 +195,16 @@ func (am *AuthManager) GetStatus() (bool, bool, int) {
 
 // loadOrGenerateMasterPassword loads an existing master password or generates a new one.
 func (am *AuthManager) loadOrGenerateMasterPassword() error {
-	configDir, err := os.UserConfigDir()
+	authFile, err := authFilePath()
 	if err != nil {
-		return fmt.Errorf("failed to get config directory: %w", err)
+		return err
 	}
-
-	knoxDir := filepath.Join(configDir, "knox")
-	if err := os.MkdirAll(knoxDir, 0o700); err != nil {
-		return fmt.Errorf("failed to create knox directory: %w", err)
-	}
-
-	authFile := filepath.Join(knoxDir, "dbus-auth")
 
 	// Try to load existing auth data
-	// #nosec G304 -- authFile path is constructed from user's config directory, not user input
-	if data, err := os.ReadFile(authFile); err == nil {
-		return am.loadMasterPassword(data)
+	if _, err := os.Lstat(authFile); err == nil {
+		return am.loadMasterPasswordFromFile(authFile)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to inspect auth file: %w", err)
 	}
 
 	// Generate new master password
@@ -261,17 +258,57 @@ func (am *AuthManager) loadMasterPassword(data []byte) error {
 
 // saveMasterPassword saves the current master password to the default location.
 func (am *AuthManager) saveMasterPassword() error {
-	configDir, err := os.UserConfigDir()
+	authFile, err := authFilePath()
 	if err != nil {
-		return fmt.Errorf("failed to get config directory: %w", err)
+		return err
 	}
 
-	authFile := filepath.Join(configDir, "knox", "dbus-auth")
 	return am.saveMasterPasswordToFile(authFile)
+}
+
+func (am *AuthManager) loadMasterPasswordFromFile(authFile string) error {
+	if err := validateAuthFilePath(authFile); err != nil {
+		return err
+	}
+
+	info, err := os.Lstat(authFile)
+	if err != nil {
+		return fmt.Errorf("failed to stat auth file: %w", err)
+	}
+	if err := validateAuthFileInfo(info); err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(authFile) // #nosec G304 -- path and file metadata are validated above.
+	if err != nil {
+		return fmt.Errorf("failed to read auth file: %w", err)
+	}
+	return am.loadMasterPassword(data)
 }
 
 // saveMasterPasswordToFile saves master password to a specific file.
 func (am *AuthManager) saveMasterPasswordToFile(authFile string) error {
+	if err := validateAuthFilePath(authFile); err != nil {
+		return err
+	}
+	authDir := filepath.Dir(authFile)
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		return fmt.Errorf("failed to create auth directory: %w", err)
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(authDir, 0o700); err != nil {
+			return fmt.Errorf("failed to secure auth directory permissions: %w", err)
+		}
+	}
+
+	if info, err := os.Lstat(authFile); err == nil {
+		if err := validateAuthFileInfo(info); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to inspect auth file: %w", err)
+	}
+
 	// Encode master password
 	encodedMasterPassword := base64.StdEncoding.EncodeToString(am.masterPassword)
 
@@ -280,11 +317,53 @@ func (am *AuthManager) saveMasterPasswordToFile(authFile string) error {
 	copy(data[:32], am.salt)
 	copy(data[32:], []byte(encodedMasterPassword))
 
-	// Write to file with restricted permissions
-	if err := os.WriteFile(authFile, data, 0o600); err != nil {
+	file, err := os.OpenFile(authFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
 		return fmt.Errorf("failed to write auth file: %w", err)
 	}
+	defer file.Close()
 
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("failed to write auth file: %w", err)
+	}
+	if err := file.Chmod(0o600); err != nil {
+		return fmt.Errorf("failed to secure auth file permissions: %w", err)
+	}
+
+	return nil
+}
+
+func authFilePath() (string, error) {
+	authFile, err := xdg.ConfigFile("dbus-auth")
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve dbus auth file path: %w", err)
+	}
+	if err := validateAuthFilePath(authFile); err != nil {
+		return "", err
+	}
+	return authFile, nil
+}
+
+func validateAuthFilePath(authFile string) error {
+	if !filepath.IsAbs(authFile) {
+		return errors.New("auth file path must be absolute")
+	}
+	if strings.Contains(authFile, "..") {
+		return errors.New("auth file path cannot contain parent directory references")
+	}
+	return nil
+}
+
+func validateAuthFileInfo(info os.FileInfo) error {
+	if info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("auth file must not be a symlink")
+	}
+	if info.IsDir() {
+		return errors.New("auth file path must be a regular file")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return fmt.Errorf("auth file has insecure permissions %o (should be 0600)", info.Mode().Perm())
+	}
 	return nil
 }
 
