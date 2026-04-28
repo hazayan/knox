@@ -193,8 +193,8 @@ func (a *DBAdapter) Remove(keyID string) error {
 
 	err := a.backend.DeleteKey(ctx, keyID)
 	if errors.Is(err, ErrKeyNotFound) {
-		// Key not found is not an error for delete
-		return nil
+		a.invalidateCached(keyID)
+		return types.ErrKeyIDNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("backend delete failed: %w", err)

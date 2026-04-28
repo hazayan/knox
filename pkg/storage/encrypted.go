@@ -137,7 +137,7 @@ func (e *EncryptedBackend) Remove(keyID string) error {
 
 	err := e.backend.DeleteKey(ctx, keyID)
 	if errors.Is(err, ErrKeyNotFound) {
-		return nil // Not an error
+		return types.ErrKeyIDNotFound
 	}
 	return err
 }

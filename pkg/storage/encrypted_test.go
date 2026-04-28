@@ -429,7 +429,7 @@ func TestEncryptedBackend_Remove(t *testing.T) {
 		encryptedBackend := NewEncryptedBackend(mockBackend)
 
 		err := encryptedBackend.Remove("non-existent-key")
-		require.NoError(t, err, "Removing non-existent key should not error")
+		require.ErrorIs(t, err, types.ErrKeyIDNotFound)
 	})
 
 	t.Run("Remove_BackendFailure", func(t *testing.T) {
