@@ -14,9 +14,6 @@ The design priority is:
 4. CLI usability for scripts and daily administration
 5. Optional desktop integration through FreeDesktop Secret Service
 
-Enterprise features such as high availability, Kubernetes automation, cloud KMS,
-and compliance reporting are not part of the main maturity target.
-
 ## Runtime Components
 
 ```text
