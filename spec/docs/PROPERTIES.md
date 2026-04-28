@@ -1,6 +1,9 @@
 # Formal Properties Verified for Knox
 
-This document lists all safety and liveness properties formally verified using TLA+, mapped to their security and correctness implications.
+This document lists safety and liveness properties checked in the TLA+ models,
+mapped to their security and correctness implications. These are model
+properties, not proof that the current Go implementation enforces every
+property.
 
 ## Key Version State Machine Properties
 

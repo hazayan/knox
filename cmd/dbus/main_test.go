@@ -616,7 +616,7 @@ func TestDBusBridgeCreateAuthHandlersComprehensive(t *testing.T) {
 
 	t.Run("WithFileToken", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		tokenFile := filepath.Join(tmpDir, ".knox", "token")
+		tokenFile := filepath.Join(tmpDir, ".config", "knox", "token")
 
 		err := os.MkdirAll(filepath.Dir(tokenFile), 0o755)
 		require.NoError(t, err)

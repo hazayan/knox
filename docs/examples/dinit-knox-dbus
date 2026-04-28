@@ -1,0 +1,4 @@
+type = process
+command = /usr/local/bin/knox-dbus --config /home/USER/.config/knox/dbus.yaml
+restart = true
+logfile = /home/USER/.local/state/knox/knox-dbus.log

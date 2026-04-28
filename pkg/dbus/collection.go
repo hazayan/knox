@@ -358,15 +358,8 @@ func (c *Collection) CreateItem(properties map[string]dbus.Variant, secret Secre
 		return "/", "/", dbus.MakeFailedError(err)
 	}
 
-	// Create default ACL (grant admin access to creator)
-	// For D-Bus bridge, use a system principal
-	acl := types.ACL{
-		{
-			Type:       types.User,
-			ID:         "dbus-user",
-			AccessType: types.Admin,
-		},
-	}
+	// Create empty ACL, server will add creator principal automatically
+	acl := types.ACL{}
 
 	// Save to Knox
 	ctx := context.Background()

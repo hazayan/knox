@@ -1,164 +1,90 @@
-# Knox - Secret Management System
-Knox started as a fork of [pinterest/knox](https://github.com/pinterest/knox) and has been refactored and improved to fit a narrower and more focused use-case: personal secret management service with a bridge to the freedesktop.org's secret service interface, that can also stretch to cater to small professional outfit.
+# Knox - Home-Network Secret Management
 
-## The Problem Knox Solves
-Knox provides a comprehensive solution with reasonable security features.
+Knox is a personal secret management service forked from
+[pinterest/knox](https://github.com/pinterest/knox). The target for this fork is
+not enterprise Vault parity. The target is a sturdy, self-hosted "poor man's
+Vault" for a trusted home network: FreeBSD servers, Artix Linux workstations and
+laptops, CLI workflows, and optional FreeDesktop Secret Service integration.
 
-## Key Features
+## Current Status
 
-### 🔒 Security First
-- **AES-256-GCM Encryption**: All secrets encrypted at rest with envelope encryption
-- **mTLS Authentication**: Mutual TLS for machine-to-machine authentication
-- **SPIFFE Support**: Service identity verification with SPIFFE standards
-- **Fine-grained ACLs**: Per-secret access control with Read/Write/Admin permissions
-- **Comprehensive Audit Logging**: All operations logged for compliance
-- **Input Validation**: Strict validation of all inputs to prevent injection attacks
-- **Security Headers**: HTTP security headers to prevent common web vulnerabilities
+Knox is under active stabilization. The codebase has meaningful pieces in place:
 
-### 🚀 Production Ready
-- **Multiple Storage Backends**: PostgreSQL, filesystem, and in-memory storage
-- **High Availability**: Support for distributed deployments with shared storage
-- **Prometheus Metrics**: Built-in metrics for monitoring and alerting
-- **Health Checks**: /health and /ready endpoints for orchestration
-- **Structured Logging**: JSON and text logging with configurable levels
-- **Rate Limiting**: Configurable rate limiting per principal
+- AES-256-GCM envelope encryption for stored secrets
+- HTTP API with ACL-aware key operations
+- CLI commands for key, ACL, and config workflows
+- Filesystem, memory, PostgreSQL, and etcd storage packages
+- D-Bus Secret Service bridge implementation
+- Tests across crypto, storage, server, client, and D-Bus packages
 
-### 🖥️ Desktop Integration
-- **FreeDesktop Secret Service**: Native integration with Linux desktop applications
-- **Transparent Usage**: Works with Firefox, Chrome, SSH, Git, and other D-Bus clients
-- **Secure Bridge**: D-Bus to Knox bridge with session encryption
+The implementation does not yet live up to the older production/enterprise
+claims in the documentation. Treat it as alpha software until the full test suite
+is green and the home-network operational path is documented end to end.
 
-### 🔧 Developer Experience
-- **Modern CLI**: Intuitive command-line interface with shell completion
-- **Multi-profile Support**: Separate configurations for dev/staging/prod environments
-- **JSON Output**: Machine-readable output for scripting and automation
-- **Smart Caching**: Configurable client-side caching with TTL
+## Intended Use
 
-## Quick Start
+The practical deployment model is:
 
-### Prerequisites
+```text
+FreeBSD or Linux host
+  knox-server
+  filesystem or PostgreSQL storage
+  master key from /etc/knox/master.key or KNOX_MASTER_KEY_FILE
+  TLS and simple auth suitable for a trusted LAN
+
+Artix Linux workstation/laptop
+  knox CLI
+  optional knox-dbus launched by dinit or an XDG autostart entry
+
+FreeBSD/Linux servers
+  scripts and services using knox CLI or the HTTP API
+```
+
+## Non-Goals
+
+These are not primary goals for this fork:
+
+- Kubernetes operators
+- cloud KMS integrations
+- enterprise compliance claims
+- multi-region/high-availability operation
+- 10k requests/sec benchmarks
+- systemd-only setup instructions
+
+etcd, SPIFFE, GitHub auth, and other advanced pieces may remain in the tree, but
+they are secondary to a simple, recoverable home-network deployment.
+
+## Build
+
+Prerequisites:
+
 - Go 1.21 or later
-- PostgreSQL (optional, for production storage)
 
-### Installation
+Build the three main binaries:
 
 ```bash
-# Clone the repository
-git clone https://github.com/hazayan/knox.git
-cd knox
-
-# Build all components
 go build -o bin/knox ./cmd/client
 go build -o bin/knox-server ./cmd/server
 go build -o bin/knox-dbus ./cmd/dbus
-
-# Install to PATH (optional)
-sudo cp bin/knox /usr/local/bin/knox
-sudo cp bin/knox-server /usr/local/bin/knox-server
-cp bin/knox-dbus ~/.local/bin/knox-dbus
 ```
 
-### Running the Server
+## Server Configuration
 
-```bash
-# Start with memory backend (development)
-knox-server --bind-address localhost:9000
+`knox-server` is currently configured through a YAML file. By default it reads
+`/etc/knox/server.yaml`; pass a different path with `--config`.
 
-# Start with PostgreSQL backend (production)
-knox-server --bind-address localhost:9000 \
-  --storage-backend postgres \
-  --postgres-connection-string "postgresql://user:password@localhost/knox"
-```
+Minimal local example:
 
-### Using the CLI
-
-```bash
-# Initialize configuration
-knox-client config init --server localhost:9000
-
-# Create your first secret
-echo "super-secret-password" | knox key create myapp:database_password
-
-# Retrieve the secret
-knox-client key get myapp:database_password
-
-# List all keys
-knox-client key list
-
-# Manage access control
-knox-client acl add myapp:database_password User:alice@example.com:Read
-```
-
-### Desktop Integration
-
-```bash
-# Start D-Bus bridge (for desktop app integration)
-knox-dbus --config ~/.config/knox/dbus.yaml
-
-# Firefox, Chrome, SSH, and other applications will now use Knox for secret storage
-```
-
-## Architecture Overview
-
-### Project Structure
-
-```
-knox/
-├── cmd/
-│   ├── client/            # Production CLI client
-│   ├── server/            # Production HTTP server
-│   └── dbus/              # FreeDesktop Secret Service bridge
-├── pkg/
-│   ├── auth/              # Authentication providers (mTLS, SPIFFE)
-│   ├── crypto/            # Cryptographic operations (AES-256-GCM)
-│   ├── storage/           # Storage backends (PostgreSQL, filesystem, memory)
-│   ├── config/            # Configuration management
-│   ├── observability/     # Metrics and logging
-│   └── dbus/              # D-Bus protocol implementation
-├── server/                # Core server logic and API routes
-├── client/                # Client library implementation
-└── docs/                  # Comprehensive documentation
-```
-
-### Security Features
-
-- **Encryption at Rest**: All secrets encrypted with AES-256-GCM using envelope encryption
-- **Authentication**: Multiple providers including mTLS, SPIFFE, and token-based auth
-- **Authorization**: Fine-grained ACLs with Read/Write/Admin permissions per principal
-- **Audit Logging**: Comprehensive logging of all operations for compliance
-- **Input Validation**: Strict validation of all inputs to prevent injection attacks
-- **Rate Limiting**: Configurable rate limiting per principal to prevent abuse
-
-### Storage Backends
-
-- **PostgreSQL**: Production-ready with transaction support and high availability
-- **Filesystem**: Simple file-based storage for development and testing
-- **Memory**: In-memory storage for testing and ephemeral deployments
-
-## Configuration
-
-### Server Configuration
-
-Create `server.yaml`:
 ```yaml
-bind_address: "0.0.0.0:9000"
-tls:
-  cert_file: "/etc/knox/tls/server.crt"
-  key_file: "/etc/knox/tls/server.key"
-  client_ca: "/etc/knox/tls/ca.crt"
+bind_address: "127.0.0.1:9000"
 
 storage:
-  backend: "postgres"
-  postgres:
-    connection_string: "postgresql://knox:password@localhost/knox"
-    max_connections: 100
+  backend: "filesystem"
+  filesystem_dir: "/var/lib/knox/keys"
 
 auth:
   providers:
-    - type: "spiffe"
-      trust_domain: "example.com"
-    - type: "mtls"
-      ca_file: "/etc/knox/ca.crt"
+    - type: "mock"
 
 observability:
   metrics:
@@ -166,27 +92,86 @@ observability:
     endpoint: "/metrics"
   logging:
     level: "info"
-    format: "json"
+    format: "text"
+  audit:
+    enabled: true
+    output: "stdout"
+
+limits:
+  rate_limit_per_principal: 100
+  max_key_size: "1MB"
+  max_keys_per_list: 1000
 ```
 
-### Client Configuration
+The server needs a 32-byte master key. Supported sources, in priority order:
 
-Initialize with:
+1. `KNOX_MASTER_KEY`, as base64 or hex
+2. `KNOX_MASTER_KEY_FILE`, pointing to an absolute path
+3. `/etc/knox/master.key`
+
+Key files must be owner-only, for example:
+
 ```bash
-knox config init --server knox.example.com:9000 \
-  --ca-cert /etc/knox/ca.crt \
-  --client-cert /etc/knox/client.crt \
-  --client-key /etc/knox/client.key
+install -d -m 0700 /etc/knox
+openssl rand -base64 32 > /etc/knox/master.key
+chmod 0600 /etc/knox/master.key
 ```
+
+Start the server:
+
+```bash
+knox-server --config /etc/knox/server.yaml
+```
+
+## CLI
+
+Initialize client configuration:
+
+```bash
+knox config init --server 127.0.0.1:9000
+```
+
+Common workflows:
+
+```bash
+echo "secret-value" | knox key create home:test
+knox key get home:test
+knox key list
+knox key rotate home:test --data "new-secret-value"
+knox acl get home:test
+```
+
+The CLI and older client library still need cleanup around legacy cache/register
+behavior. See [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) for current command details.
+
+## Desktop Integration
+
+`knox-dbus` implements a FreeDesktop Secret Service bridge. The intended Artix
+Linux path is to launch it with dinit or an XDG session/autostart mechanism, not
+systemd.
+
+Current D-Bus limitations are documented in
+[docs/DBUS_GUIDE.md](docs/DBUS_GUIDE.md). Browser/libsecret compatibility should
+be verified with `secret-tool` and real desktop applications before relying on it
+for daily use.
+
+## Stabilization Checklist
+
+Knox should not be considered sturdy for home-network use until:
+
+- `go test ./...` passes
+- the server has one canonical route path
+- storage backend create/update semantics are consistent
+- audit logging covers key and ACL operations without logging secret values
+- master-key rotation cannot remove old cryptors while data still needs them
+- FreeBSD rc.d and Artix dinit examples exist
+- backup and restore are documented and tested
+- D-Bus behavior is verified with `secret-tool`
 
 ## Documentation
 
-### Quick Navigation
-- **[Documentation Index](docs/INDEX.md)** - Complete navigation guide for all documentation
-
-### Essential Guides
-- [CLI Guide](docs/CLI_GUIDE.md) - Complete command reference
-- [D-Bus Integration](docs/DBUS_GUIDE.md) - Desktop application integration
-- [Production Guide](docs/PRODUCTION_GUIDE.md) - Deployment and operations
-- [Architecture](docs/ARCHITECTURE.md) - System design and components
-
+- [Architecture](docs/ARCHITECTURE.md)
+- [CLI Guide](docs/CLI_GUIDE.md)
+- [D-Bus Guide](docs/DBUS_GUIDE.md)
+- [Home Operations](docs/HOME_OPERATIONS.md)
+- [Documentation Index](docs/INDEX.md)

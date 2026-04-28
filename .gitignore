@@ -1,6 +1,8 @@
+.jj
 .idea
 .envrc
 .rules
+.codex
 
 bin/
 agent/
@@ -9,3 +11,4 @@ build-dir/
 *.out
 *coverage.html
 *coverage.out
+DEVELOPMENT.log

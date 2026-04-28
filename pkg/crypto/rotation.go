@@ -78,13 +78,29 @@ func (krm *KeyRotationManager) RotateToNewKey(newCryptor keydb.Cryptor) {
 	krm.currentCryptor = newCryptor
 }
 
-// RemoveOldCryptor removes an old cryptor (after re-encryption is complete).
-func (krm *KeyRotationManager) RemoveOldCryptor(index int) error {
+// RemoveOldCryptor removes an old cryptor after verifying no stored keys still
+// require it for decryption.
+func (krm *KeyRotationManager) RemoveOldCryptor(db keydb.DB, index int) error {
 	krm.mu.Lock()
 	defer krm.mu.Unlock()
 
+	if db == nil {
+		return errors.New("database cannot be nil")
+	}
 	if index < 0 || index >= len(krm.oldCryptors) {
 		return fmt.Errorf("invalid cryptor index: %d", index)
+	}
+
+	dbKeys, err := db.GetAll()
+	if err != nil {
+		return fmt.Errorf("failed to inspect database before removing cryptor: %w", err)
+	}
+
+	oldCryptor := krm.oldCryptors[index]
+	for _, dbKey := range dbKeys {
+		if _, err := oldCryptor.Decrypt(&dbKey); err == nil {
+			return fmt.Errorf("cannot remove old cryptor %d: key %s still decrypts with it", index, dbKey.ID)
+		}
 	}
 
 	// Remove from slice
