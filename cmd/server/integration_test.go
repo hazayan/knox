@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/hazayan/knox/pkg/storage"
 	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
 	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
-	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
+	_ "github.com/hazayan/knox/pkg/storage/orm"        // Register SQLite backend
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -366,7 +367,7 @@ func TestContextCancellation(t *testing.T) {
 // TestStorageBackendRegistration tests backend registration functionality.
 func TestStorageBackendRegistration(t *testing.T) {
 	// Test that all required backends are registered
-	backends := []string{"memory", "filesystem", "postgres"}
+	backends := []string{"memory", "filesystem", "sqlite", "etcd"}
 
 	for _, backendName := range backends {
 		t.Run(backendName, func(t *testing.T) {
@@ -375,6 +376,12 @@ func TestStorageBackendRegistration(t *testing.T) {
 			cfg := storage.Config{Backend: backendName}
 			if backendName == "filesystem" {
 				cfg.FilesystemDir = t.TempDir()
+			}
+			if backendName == "sqlite" {
+				cfg.SQLitePath = filepath.Join(t.TempDir(), "knox.db")
+			}
+			if backendName == "etcd" {
+				cfg.EtcdEndpoints = []string{"localhost:2379"}
 			}
 
 			backend, err := storage.NewBackend(cfg)

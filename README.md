@@ -12,7 +12,7 @@ Knox is under active stabilization. The codebase has meaningful pieces in place:
 - AES-256-GCM envelope encryption for stored secrets
 - HTTP API with ACL-aware key operations
 - CLI commands for key, ACL, and config workflows
-- Filesystem, memory, PostgreSQL, and etcd storage packages
+- Filesystem, SQLite, memory, and etcd storage packages
 - D-Bus Secret Service bridge implementation
 - Tests across crypto, storage, server, client, and D-Bus packages
 
@@ -27,7 +27,7 @@ The practical deployment model is:
 ```text
 Unix server or workstation
   knox-server
-  filesystem or PostgreSQL storage
+  filesystem or SQLite storage
   master key from /etc/knox/master.key or KNOX_MASTER_KEY_FILE
   TLS and simple auth suitable for a private environment
 
@@ -66,6 +66,10 @@ bind_address: "127.0.0.1:9000"
 storage:
   backend: "filesystem"
   filesystem_dir: "/var/lib/knox/keys"
+
+  # SQLite is also available through the ORM backend:
+  # backend: "sqlite"
+  # sqlite_path: "/var/lib/knox/knox.db"
 
 auth:
   providers:

@@ -230,7 +230,7 @@ func AuditAuthAttempt(principalID, principalType, provider, result string, metad
 }
 
 // SanitizeDatabaseURL removes credentials from database connection strings for safe logging.
-// Supports postgres://, mysql://, and other database URL formats.
+// Supports URL-style and user:password@host database connection strings.
 func SanitizeDatabaseURL(dbURL string) string {
 	if dbURL == "" {
 		return ""

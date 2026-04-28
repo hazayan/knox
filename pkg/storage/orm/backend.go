@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync/atomic"
 
 	"github.com/hazayan/knox/pkg/storage"
@@ -13,8 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Backend implements storage.Backend using GORM for database abstraction.
-// This backend is database-agnostic and works with PostgreSQL, MySQL, SQLite, etc.
+// Backend implements storage.Backend using GORM for SQLite.
 type Backend struct {
 	db *gorm.DB
 
@@ -256,29 +254,7 @@ func (b *Backend) Stats(ctx context.Context) (*storage.Stats, error) {
 		},
 	}
 
-	// Try to get table size (database-specific, may fail)
-	var tableSize int64
-	switch strings.ToLower(dialectName) {
-	case "postgres":
-		// PostgreSQL-specific query
-		if err := b.db.WithContext(ctx).Raw("SELECT pg_total_relation_size('knox_keys')").Scan(&tableSize).Error; err == nil {
-			stats.StorageSize = tableSize
-		}
-	case "mysql":
-		// MySQL-specific query
-		var result struct {
-			DataLength  int64
-			IndexLength int64
-		}
-		if err := b.db.WithContext(ctx).Raw(`
-			SELECT data_length + index_length AS total_size
-			FROM information_schema.tables
-			WHERE table_schema = DATABASE() AND table_name = 'knox_keys'
-		`).Scan(&result).Error; err == nil {
-			stats.StorageSize = result.DataLength + result.IndexLength
-		}
-		// SQLite doesn't have a reliable way to get table size without OS-level queries
-	}
+	// SQLite doesn't have a reliable table-size value without OS-level queries.
 
 	return stats, nil
 }

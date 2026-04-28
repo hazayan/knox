@@ -432,14 +432,13 @@ server:
 
   # Storage Configuration
   storage:
-    backend: "filesystem"  # memory, filesystem, postgres, etcd
+    backend: "filesystem"  # memory, filesystem, sqlite, etcd
 
     # Filesystem backend (default)
     filesystem_dir: "/var/lib/knox/keys"
 
-    # PostgreSQL backend (production)
-    # postgres_connection_string: "postgresql://knox:password@localhost/knox"
-    # postgres_max_connections: 100
+    # SQLite backend
+    # sqlite_path: "/var/lib/knox/knox.db"
 
     # etcd backend (distributed)
     # etcd_endpoints: ["http://localhost:2379"]
