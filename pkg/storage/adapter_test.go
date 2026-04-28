@@ -56,6 +56,9 @@ func (m *MockBackend) DeleteKey(_ context.Context, keyID string) error {
 	if m.shouldFail || m.failOps["DeleteKey"] {
 		return errors.New("backend delete failed")
 	}
+	if _, exists := m.keys[keyID]; !exists {
+		return ErrKeyNotFound
+	}
 	delete(m.keys, keyID)
 	return nil
 }
@@ -558,7 +561,22 @@ func TestDBAdapter_Remove(t *testing.T) {
 		adapter := NewDBAdapter(mockBackend, nil).(*DBAdapter)
 
 		err := adapter.Remove("non-existent-key")
-		require.NoError(t, err, "Removing non-existent key should not error")
+		require.ErrorIs(t, err, types.ErrKeyIDNotFound)
+	})
+
+	t.Run("Remove_NonExistentKeyClearsStaleCache", func(t *testing.T) {
+		mockBackend := NewMockBackend()
+		adapter := NewDBAdapter(mockBackend, nil).(*DBAdapter)
+		adapter.setCached("stale-key", &keydb.DBKey{
+			ID: "stale-key",
+			VersionList: []keydb.EncKeyVersion{
+				{ID: 1, EncData: []byte("stale-data")},
+			},
+		})
+
+		err := adapter.Remove("stale-key")
+		require.ErrorIs(t, err, types.ErrKeyIDNotFound)
+		assert.Nil(t, adapter.getCached("stale-key"))
 	})
 
 	t.Run("Remove_BackendFailure", func(t *testing.T) {
