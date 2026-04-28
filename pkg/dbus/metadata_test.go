@@ -121,6 +121,13 @@ func TestExtractMetadataFromKeyData(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, extractedMetadata)
 	assert.Equal(t, invalidData, extractedSecret)
+
+	// Test with legacy secret that happens to be valid JSON
+	legacyJSONData := []byte(`{"token":"abc123"}`)
+	extractedMetadata, extractedSecret, err = ExtractMetadataFromKeyData(legacyJSONData)
+	assert.NoError(t, err)
+	assert.Nil(t, extractedMetadata)
+	assert.Equal(t, legacyJSONData, extractedSecret)
 }
 
 func TestCombineMetadataWithSecret(t *testing.T) {
@@ -260,4 +267,26 @@ func TestExtractMetadata_EdgeCases(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Nil(t, extractedMetadata)
 	assert.Equal(t, []byte("secret only"), extractedSecret)
+
+	// Test with malformed structured metadata
+	malformedMetadata := []byte(`{"metadata":"not-an-object","secret":"c2VjcmV0"}`)
+	extractedMetadata, extractedSecret, err = ExtractMetadataFromKeyData(malformedMetadata)
+	assert.Error(t, err)
+	assert.Nil(t, extractedMetadata)
+	assert.Nil(t, extractedSecret)
+
+	// Test with structured null secret
+	nullSecret := []byte(`{"metadata":{"label":"Null Secret"},"secret":null}`)
+	extractedMetadata, extractedSecret, err = ExtractMetadataFromKeyData(nullSecret)
+	assert.Error(t, err)
+	assert.Nil(t, extractedMetadata)
+	assert.Nil(t, extractedSecret)
+
+	// Test with nil metadata attributes normalized
+	metadataWithoutAttributes := []byte(`{"metadata":{"label":"No Attrs","created":1,"modified":1},"secret":"c2VjcmV0"}`)
+	extractedMetadata, extractedSecret, err = ExtractMetadataFromKeyData(metadataWithoutAttributes)
+	assert.NoError(t, err)
+	assert.NotNil(t, extractedMetadata)
+	assert.NotNil(t, extractedMetadata.Attributes)
+	assert.Equal(t, []byte("secret"), extractedSecret)
 }

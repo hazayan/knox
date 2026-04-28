@@ -64,6 +64,10 @@ func New(baseDir string) (*Backend, error) {
 
 // GetKey retrieves a key by ID.
 func (b *Backend) GetKey(_ context.Context, keyID string) (*types.Key, error) {
+	if err := validateStorageKeyID(keyID); err != nil {
+		return nil, err
+	}
+
 	b.incrementOp("get")
 
 	lock := b.getLock(keyID)
@@ -128,6 +132,10 @@ func (b *Backend) PutKey(_ context.Context, key *types.Key) error {
 
 // DeleteKey removes a key by ID.
 func (b *Backend) DeleteKey(_ context.Context, keyID string) error {
+	if err := validateStorageKeyID(keyID); err != nil {
+		return err
+	}
+
 	b.incrementOp("delete")
 
 	lock := b.getLock(keyID)
@@ -187,6 +195,10 @@ func (b *Backend) ListKeys(_ context.Context, prefix string) ([]string, error) {
 
 // UpdateKey atomically updates a key using the provided update function.
 func (b *Backend) UpdateKey(_ context.Context, keyID string, updateFn func(*types.Key) (*types.Key, error)) error {
+	if err := validateStorageKeyID(keyID); err != nil {
+		return err
+	}
+
 	b.incrementOp("update")
 
 	lock := b.getLock(keyID)
@@ -335,6 +347,16 @@ func (b *Backend) keyPath(keyID string) string {
 	}
 
 	return fullPath
+}
+
+func validateStorageKeyID(keyID string) error {
+	if keyID == "" {
+		return types.ErrInvalidKeyID
+	}
+	if strings.Contains(keyID, "..") || strings.Contains(keyID, "/") || strings.Contains(keyID, "\\") || strings.Contains(keyID, "\x00") {
+		return types.ErrInvalidKeyID
+	}
+	return nil
 }
 
 // sanitizeKeyID removes or replaces dangerous characters in key IDs.

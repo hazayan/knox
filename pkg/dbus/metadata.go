@@ -3,6 +3,7 @@ package dbus
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -82,17 +83,43 @@ const (
 // ExtractMetadataFromKeyData extracts metadata from key data.
 // Knox stores the actual secret data along with metadata in a structured format.
 func ExtractMetadataFromKeyData(keyData []byte) (*ItemMetadata, []byte, error) {
-	var data struct {
-		Metadata *ItemMetadata `json:"metadata"`
-		Secret   []byte        `json:"secret"`
-	}
-
-	if err := json.Unmarshal(keyData, &data); err != nil {
-		// If unmarshaling fails, assume it's legacy format (just the secret)
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(keyData, &raw); err != nil {
+		// If unmarshaling fails, assume it's legacy format (just the secret).
 		return nil, keyData, nil
 	}
 
-	return data.Metadata, data.Secret, nil
+	metadataRaw, hasMetadata := raw["metadata"]
+	secretRaw, hasSecret := raw["secret"]
+	if !hasMetadata && !hasSecret {
+		// Valid JSON can still be a legacy secret value.
+		return nil, keyData, nil
+	}
+
+	var metadata *ItemMetadata
+	if hasMetadata && string(metadataRaw) != "null" {
+		if err := json.Unmarshal(metadataRaw, &metadata); err != nil {
+			return nil, nil, err
+		}
+		if metadata != nil && metadata.Attributes == nil {
+			metadata.Attributes = make(map[string]string)
+		}
+	}
+
+	var secret []byte
+	if hasSecret {
+		if err := json.Unmarshal(secretRaw, &secret); err != nil {
+			return nil, nil, err
+		}
+	} else if hasMetadata {
+		secret = []byte{}
+	}
+
+	if hasSecret && secret == nil {
+		return nil, nil, errors.New("structured secret payload has null secret")
+	}
+
+	return metadata, secret, nil
 }
 
 // CombineMetadataWithSecret combines metadata and secret into a single byte array.

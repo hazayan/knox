@@ -1,9 +1,9 @@
-# Knox - Personal Secret Management
+# Knox - Self-Hosted Secret Management
 
-Knox is a personal secret management service forked from
+Knox is a self-hosted secret management service forked from
 [pinterest/knox](https://github.com/pinterest/knox). The target for this fork is
-a sturdy, self-hosted secret manager for personal Unix systems, CLI workflows,
-and optional FreeDesktop Secret Service integration.
+a sturdy secret manager for Unix systems, CLI workflows, and optional
+FreeDesktop Secret Service integration.
 
 ## Current Status
 
@@ -16,9 +16,9 @@ Knox is under active stabilization. The codebase has meaningful pieces in place:
 - D-Bus Secret Service bridge implementation
 - Tests across crypto, storage, server, client, and D-Bus packages
 
-The implementation does not yet live up to the older production/enterprise
-claims in the documentation. Treat it as alpha software until the full test suite
-is green and the personal-use operational path is documented end to end.
+The implementation does not yet live up to the older production claims in the
+documentation. Treat it as alpha software until the full test suite is green and
+the operational path is documented end to end.
 
 ## Intended Use
 
@@ -119,11 +119,11 @@ knox config init --server 127.0.0.1:9000
 Common workflows:
 
 ```bash
-echo "secret-value" | knox key create home:test
-knox key get home:test
+echo "secret-value" | knox key create app:test
+knox key get app:test
 knox key list
-knox key rotate home:test --data "new-secret-value"
-knox acl get home:test
+knox key rotate app:test --data "new-secret-value"
+knox acl get app:test
 ```
 
 The CLI and older client library still need cleanup around legacy cache/register
@@ -142,7 +142,7 @@ for daily use.
 
 ## Stabilization Checklist
 
-Knox should not be considered sturdy for personal use until:
+Knox should not be considered sturdy until:
 
 - `go test ./...` passes
 - the server has one canonical route path
@@ -158,5 +158,5 @@ Knox should not be considered sturdy for personal use until:
 - [Architecture](docs/ARCHITECTURE.md)
 - [CLI Guide](docs/CLI_GUIDE.md)
 - [D-Bus Guide](docs/DBUS_GUIDE.md)
-- [Personal Operations](docs/HOME_OPERATIONS.md)
+- [Operations](docs/OPERATIONS.md)
 - [Documentation Index](docs/INDEX.md)

@@ -127,27 +127,21 @@ func TestLoadMasterKey_KeyFile(t *testing.T) {
 	})
 
 	t.Run("RelativePath", func(t *testing.T) {
-		// Test with a relative path that doesn't exist
-		// The error will be about file not found, not about absolute path
-		// This documents the current behavior
 		t.Setenv("KNOX_MASTER_KEY_FILE", "relative.key")
 		defer t.Setenv("KNOX_MASTER_KEY_FILE", "")
 
 		_, err := crypto.LoadMasterKey()
 		assert.Error(t, err)
-		// The error is about file not found, not path validation
+		assert.Contains(t, err.Error(), "must be absolute")
 	})
 
 	t.Run("PathTraversal", func(t *testing.T) {
-		// Test with a path traversal that doesn't exist
-		// The error will be about file not found, not about path traversal
-		// This documents the current behavior
 		t.Setenv("KNOX_MASTER_KEY_FILE", "/etc/knox/../passwd")
 		defer t.Setenv("KNOX_MASTER_KEY_FILE", "")
 
 		_, err := crypto.LoadMasterKey()
 		assert.Error(t, err)
-		// The error is about file not found, not path traversal
+		assert.Contains(t, err.Error(), "parent directory references")
 	})
 }
 
@@ -335,6 +329,28 @@ func TestSaveMasterKeyToFile(t *testing.T) {
 		err = crypto.SaveMasterKeyToFile(key, "/non/existent/dir/key.key")
 		assert.Error(t, err)
 	})
+
+	t.Run("DoesNotOverwriteExistingFile", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		keyFile := filepath.Join(tmpDir, "test.key")
+
+		original := make([]byte, 32)
+		_, err := rand.Read(original)
+		require.NoError(t, err)
+		require.NoError(t, crypto.SaveMasterKeyToFile(original, keyFile))
+
+		replacement := make([]byte, 32)
+		_, err = rand.Read(replacement)
+		require.NoError(t, err)
+
+		err = crypto.SaveMasterKeyToFile(replacement, keyFile)
+		assert.Error(t, err)
+
+		t.Setenv("KNOX_MASTER_KEY_FILE", keyFile)
+		loadedKey, err := crypto.LoadMasterKey()
+		require.NoError(t, err)
+		assert.Equal(t, original, loadedKey)
+	})
 }
 
 // TestKeyLoader_Integration tests integration between generation and loading.
@@ -459,6 +475,13 @@ func TestSaveMasterKeyToFile_ErrorPaths(t *testing.T) {
 		err := crypto.SaveMasterKeyToFile(validKey, "/nonexistent/directory/key.txt")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write key file")
+	})
+
+	t.Run("RelativePath", func(t *testing.T) {
+		validKey := make([]byte, 32)
+		err := crypto.SaveMasterKeyToFile(validKey, "relative.key")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "must be absolute")
 	})
 }
 

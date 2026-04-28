@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 )
 
 func TestNewAuthManager(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
 	am := NewAuthManager()
 	require.NotNil(t, am)
 
@@ -322,6 +325,49 @@ func TestAuthManager_loadOrGenerateMasterPassword(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, am.salt)
 	assert.NotNil(t, am.masterPassword)
+
+	authFile := filepath.Join(tempDir, "knox", "dbus-auth")
+	info, err := os.Stat(authFile)
+	require.NoError(t, err)
+	if runtime.GOOS != "windows" {
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+}
+
+func TestAuthManager_loadOrGenerateMasterPasswordRejectsInsecureAuthFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission checks do not apply on Windows")
+	}
+
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	authFile := filepath.Join(tempDir, "knox", "dbus-auth")
+	require.NoError(t, os.MkdirAll(filepath.Dir(authFile), 0o700))
+	require.NoError(t, os.WriteFile(authFile, []byte("bad auth data"), 0o644))
+
+	am := &AuthManager{}
+	err := am.loadOrGenerateMasterPassword()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "insecure permissions")
+}
+
+func TestNewAuthManagerFailsClosedOnInsecureAuthFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission checks do not apply on Windows")
+	}
+
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+
+	authFile := filepath.Join(tempDir, "knox", "dbus-auth")
+	require.NoError(t, os.MkdirAll(filepath.Dir(authFile), 0o700))
+	require.NoError(t, os.WriteFile(authFile, []byte("bad auth data"), 0o644))
+
+	am := NewAuthManager()
+	enabled, locked, _ := am.GetStatus()
+	assert.True(t, enabled)
+	assert.True(t, locked)
 }
 
 func TestAuthManager_generateMasterPassword(t *testing.T) {
@@ -432,6 +478,33 @@ func TestAuthManager_saveMasterPasswordToFile(t *testing.T) {
 	// Should be 32 bytes salt + base64 encoded master password
 	assert.True(t, len(data) >= 32)
 	assert.Equal(t, am.salt, data[:32])
+
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(authFile)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+}
+
+func TestAuthManager_saveMasterPasswordToFileRejectsSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink behavior differs on Windows")
+	}
+
+	tempDir := t.TempDir()
+	targetFile := filepath.Join(tempDir, "target-auth")
+	authFile := filepath.Join(tempDir, "test-auth")
+	require.NoError(t, os.WriteFile(targetFile, []byte("target"), 0o600))
+	require.NoError(t, os.Symlink(targetFile, authFile))
+
+	am := &AuthManager{
+		salt:           make([]byte, 32),
+		masterPassword: make([]byte, 32),
+	}
+
+	err := am.saveMasterPasswordToFile(authFile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "symlink")
 }
 
 func TestCompareKeys(t *testing.T) {
@@ -455,6 +528,8 @@ func TestCompareKeys(t *testing.T) {
 }
 
 func TestNewAuthPromptHandler(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
 	am := NewAuthManager()
 	handler := NewAuthPromptHandler(am)
 	require.NotNil(t, handler)
@@ -513,6 +588,8 @@ func TestAuthPromptHandler_HandleUnlockPrompt(t *testing.T) {
 }
 
 func TestAuthPromptHandler_HandleChangePasswordPrompt(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
 	am := NewAuthManager()
 	handler := NewAuthPromptHandler(am)
 
@@ -570,6 +647,8 @@ func TestAuthPromptHandler_IsAuthenticationRequired_WhenUnlocked(t *testing.T) {
 }
 
 func TestAuthPromptHandler_GetAuthenticationPromptMessage(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
 	am := NewAuthManager()
 	handler := NewAuthPromptHandler(am)
 

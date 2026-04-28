@@ -57,7 +57,7 @@ func TestValidateCacheFilePath(t *testing.T) {
 	t.Run("OutsideBaseDir", func(t *testing.T) {
 		_, err := validateCacheFilePath(tempDir, "/etc/passwd")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cache file must have .json extension")
+		assert.Contains(t, err.Error(), "outside allowed directory")
 	})
 
 	t.Run("InvalidExtension", func(t *testing.T) {

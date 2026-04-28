@@ -35,13 +35,13 @@ Knox provides secure storage and rotation of credentials with fine-grained
 access control and comprehensive audit logging.`,
 		Version: version,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			// Skip config loading for config, version, and completion commands
+			// Skip config loading for local utility commands
 			cmdName := cmd.Name()
-			if cmdName == "config" || cmdName == "version" || cmdName == "completion" || cmdName == "help" {
+			if cmdName == "auth" || cmdName == "config" || cmdName == "version" || cmdName == "completion" || cmdName == "help" {
 				return nil
 			}
-			// Also skip for subcommands of config
-			if cmd.Parent() != nil && cmd.Parent().Name() == "config" {
+			// Also skip for subcommands of local utility command groups.
+			if cmd.Parent() != nil && (cmd.Parent().Name() == "auth" || cmd.Parent().Name() == "config") {
 				return nil
 			}
 			return loadConfig()
@@ -63,6 +63,8 @@ access control and comprehensive audit logging.`,
 	// Add command groups
 	rootCmd.AddCommand(newKeyCmd())
 	rootCmd.AddCommand(newACLCmd())
+	rootCmd.AddCommand(newAuthCmd())
+	rootCmd.AddCommand(newServerCmd())
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newVersionCmd())
 	rootCmd.AddCommand(newCompletionCmd())

@@ -7,12 +7,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"text/tabwriter"
 
 	"github.com/hazayan/knox/client"
 	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/pkg/xdg"
 	"github.com/spf13/cobra"
 )
 
@@ -577,18 +579,45 @@ func getAPIClient() (client.APIClient, error) {
 	// Determine cache folder
 	cacheFolder := ""
 	if prof.Cache.Enabled {
-		cacheFolder = prof.Cache.Directory
-		// Expand ~ to home directory
-		if strings.HasPrefix(cacheFolder, "~/") {
-			home, _ := os.UserHomeDir()
-			cacheFolder = filepath.Join(home, cacheFolder[2:])
-		}
-		// Create cache directory if it doesn't exist
-		if err := os.MkdirAll(cacheFolder, 0o700); err != nil {
-			return nil, fmt.Errorf("failed to create cache directory: %w", err)
+		cacheFolder, err = resolveCacheFolder(cfg.CurrentProfile, prof.Cache.Directory)
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	knoxClient := client.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)
 	return knoxClient, nil
+}
+
+func resolveCacheFolder(profileName, configuredDir string) (string, error) {
+	cacheFolder := strings.TrimSpace(configuredDir)
+	if cacheFolder == "" {
+		return xdg.ProfileCacheDir(profileName)
+	}
+
+	if strings.Contains(cacheFolder, "..") {
+		return "", errors.New("cache directory cannot contain parent directory references")
+	}
+	if strings.HasPrefix(cacheFolder, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve home directory: %w", err)
+		}
+		cacheFolder = filepath.Join(home, cacheFolder[2:])
+	}
+
+	absCacheFolder, err := filepath.Abs(cacheFolder)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve cache directory: %w", err)
+	}
+	if err := os.MkdirAll(absCacheFolder, 0o700); err != nil {
+		return "", fmt.Errorf("failed to create cache directory: %w", err)
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(absCacheFolder, 0o700); err != nil {
+			return "", fmt.Errorf("failed to secure cache directory permissions: %w", err)
+		}
+	}
+
+	return absCacheFolder, nil
 }

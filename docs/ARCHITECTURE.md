@@ -2,9 +2,9 @@
 
 ## Scope
 
-This fork is scoped as a personal Unix secret manager. It should be simple
-enough to run on ordinary servers, workstations, and laptops, and recoverable
-without specialized infrastructure.
+This fork is scoped as a small self-hosted Unix secret manager. It should be
+simple enough to run on ordinary servers, workstations, and laptops, and
+recoverable without specialized infrastructure.
 
 The design priority is:
 
@@ -33,7 +33,7 @@ knox-dbus
   maps D-Bus collections/items to Knox keys
 ```
 
-## Recommended Personal Deployment
+## Recommended Deployment
 
 ```text
 Unix server or workstation
@@ -48,10 +48,10 @@ Unix workstation or laptop
   optional /usr/local/bin/knox-dbus
 ```
 
-For the first sturdy personal release, prefer filesystem storage unless
-PostgreSQL is already part of the local environment. etcd is not recommended for
-the personal profile because it adds operational complexity that does not help a
-simple single-server use case.
+For the first sturdy release, prefer filesystem storage unless PostgreSQL is
+already part of the local environment. etcd is not recommended for the default
+profile because it adds operational complexity that does not help a simple
+single-server use case.
 
 ## Data Flow
 
@@ -76,7 +76,7 @@ The storage abstraction lives under `pkg/storage`.
 Supported packages in the tree:
 
 - `memory`: tests and ephemeral development
-- `filesystem`: recommended first personal-use backend
+- `filesystem`: recommended first default backend
 - `postgres`: optional if a local PostgreSQL server is already maintained
 - `etcd`: advanced/experimental for this fork's scope
 
@@ -96,7 +96,7 @@ Master key sources:
 2. `KNOX_MASTER_KEY_FILE`
 3. `/etc/knox/master.key`
 
-The personal-use target should document and test:
+The default operational path should document and test:
 
 - generating a master key
 - file permission checks
@@ -110,13 +110,13 @@ sync with code and tests.
 
 ## Authentication
 
-The personal profile should prefer a small set of boring authentication options:
+The default profile should prefer a small set of boring authentication options:
 
 - token-based auth for humans and scripts
 - mTLS for machines where host identity matters
 
 SPIFFE and GitHub auth may remain available, but they are not core to the
-personal-use case and should not drive the default setup.
+default use case and should not drive the default setup.
 
 ## Authorization
 
@@ -132,7 +132,7 @@ part of the production router.
 
 ## Observability
 
-For personal use, useful observability is:
+Useful observability is:
 
 - clear structured logs
 - health and readiness endpoints

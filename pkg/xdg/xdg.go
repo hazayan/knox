@@ -39,7 +39,7 @@ const (
 const (
 	ConfigDirPerm  = 0o755 // rwxr-xr-x
 	DataDirPerm    = 0o700 // rwx------
-	CacheDirPerm   = 0o755 // rwxr-xr-x
+	CacheDirPerm   = 0o700 // rwx------
 	StateDirPerm   = 0o700 // rwx------
 	RuntimeDirPerm = 0o700 // rwx------
 )

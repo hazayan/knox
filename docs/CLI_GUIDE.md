@@ -2,11 +2,13 @@
 
 ## Overview
 
-The Knox CLI (`knox`) is the main interface for administering a personal
-Knox server. It currently exposes these command groups:
+The Knox CLI (`knox`) is the main interface for administering a Knox server. It
+currently exposes these command groups:
 
 - `key`: create, get, list, delete, rotate, and inspect versions
 - `acl`: get, add, and remove ACL entries
+- `auth`: store, inspect, and remove the local token file
+- `server`: check health, readiness, and local profile information
 - `config`: initialize, show, generate, and manage profiles
 - `version`: print CLI version information
 - `completion`: generate shell completion
@@ -31,7 +33,7 @@ install -m 0755 bin/knox /usr/local/bin/knox
 Initialize a default config:
 
 ```bash
-knox config init --server knox.home.arpa:9000
+knox config init --server 127.0.0.1:9000
 ```
 
 Knox follows the XDG config path, usually:
@@ -50,10 +52,10 @@ knox config show --json
 Manage profiles:
 
 ```bash
-knox config profile add laptop --server knox.home.arpa:9000
+knox config profile add workstation --server 127.0.0.1:9000
 knox config profile list
-knox config profile use laptop
-knox --profile laptop key list
+knox config profile use workstation
+knox --profile workstation key list
 ```
 
 ## Key Management
@@ -61,47 +63,47 @@ knox --profile laptop key list
 Create a key:
 
 ```bash
-knox key create home:api_key --data "secret123"
-echo "secret123" | knox key create home:api_key
-knox key create home:api_key --data-file secret.txt
+knox key create app:api_key --data "secret123"
+echo "secret123" | knox key create app:api_key
+knox key create app:api_key --data-file secret.txt
 ```
 
 Create with ACL entries:
 
 ```bash
-knox key create home:api_key --data "secret123" \
+knox key create app:api_key --data "secret123" \
   --acl "User:alice:Read" \
-  --acl "Machine:server-01:Write"
+  --acl "Machine:node-01:Write"
 ```
 
 Read a key:
 
 ```bash
-knox key get home:api_key
-knox key get home:api_key --json
+knox key get app:api_key
+knox key get app:api_key --json
 ```
 
 List keys:
 
 ```bash
 knox key list
-knox key list home:
+knox key list app:
 knox key list --json
 ```
 
 Rotate a key:
 
 ```bash
-knox key rotate home:api_key --data "newsecret456"
-echo "newsecret456" | knox key rotate home:api_key
-knox key versions home:api_key
+knox key rotate app:api_key --data "newsecret456"
+echo "newsecret456" | knox key rotate app:api_key
+knox key versions app:api_key
 ```
 
 Delete a key:
 
 ```bash
-knox key delete home:api_key
-knox key delete home:api_key --force
+knox key delete app:api_key
+knox key delete app:api_key --force
 ```
 
 ## ACL Management
@@ -109,22 +111,22 @@ knox key delete home:api_key --force
 View ACLs:
 
 ```bash
-knox acl get home:api_key
-knox acl get home:api_key --json
+knox acl get app:api_key
+knox acl get app:api_key --json
 ```
 
 Add access:
 
 ```bash
-knox acl add home:api_key User:alice:Read
-knox acl add home:api_key Machine:server-01:Write
-knox acl add home:api_key User:admin:Admin
+knox acl add app:api_key User:alice:Read
+knox acl add app:api_key Machine:node-01:Write
+knox acl add app:api_key User:admin:Admin
 ```
 
 Remove access:
 
 ```bash
-knox acl remove home:api_key User:alice
+knox acl remove app:api_key User:alice
 ```
 
 ACL format:
@@ -148,6 +150,21 @@ Access levels:
 - `Write`
 - `Admin`
 
+## Server Status
+
+Check operational endpoints from the active profile:
+
+```bash
+knox server health
+knox server ready
+knox server info
+knox server info --json
+```
+
+Profiles with explicit `http://` or `https://` server URLs use that scheme.
+Profiles without a scheme use HTTPS when TLS files are configured and HTTP
+otherwise.
+
 ## Authentication
 
 Supported client auth paths are still being consolidated. Current code supports
@@ -164,16 +181,21 @@ knox key list
 Token file example:
 
 ```bash
-install -d -m 0700 ~/.config/knox
-printf '%s\n' "token-value" > ~/.config/knox/token
-chmod 0600 ~/.config/knox/token
+knox auth login token-value
+printf '%s\n' "token-value" | knox auth login
+knox auth status
+knox auth logout
 ```
+
+The token file is read from the XDG config directory and must not be readable by
+group or other users. `knox auth login` creates the file with owner-only
+permissions. Trailing whitespace is ignored.
 
 mTLS profile fields:
 
 ```bash
 knox config profile add secure \
-  --server knox.home.arpa:9000 \
+  --server 127.0.0.1:9000 \
   --ca-cert /etc/knox/ca.crt \
   --client-cert /etc/knox/client.crt \
   --client-key /etc/knox/client.key
@@ -184,9 +206,9 @@ knox config profile add secure \
 Use `--json` for scripting:
 
 ```bash
-knox key get home:api_key --json
+knox key get app:api_key --json
 knox key list --json
-knox acl get home:api_key --json
+knox acl get app:api_key --json
 ```
 
 ## Shell Completion
@@ -199,11 +221,8 @@ knox completion fish
 
 ## Current Gaps
 
-- `server health/info` commands are documented as desired but not implemented.
-- `auth login/logout` commands are documented as desired but not implemented.
 - Legacy `knox register` cache behavior still exists in the client library but
   is not exposed by the current Cobra CLI.
-- Cache path and token-file behavior need a single XDG-compatible design.
 
 ## See Also
 

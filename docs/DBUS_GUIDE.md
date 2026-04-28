@@ -11,7 +11,7 @@ daily use.
 
 ## Why This Is Useful
 
-- **Single personal backend**: Keep workstation secrets in your Knox server
+- **Single backend**: Keep workstation secrets in your Knox server
 - **Zero application plugins**: Use the standard Secret Service API where apps support it
 - **Centralized backup target**: Back up Knox storage and master key instead of many desktop stores
 - **Consistent ACL model**: Let Knox enforce access for D-Bus-created keys
@@ -46,7 +46,7 @@ daily use.
 
 ```bash
 cd knox
-go build -o bin/knox-dbus ./cmd/knox-dbus
+go build -o bin/knox-dbus ./cmd/dbus
 sudo cp bin/knox-dbus /usr/local/bin/
 ```
 
@@ -88,17 +88,9 @@ encryption:
 Prefer a user service or an XDG session autostart entry. Exact service
 dependencies vary by desktop session, so treat this as a starting template.
 
-Example user service:
-
-```text
-type = process
-command = /usr/local/bin/knox-dbus --config /home/USER/.config/knox/dbus.yaml
-restart = true
-logfile = /home/USER/.local/state/knox/knox-dbus.log
-```
-
-Replace `USER` with the account that owns the desktop session. The directory and
-service syntax may need to be adapted for your service manager.
+See [examples/service-manager-knox-dbus.conf](examples/service-manager-knox-dbus.conf)
+for a generic user-service template. The directory layout and service syntax may
+need to be adapted for your service manager.
 
 Start and inspect it with:
 
@@ -501,14 +493,14 @@ Typical usage:
 
 1. **No offline mode**: Requires Knox server connectivity
 2. **Session encryption**: Currently uses "plain" mode (Knox encrypts)
-3. **Metadata**: Labels/attributes are packed with the stored secret data, not stored as first-class Knox fields
+3. **Metadata shape**: Labels/attributes are packed with stored secret data, not stored as first-class Knox fields
 4. **Locking**: Lock state is local to the bridge and is not durable Knox policy
 5. **Prompts**: User prompts are incomplete and should not be treated as a security boundary
 
 ## Future Enhancements
 
 - [ ] Full DH key exchange implementation
-- [ ] Store item metadata in Knox
+- [x] Preserve item metadata in stored Knox payloads
 - [ ] Support for locked collections
 - [ ] User prompts for sensitive operations
 - [ ] Offline cache mode

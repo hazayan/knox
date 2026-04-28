@@ -18,8 +18,13 @@ import (
 	"time"
 
 	"github.com/hazayan/knox/pkg/config"
+	"github.com/hazayan/knox/pkg/crypto"
+	"github.com/hazayan/knox/pkg/observability/logging"
 	"github.com/hazayan/knox/pkg/storage"
 	"github.com/hazayan/knox/pkg/types"
+	"github.com/hazayan/knox/server"
+	"github.com/hazayan/knox/server/auth"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,6 +52,56 @@ func decodeAPIResponseData(t *testing.T, body io.Reader, target any) apiResponse
 	}
 
 	return resp
+}
+
+func TestAuditRouteOperationLogsKeyEventsWithoutSecrets(t *testing.T) {
+	var out bytes.Buffer
+	previousOutput := logging.AuditLogger.Out
+	previousFormatter := logging.AuditLogger.Formatter
+	previousLevel := logging.AuditLogger.GetLevel()
+	t.Cleanup(func() {
+		logging.AuditLogger.SetOutput(previousOutput)
+		logging.AuditLogger.SetFormatter(previousFormatter)
+		logging.AuditLogger.SetLevel(previousLevel)
+	})
+	logging.AuditLogger.SetOutput(&out)
+	logging.AuditLogger.SetFormatter(&logrus.JSONFormatter{})
+	logging.AuditLogger.SetLevel(logrus.InfoLevel)
+
+	principal := auth.NewUser("alice", []string{"operators"})
+	auditRouteOperation(
+		"postkeys",
+		principal,
+		map[string]string{
+			"id":   "app:test",
+			"data": "c2VjcmV0LXZhbHVl",
+			"acl":  `[{"type":"User","id":"bob","access_type":"Read"}]`,
+		},
+		nil,
+		http.StatusOK,
+		"/v0/keys/",
+	)
+
+	output := out.String()
+	assert.Contains(t, output, "key.create")
+	assert.Contains(t, output, "app:test")
+	assert.Contains(t, output, "alice")
+	assert.NotContains(t, output, "c2VjcmV0LXZhbHVl")
+
+	out.Reset()
+	auditRouteOperation(
+		"getkey",
+		principal,
+		map[string]string{"keyID": "app:test"},
+		&server.HTTPError{Subcode: types.UnauthorizedCode, Message: "denied"},
+		http.StatusForbidden,
+		"/v0/keys/app:test/",
+	)
+
+	output = out.String()
+	assert.Contains(t, output, "key.access")
+	assert.Contains(t, output, "denied")
+	assert.Contains(t, output, "read")
 }
 
 // TestServerStartup tests basic server startup and shutdown.
@@ -598,6 +653,143 @@ func TestStorageBackends(t *testing.T) {
 	})
 }
 
+func TestFilesystemBackendPersistsAcrossRestartWithSameMasterKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	masterKey, err := crypto.GenerateMasterKey()
+	require.NoError(t, err)
+
+	cfg := &config.ServerConfig{
+		BindAddress: "localhost:0",
+		Storage: config.StorageConfig{
+			Backend:       "filesystem",
+			FilesystemDir: tmpDir,
+		},
+		Auth: config.AuthConfig{
+			Providers: []config.AuthProviderConfig{
+				{Type: "mock"},
+			},
+		},
+		Observability: config.ObservabilityConfig{
+			Logging: config.LoggingConfig{
+				Level:  "error",
+				Format: "text",
+			},
+		},
+	}
+
+	firstServer, err := createTestServerWithMasterKey(cfg, masterKey)
+	require.NoError(t, err)
+	require.NoError(t, firstServer.Start())
+
+	client := createTestClient(t, firstServer.Server)
+	authToken := "test-token"
+	keyID := "restore:test:key"
+	secret := []byte("persistent-secret")
+
+	reqBody := url.Values{}
+	reqBody.Set("id", keyID)
+	aclJSON, err := json.Marshal([]map[string]any{
+		{
+			"type":   "User",
+			"id":     "testuser",
+			"access": "Admin",
+		},
+	})
+	require.NoError(t, err)
+	reqBody.Set("acl", string(aclJSON))
+	reqBody.Set("data", base64.StdEncoding.EncodeToString(secret))
+
+	createResp, err := makeAuthenticatedRequest(client, firstServer.Server.URL+"/v0/keys/", "POST", authToken, reqBody)
+	require.NoError(t, err)
+	createResp.Body.Close()
+	require.Equal(t, http.StatusOK, createResp.StatusCode)
+	firstServer.Close()
+
+	secondServer, err := createTestServerWithMasterKey(cfg, masterKey)
+	require.NoError(t, err)
+	require.NoError(t, secondServer.Start())
+	defer secondServer.Close()
+
+	client = createTestClient(t, secondServer.Server)
+	getResp, err := makeAuthenticatedRequest(client, secondServer.Server.URL+"/v0/keys/"+keyID+"/", "GET", authToken, nil)
+	require.NoError(t, err)
+	defer getResp.Body.Close()
+	require.Equal(t, http.StatusOK, getResp.StatusCode)
+
+	var key types.Key
+	decodeAPIResponseData(t, getResp.Body, &key)
+	require.Len(t, key.VersionList, 1)
+	assert.Equal(t, secret, key.VersionList[0].Data)
+}
+
+func TestFilesystemBackupRestoreWithMasterKeyFile(t *testing.T) {
+	workDir := t.TempDir()
+	sourceDir := filepath.Join(workDir, "source-keys")
+	restoredDir := filepath.Join(workDir, "restored-keys")
+	sourceKeyFile := filepath.Join(workDir, "source-master.key")
+	restoredKeyFile := filepath.Join(workDir, "restored-master.key")
+
+	masterKey, err := crypto.GenerateMasterKey()
+	require.NoError(t, err)
+	require.NoError(t, crypto.SaveMasterKeyToFile(masterKey, sourceKeyFile))
+
+	t.Setenv("KNOX_MASTER_KEY", "")
+	t.Setenv("KNOX_MASTER_KEY_FILE", sourceKeyFile)
+	loadedMasterKey, err := crypto.LoadMasterKey()
+	require.NoError(t, err)
+
+	cfg := filesystemServerConfig(sourceDir)
+	sourceServer, err := createTestServerWithMasterKey(cfg, loadedMasterKey)
+	require.NoError(t, err)
+	require.NoError(t, sourceServer.Start())
+
+	client := createTestClient(t, sourceServer.Server)
+	authToken := "test-token"
+	keyID := "backup:test:key"
+	originalSecret := []byte("backup-secret")
+	rotatedSecret := []byte("restored-rotation-secret")
+
+	createTestKeyViaHTTP(t, client, sourceServer.Server.URL, authToken, keyID, originalSecret)
+
+	listResp, err := makeAuthenticatedRequest(client, sourceServer.Server.URL+"/v0/keys/", "GET", authToken, nil)
+	require.NoError(t, err)
+	defer listResp.Body.Close()
+	require.Equal(t, http.StatusOK, listResp.StatusCode)
+	var sourceKeys []string
+	decodeAPIResponseData(t, listResp.Body, &sourceKeys)
+	assert.Contains(t, sourceKeys, keyID)
+
+	sourceServer.Close()
+
+	require.NoError(t, copyDir(sourceDir, restoredDir))
+	require.NoError(t, copyFile(sourceKeyFile, restoredKeyFile, 0o600))
+
+	t.Setenv("KNOX_MASTER_KEY_FILE", restoredKeyFile)
+	restoredMasterKey, err := crypto.LoadMasterKey()
+	require.NoError(t, err)
+
+	restoredCfg := filesystemServerConfig(restoredDir)
+	restoredServer, err := createTestServerWithMasterKey(restoredCfg, restoredMasterKey)
+	require.NoError(t, err)
+	require.NoError(t, restoredServer.Start())
+	defer restoredServer.Close()
+
+	client = createTestClient(t, restoredServer.Server)
+	restoredKey := getTestKeyViaHTTP(t, client, restoredServer.Server.URL, authToken, keyID)
+	require.Len(t, restoredKey.VersionList, 1)
+	assert.Equal(t, originalSecret, restoredKey.VersionList[0].Data)
+
+	addVersionResp, err := addTestKeyVersionViaHTTP(t, client, restoredServer.Server.URL, authToken, keyID, rotatedSecret)
+	require.NoError(t, err)
+	addVersionResp.Body.Close()
+	require.Equal(t, http.StatusOK, addVersionResp.StatusCode)
+
+	restoredKey = getTestKeyViaHTTP(t, client, restoredServer.Server.URL, authToken, keyID)
+	require.Len(t, restoredKey.VersionList, 2)
+	assert.Equal(t, originalSecret, restoredKey.VersionList[0].Data)
+	assert.Equal(t, rotatedSecret, restoredKey.VersionList[1].Data)
+}
+
 // TestMiddlewareStack tests the middleware functionality.
 func TestMiddlewareStack(t *testing.T) {
 	testServer := createAndStartTestServer(t, "memory")
@@ -700,6 +892,27 @@ func createAndStartTestServer(t *testing.T, backend string) *httptest.Server {
 	return server.Server
 }
 
+func filesystemServerConfig(dir string) *config.ServerConfig {
+	return &config.ServerConfig{
+		BindAddress: "localhost:0",
+		Storage: config.StorageConfig{
+			Backend:       "filesystem",
+			FilesystemDir: dir,
+		},
+		Auth: config.AuthConfig{
+			Providers: []config.AuthProviderConfig{
+				{Type: "mock"},
+			},
+		},
+		Observability: config.ObservabilityConfig{
+			Logging: config.LoggingConfig{
+				Level:  "error",
+				Format: "text",
+			},
+		},
+	}
+}
+
 func createTestClient(t *testing.T, _ *httptest.Server) *http.Client {
 	t.Helper()
 
@@ -789,4 +1002,77 @@ func testBasicKeyOperations(t *testing.T, client *http.Client, baseURL string) {
 	require.NoError(t, err)
 	defer getResp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
+}
+
+func createTestKeyViaHTTP(t *testing.T, client *http.Client, baseURL, authToken, keyID string, secret []byte) {
+	t.Helper()
+
+	reqBody := url.Values{}
+	reqBody.Set("id", keyID)
+	aclJSON, err := json.Marshal([]map[string]any{
+		{
+			"type":   "User",
+			"id":     "testuser",
+			"access": "Admin",
+		},
+	})
+	require.NoError(t, err)
+	reqBody.Set("acl", string(aclJSON))
+	reqBody.Set("data", base64.StdEncoding.EncodeToString(secret))
+
+	resp, err := makeAuthenticatedRequest(client, baseURL+"/v0/keys/", "POST", authToken, reqBody)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func getTestKeyViaHTTP(t *testing.T, client *http.Client, baseURL, authToken, keyID string) types.Key {
+	t.Helper()
+
+	resp, err := makeAuthenticatedRequest(client, baseURL+"/v0/keys/"+keyID+"/", "GET", authToken, nil)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var key types.Key
+	decodeAPIResponseData(t, resp.Body, &key)
+	return key
+}
+
+func addTestKeyVersionViaHTTP(t *testing.T, client *http.Client, baseURL, authToken, keyID string, secret []byte) (*http.Response, error) {
+	t.Helper()
+
+	reqBody := url.Values{}
+	reqBody.Set("data", base64.StdEncoding.EncodeToString(secret))
+	return makeAuthenticatedRequest(client, baseURL+"/v0/keys/"+keyID+"/versions/", "POST", authToken, reqBody)
+}
+
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		targetPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(targetPath, info.Mode().Perm())
+		}
+		return copyFile(path, targetPath, info.Mode().Perm())
+	})
+}
+
+func copyFile(src, dst string, mode os.FileMode) error {
+	data, err := os.ReadFile(src) //nolint:gosec // Test helper copies paths created by the test.
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, mode)
 }

@@ -235,18 +235,32 @@ func NewClient(host string, client HTTP, authHandlers []AuthHandler, keyFolder, 
 
 // validateCacheFilePath ensures the cache file path is safe and allowed.
 func validateCacheFilePath(baseDir, file string) (string, error) {
+	if file == "" {
+		return "", errors.New("cache file name cannot be empty")
+	}
+	if filepath.IsAbs(file) {
+		return "", errors.New("cache file path is outside allowed directory")
+	}
+
 	absBase, err := filepath.Abs(baseDir)
 	if err != nil {
 		return "", err
 	}
-	absFile, err := filepath.Abs(filepath.Join(baseDir, file))
+
+	cleanBase := filepath.Clean(absBase)
+	absFile, err := filepath.Abs(filepath.Join(cleanBase, file))
 	if err != nil {
 		return "", err
 	}
-	if !strings.HasPrefix(absFile, absBase) {
+
+	relPath, err := filepath.Rel(cleanBase, absFile)
+	if err != nil {
+		return "", err
+	}
+	if relPath == "." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) || relPath == ".." {
 		return "", errors.New("cache file path is outside allowed directory")
 	}
-	if strings.Contains(absFile, "..") {
+	if strings.Contains(relPath, "..") {
 		return "", errors.New("path traversal detected in cache file path")
 	}
 	// Only allow .json files for cache
