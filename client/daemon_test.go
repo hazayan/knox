@@ -100,8 +100,29 @@ func setUpTest(t *testing.T) (*returnParameters, string, daemon) {
 	return &params, dir, d
 }
 
+func assertFileMode(t *testing.T, name string, want os.FileMode) {
+	t.Helper()
+
+	info, err := os.Stat(name)
+	if err != nil {
+		t.Fatalf("failed to stat %s: %v", name, err)
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("%s mode got %o, want %o", name, got, want)
+	}
+}
+
 func TearDownTest(dir string) {
 	os.RemoveAll(dir)
+}
+
+func TestDaemonInitializeUsesOwnerOnlyPermissions(t *testing.T) {
+	_, dir, d := setUpTest(t)
+	defer TearDownTest(dir)
+
+	assertFileMode(t, d.dir, defaultDirPermission)
+	assertFileMode(t, d.keyDir(), defaultDirPermission)
+	assertFileMode(t, d.registerFilename(), defaultFilePermission)
 }
 
 func TestProcessKey(t *testing.T) {
@@ -138,6 +159,7 @@ func TestProcessKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s is not nil", err)
 	}
+	assertFileMode(t, d.keyFilename(expected.ID), defaultFilePermission)
 	if ret.ID != expected.ID {
 		t.Fatalf("%s does not equal %s", ret.ID, expected.ID)
 	}
