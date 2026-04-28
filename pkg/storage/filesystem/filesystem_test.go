@@ -856,6 +856,11 @@ func TestBackend_GetKeyErrors(t *testing.T) {
 		_, err = backend.GetKey(ctx, "corrupted_key")
 		assert.Error(t, err)
 	})
+
+	t.Run("invalid_key_id", func(t *testing.T) {
+		_, err := backend.GetKey(ctx, "../escape")
+		assert.ErrorIs(t, err, types.ErrInvalidKeyID)
+	})
 }
 
 // TestBackend_PutKeyErrors tests error paths in PutKey.
@@ -991,6 +996,40 @@ func TestBackend_UpdateKeyErrors(t *testing.T) {
 		})
 		assert.Error(t, err)
 	})
+
+	t.Run("invalid_key_id", func(t *testing.T) {
+		err := backend.UpdateKey(ctx, "../escape", func(current *types.Key) (*types.Key, error) {
+			return current, nil
+		})
+		assert.ErrorIs(t, err, types.ErrInvalidKeyID)
+	})
+}
+
+func TestBackend_InvalidKeyIDDoesNotTouchStorageDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	backend, err := New(tmpDir)
+	require.NoError(t, err)
+	defer backend.Close()
+
+	ctx := t.Context()
+
+	err = backend.DeleteKey(ctx, "")
+	assert.ErrorIs(t, err, types.ErrInvalidKeyID)
+
+	info, statErr := os.Stat(tmpDir)
+	require.NoError(t, statErr)
+	assert.True(t, info.IsDir())
+
+	err = backend.DeleteKey(ctx, "../escape")
+	assert.ErrorIs(t, err, types.ErrInvalidKeyID)
+
+	_, err = backend.GetKey(ctx, "")
+	assert.ErrorIs(t, err, types.ErrInvalidKeyID)
+
+	err = backend.UpdateKey(ctx, "", func(_ *types.Key) (*types.Key, error) {
+		return nil, nil
+	})
+	assert.ErrorIs(t, err, types.ErrInvalidKeyID)
 }
 
 // TestBackend_PingError tests Ping error path.

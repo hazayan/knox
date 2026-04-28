@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -195,12 +196,12 @@ func createAuthHandlers(cfg *config.DBusConfig) []client.AuthHandler {
 	// Environment variable auth handler
 	handlers = append(handlers, func() (string, string, client.HTTP) {
 		// Check for user auth token in environment
-		if token := os.Getenv("KNOX_USER_AUTH"); token != "" {
+		if token := strings.TrimSpace(os.Getenv("KNOX_USER_AUTH")); token != "" {
 			return "0u" + token, "user_token", nil
 		}
 
 		// Check for machine auth token in environment
-		if token := os.Getenv("KNOX_MACHINE_AUTH"); token != "" {
+		if token := strings.TrimSpace(os.Getenv("KNOX_MACHINE_AUTH")); token != "" {
 			return "0m" + token, "machine_token", nil
 		}
 
@@ -218,14 +219,39 @@ func createAuthHandlers(cfg *config.DBusConfig) []client.AuthHandler {
 		if !filepath.IsAbs(tokenFile) || strings.Contains(tokenFile, "..") {
 			return "", "", nil
 		}
-		token, err := os.ReadFile(tokenFile) // #nosec G304 -- path is validated above
+		token, err := readAuthTokenFile(tokenFile)
 		if err != nil {
 			return "", "", nil
 		}
 
-		tokenStr := strings.TrimSpace(string(token))
-		return "0u" + tokenStr, "user_token_file", nil
+		return "0u" + token, "user_token_file", nil
 	})
 
 	return handlers
+}
+
+func readAuthTokenFile(tokenFile string) (string, error) {
+	info, err := os.Lstat(tokenFile)
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("token file must not be a symlink")
+	}
+	if info.IsDir() {
+		return "", errors.New("token file path must be a regular file")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("token file has insecure permissions %o (should be 0600)", info.Mode().Perm())
+	}
+
+	data, err := os.ReadFile(tokenFile) // #nosec G304 -- path is validated by caller and checked above.
+	if err != nil {
+		return "", err
+	}
+	token := strings.TrimSpace(string(data))
+	if token == "" {
+		return "", errors.New("token file is empty")
+	}
+	return token, nil
 }
