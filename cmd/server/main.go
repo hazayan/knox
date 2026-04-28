@@ -609,26 +609,18 @@ func auditRouteOperation(routeID string, principal types.Principal, params map[s
 	switch routeID {
 	case "getkey":
 		logging.AuditKeyAccess(keyID, principalID, principalType, "read", auditResult(apiErr), metadata)
+	case "getaccess":
+		logging.AuditKeyAccess(keyID, principalID, principalType, "get_acl", auditResult(apiErr), metadata)
 	case "postkeys":
-		if apiErr == nil {
-			logging.AuditKeyCreate(keyID, principalID, principalType, metadata)
-		}
+		logging.AuditKeyCreate(keyID, principalID, principalType, metadata)
 	case "deletekey":
-		if apiErr == nil {
-			logging.AuditKeyDelete(keyID, principalID, principalType, metadata)
-		}
+		logging.AuditKeyDelete(keyID, principalID, principalType, metadata)
 	case "putaccess":
-		if apiErr == nil {
-			logging.AuditACLChange(keyID, principalID, principalType, "update", metadata)
-		}
+		logging.AuditACLChange(keyID, principalID, principalType, "update", metadata)
 	case "postversion":
-		if apiErr == nil {
-			logging.AuditKeyAccess(keyID, principalID, principalType, "add_version", "success", metadata)
-		}
+		logging.AuditKeyAccess(keyID, principalID, principalType, "add_version", auditResult(apiErr), metadata)
 	case "putversion":
-		if apiErr == nil {
-			logging.AuditKeyAccess(keyID, principalID, principalType, "update_version", "success", metadata)
-		}
+		logging.AuditKeyAccess(keyID, principalID, principalType, "update_version", auditResult(apiErr), metadata)
 	}
 }
 
@@ -640,7 +632,7 @@ func auditKeyID(routeID string, params map[string]string) (string, bool) {
 	case "postkeys":
 		keyID := params["id"]
 		return keyID, keyID != ""
-	case "getkey", "deletekey", "putaccess", "postversion", "putversion":
+	case "getkey", "getaccess", "deletekey", "putaccess", "postversion", "putversion":
 		keyID := params["keyID"]
 		return keyID, keyID != ""
 	default:
