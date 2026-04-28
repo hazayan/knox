@@ -2,9 +2,8 @@
 
 Knox is a personal secret management service forked from
 [pinterest/knox](https://github.com/pinterest/knox). The target for this fork is
-not enterprise Vault parity. The target is a sturdy, self-hosted "poor man's
-Vault" for personal Unix systems, CLI workflows, and optional FreeDesktop Secret
-Service integration.
+a sturdy, self-hosted secret manager for personal Unix systems, CLI workflows,
+and optional FreeDesktop Secret Service integration.
 
 ## Current Status
 
@@ -39,20 +38,6 @@ Unix workstation or laptop
 local scripts and services
   scripts and services using knox CLI or the HTTP API
 ```
-
-## Non-Goals
-
-These are not primary goals for this fork:
-
-- Kubernetes operators
-- cloud KMS integrations
-- enterprise compliance claims
-- multi-region/high-availability operation
-- 10k requests/sec benchmarks
-- single-init-system setup instructions
-
-etcd, SPIFFE, GitHub auth, and other advanced pieces may remain in the tree, but
-they are secondary to a simple, recoverable personal deployment.
 
 ## Build
 
