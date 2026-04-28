@@ -24,6 +24,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type apiResponse struct {
+	Status    string          `json:"status"`
+	Code      int             `json:"code"`
+	Host      string          `json:"host"`
+	Timestamp int64           `json:"ts"`
+	Message   string          `json:"message"`
+	Data      json.RawMessage `json:"data"`
+}
+
+func decodeAPIResponseData(t *testing.T, body io.Reader, target any) apiResponse {
+	t.Helper()
+
+	var resp apiResponse
+	err := json.NewDecoder(body).Decode(&resp)
+	require.NoError(t, err)
+	require.Equal(t, "ok", resp.Status)
+
+	if target != nil {
+		err = json.Unmarshal(resp.Data, target)
+		require.NoError(t, err)
+	}
+
+	return resp
+}
+
 // TestServerStartup tests basic server startup and shutdown.
 func TestServerStartup(t *testing.T) {
 	cfg := &config.ServerConfig{
@@ -310,9 +335,7 @@ func TestKeyOperations(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var versionID uint64
-		err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&versionID)
-		require.NoError(t, err)
-		assert.Equal(t, uint64(1), versionID)
+		decodeAPIResponseData(t, bytes.NewReader(bodyBytes), &versionID)
 		assert.NotZero(t, versionID)
 
 		// Clean up the key
@@ -356,10 +379,9 @@ func TestKeyOperations(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var key types.Key
-		err = json.NewDecoder(resp.Body).Decode(&key)
-		require.NoError(t, err)
+		decodeAPIResponseData(t, resp.Body, &key)
 		assert.Equal(t, keyID, key.ID)
-		assert.Len(t, key.ACL, 1)
+		assert.Empty(t, key.ACL)
 		assert.Len(t, key.VersionList, 1)
 
 		// Clean up the key
@@ -402,8 +424,7 @@ func TestKeyOperations(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var keyList []string
-		err = json.NewDecoder(resp.Body).Decode(&keyList)
-		require.NoError(t, err)
+		decodeAPIResponseData(t, resp.Body, &keyList)
 		t.Logf("ListKeys returned: %v", keyList)
 		t.Logf("Expected keys: %v", keys)
 		t.Logf("ListKeys count: %d, Expected count: 3", len(keyList))
@@ -489,7 +510,7 @@ func TestErrorHandling(t *testing.T) {
 	authToken := "test-token"
 
 	t.Run("NonExistentKey", func(t *testing.T) {
-		resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/non-existent-key", "GET", authToken, nil)
+		resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/non-existent-key/", "GET", authToken, nil)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
@@ -769,6 +790,3 @@ func testBasicKeyOperations(t *testing.T, client *http.Client, baseURL string) {
 	defer getResp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, getResp.StatusCode)
 }
-
-// Note: createTestServer function would need to be implemented in the main package
-// to expose server creation for testing. This is a common pattern in Go applications.

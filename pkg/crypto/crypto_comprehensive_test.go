@@ -364,6 +364,9 @@ func TestKeyRotationManager(t *testing.T) {
 	t.Run("RemoveOldCryptor", func(t *testing.T) {
 		// Create initial cryptor
 		masterKey1 := make([]byte, 32)
+		for i := range masterKey1 {
+			masterKey1[i] = byte(i)
+		}
 		cryptor1, err := NewAESCryptor(masterKey1)
 		require.NoError(t, err)
 
@@ -371,26 +374,84 @@ func TestKeyRotationManager(t *testing.T) {
 
 		// Add some old cryptors
 		masterKey2 := make([]byte, 32)
+		for i := range masterKey2 {
+			masterKey2[i] = byte(i + 100)
+		}
 		cryptor2, err := NewAESCryptor(masterKey2)
 		require.NoError(t, err)
 
 		masterKey3 := make([]byte, 32)
+		for i := range masterKey3 {
+			masterKey3[i] = byte(i + 200)
+		}
 		cryptor3, err := NewAESCryptor(masterKey3)
 		require.NoError(t, err)
 
 		rotationManager.RotateToNewKey(cryptor2)
 		rotationManager.RotateToNewKey(cryptor3)
 
+		mockDB := &mockKeyDB{keys: make(map[string]keydb.DBKey)}
+
 		// Remove middle cryptor
-		err = rotationManager.RemoveOldCryptor(0)
+		err = rotationManager.RemoveOldCryptor(mockDB, 0)
 		assert.NoError(t, err)
 
 		// Try to remove invalid index
-		err = rotationManager.RemoveOldCryptor(-1)
+		err = rotationManager.RemoveOldCryptor(mockDB, -1)
 		assert.Error(t, err)
 
-		err = rotationManager.RemoveOldCryptor(10)
+		err = rotationManager.RemoveOldCryptor(mockDB, 10)
 		assert.Error(t, err)
+	})
+
+	t.Run("RemoveOldCryptorBlocksKeysThatStillNeedIt", func(t *testing.T) {
+		masterKey1 := make([]byte, 32)
+		for i := range masterKey1 {
+			masterKey1[i] = byte(i)
+		}
+		oldCryptor, err := NewAESCryptor(masterKey1)
+		require.NoError(t, err)
+
+		rotationManager := NewKeyRotationManager(oldCryptor)
+
+		testKey := &types.Key{
+			ID: "still-old",
+			ACL: types.ACL{
+				{ID: "user1", Type: types.User, AccessType: types.Read},
+			},
+			VersionList: types.KeyVersionList{
+				{
+					ID:           1,
+					Data:         []byte("test-data"),
+					Status:       types.Primary,
+					CreationTime: time.Now().UnixNano(),
+				},
+			},
+		}
+		testKey.VersionHash = testKey.VersionList.Hash()
+		dbKey, err := oldCryptor.Encrypt(testKey)
+		require.NoError(t, err)
+
+		masterKey2 := make([]byte, 32)
+		for i := range masterKey2 {
+			masterKey2[i] = byte(i + 100)
+		}
+		newCryptor, err := NewAESCryptor(masterKey2)
+		require.NoError(t, err)
+		rotationManager.RotateToNewKey(newCryptor)
+
+		mockDB := &mockKeyDB{keys: map[string]keydb.DBKey{dbKey.ID: *dbKey}}
+
+		err = rotationManager.RemoveOldCryptor(mockDB, 0)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "still decrypts with it")
+
+		reencryptedKey, err := rotationManager.Encrypt(testKey)
+		require.NoError(t, err)
+		mockDB.keys[reencryptedKey.ID] = *reencryptedKey
+
+		err = rotationManager.RemoveOldCryptor(mockDB, 0)
+		assert.NoError(t, err)
 	})
 
 	t.Run("DecryptFailure", func(t *testing.T) {

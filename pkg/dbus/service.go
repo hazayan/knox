@@ -70,8 +70,10 @@ func (b *Bridge) Start() error {
 	// Connect to D-Bus
 	if b.config.DBus.BusType == "system" {
 		b.conn, err = dbus.ConnectSystemBus()
+		log.Printf("WARNING: Using system D-Bus bus provides no isolation between users. All D-Bus users will share the same Knox principal.")
 	} else {
 		b.conn, err = dbus.ConnectSessionBus()
+		// Session bus provides per-user isolation: each user session runs its own bridge instance
 	}
 	if err != nil {
 		return fmt.Errorf("failed to connect to D-Bus: %w", err)

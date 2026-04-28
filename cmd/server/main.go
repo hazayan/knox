@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,20 +18,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
+	pkgauth "github.com/hazayan/knox/pkg/auth"
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/crypto"
 	"github.com/hazayan/knox/pkg/observability/logging"
 	"github.com/hazayan/knox/pkg/observability/metrics"
 	"github.com/hazayan/knox/pkg/storage"
+	_ "github.com/hazayan/knox/pkg/storage/etcd"       // Register etcd backend
 	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
 	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
 	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
-	_ "github.com/hazayan/knox/pkg/storage/etcd"       // Register etcd backend
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server"
 	"github.com/hazayan/knox/server/auth"
-	pkgauth "github.com/hazayan/knox/pkg/auth"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"golang.org/x/time/rate"
@@ -93,8 +91,40 @@ func createTestServer(cfg *config.ServerConfig) (*TestServer, error) {
 	}
 	logging.Infof("Created storage backend: %s", cfg.Storage.Backend)
 
-	// Create router and server
-	router := createRouter(backend, cfg)
+	masterKey, err := crypto.GenerateMasterKey()
+	if err != nil {
+		_ = backend.Close()
+		return nil, fmt.Errorf("failed to generate test master key: %w", err)
+	}
+	cryptor, err := crypto.NewAESCryptor(masterKey)
+	if err != nil {
+		_ = backend.Close()
+		return nil, fmt.Errorf("failed to create test cryptor: %w", err)
+	}
+	for i := range masterKey {
+		masterKey[i] = 0
+	}
+
+	db := storage.NewDBAdapter(backend, cryptor)
+	authProviders := setupAuthProviders(cfg)
+	decorators := []func(http.HandlerFunc) http.HandlerFunc{
+		securityHeadersMiddleware,
+		loggingMiddleware,
+		metricsMiddleware,
+		authMiddleware(authProviders),
+		rateLimitMiddleware(cfg.Limits.RateLimitPerPrincipal),
+	}
+
+	router, err := server.GetRouter(cryptor, db, decorators, nil)
+	if err != nil {
+		_ = backend.Close()
+		return nil, fmt.Errorf("failed to create test router: %w", err)
+	}
+	if cfg.Observability.Metrics.Enabled {
+		router.HandleFunc(cfg.Observability.Metrics.Endpoint, secureMetricsHandler(promhttp.Handler())).Methods("GET")
+	}
+	router.HandleFunc("/health", publicOperationalMiddleware(healthHandler(backend))).Methods("GET")
+	router.HandleFunc("/ready", publicOperationalMiddleware(readinessHandler(backend))).Methods("GET")
 
 	// Create test server
 	logging.Infof("Starting test server on %s", cfg.BindAddress)
@@ -121,187 +151,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-// createRouter creates the HTTP router with all middleware and routes
-// This function is exported for use in test files.
-func createRouter(backend storage.Backend, cfg *config.ServerConfig) *mux.Router {
-	router := mux.NewRouter()
-
-	// Apply middleware stack - convert HandlerFunc middleware to mux.MiddlewareFunc
-	router.Use(convertToMuxMiddleware(loggingMiddleware))
-	router.Use(convertToMuxMiddleware(metricsMiddleware))
-	router.Use(convertToMuxMiddleware(securityHeadersMiddleware))
-
-	// Setup auth providers and apply auth middleware
-	authProviders := setupAuthProviders(cfg)
-	router.Use(convertToMuxMiddleware(authMiddleware(authProviders)))
-
-	// Setup rate limiting and apply rate limit middleware
-	router.Use(convertToMuxMiddleware(rateLimitMiddleware(100))) // Default: 100 requests per second
-
-	// Register routes
-	registerRoutes(router, backend)
-
-	// Add health and metrics endpoints with backend context
-	router.HandleFunc("/health", healthHandler(backend)).Methods("GET")
-	router.HandleFunc("/ready", readinessHandler(backend)).Methods("GET")
-	router.Handle("/metrics", secureMetricsHandler(promhttp.Handler())).Methods("GET")
-
-	return router
-}
-
-// convertToMuxMiddleware converts a HandlerFunc middleware to mux.MiddlewareFunc.
-func convertToMuxMiddleware(middleware func(http.HandlerFunc) http.HandlerFunc) mux.MiddlewareFunc {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			middleware(next.ServeHTTP)(w, r)
-		})
-	}
-}
-
-// registerRoutes registers all Knox API routes.
-func registerRoutes(router *mux.Router, backend storage.Backend) {
-	// Basic test routes for integration testing
-	router.HandleFunc("/v0/keys/", func(w http.ResponseWriter, r *http.Request) {
-		// List keys endpoint
-		if r.Method == "GET" {
-			keys, err := backend.ListKeys(r.Context(), r.URL.Query().Get("prefix"))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(keys); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
-
-		// Create key endpoint
-		if r.Method == "POST" {
-			if err := r.ParseForm(); err != nil {
-				logging.Errorf("Failed to parse form data: %v", err)
-				http.Error(w, "Invalid form data", http.StatusBadRequest)
-				return
-			}
-			keyID := r.Form.Get("id")
-			dataStr := r.Form.Get("data")
-			aclStr := r.Form.Get("acl")
-
-			if keyID == "" {
-				http.Error(w, "Missing key ID", http.StatusBadRequest)
-				return
-			}
-
-			data, err := base64.StdEncoding.DecodeString(dataStr)
-			if err != nil {
-				http.Error(w, "Invalid data encoding", http.StatusBadRequest)
-				return
-			}
-
-			var acl types.ACL
-			if aclStr != "" {
-				if err := json.Unmarshal([]byte(aclStr), &acl); err != nil {
-					logging.Errorf("Failed to parse ACL JSON: %v", err)
-					http.Error(w, "Invalid ACL format", http.StatusBadRequest)
-					return
-				}
-
-				// Validate ACL before using it
-				if err := acl.Validate(); err != nil {
-					logging.Errorf("ACL validation failed: %v", err)
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
-			} else {
-				// Default ACL if not provided
-				acl = types.ACL{
-					{
-						Type:       types.User,
-						ID:         "test-user",
-						AccessType: types.Admin,
-					},
-				}
-			}
-
-			key := &types.Key{
-				ID:  keyID,
-				ACL: acl,
-				VersionList: types.KeyVersionList{
-					{
-						ID:     1,
-						Data:   data,
-						Status: types.Primary,
-					},
-				},
-			}
-			key.VersionHash = key.VersionList.Hash()
-
-			// Validate the key before storing
-			if err := key.Validate(); err != nil {
-				logging.Errorf("Key validation failed for %s: %v", keyID, err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			if err := backend.PutKey(r.Context(), key); err != nil {
-				logging.Errorf("Failed to store key %s: %v", keyID, err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(uint64(1)); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
-
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}).Methods("GET", "POST")
-
-	router.HandleFunc("/v0/keys/{keyID}/", func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		keyID := vars["keyID"]
-
-		if r.Method == "GET" {
-			key, err := backend.GetKey(r.Context(), keyID)
-			if err != nil {
-				if storage.IsKeyNotFound(err) {
-					http.Error(w, "Key not found", http.StatusNotFound)
-				} else {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				}
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(key); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			return
-		}
-
-		if r.Method == "DELETE" {
-			if err := backend.DeleteKey(r.Context(), keyID); err != nil {
-				if storage.IsKeyNotFound(err) {
-					http.Error(w, "Key not found", http.StatusNotFound)
-				} else {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-				}
-				return
-			}
-
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}).Methods("GET", "DELETE")
 }
 
 func runServer(_ *cobra.Command, _ []string) error {
@@ -398,8 +247,8 @@ func runServer(_ *cobra.Command, _ []string) error {
 	}
 
 	// Add health check endpoints
-	router.HandleFunc("/health", healthHandler(storageBackend)).Methods("GET")
-	router.HandleFunc("/ready", readinessHandler(storageBackend)).Methods("GET")
+	router.HandleFunc("/health", publicOperationalMiddleware(healthHandler(storageBackend))).Methods("GET")
+	router.HandleFunc("/ready", publicOperationalMiddleware(readinessHandler(storageBackend))).Methods("GET")
 	logging.Info("Health check endpoints: /health, /ready")
 
 	// Create HTTP server
@@ -679,6 +528,10 @@ func createTLSConfig(cfg *config.TLSConfig) (*tls.Config, error) {
 }
 
 // Middleware functions
+
+func publicOperationalMiddleware(handler http.HandlerFunc) http.HandlerFunc {
+	return securityHeadersMiddleware(loggingMiddleware(metricsMiddleware(handler)))
+}
 
 // securityHeadersMiddleware adds security headers to HTTP responses.
 func securityHeadersMiddleware(next http.HandlerFunc) http.HandlerFunc {
