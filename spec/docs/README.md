@@ -4,7 +4,7 @@ This directory contains formal specifications and verification for Knox's core f
 
 ## Overview
 
-Knox is a home-network secret key management and rotation system. These TLA+
+Knox is a personal secret key management and rotation system. These TLA+
 models document and check intended safety and liveness properties that are
 difficult to test exhaustively with traditional tests.
 
