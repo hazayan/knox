@@ -84,22 +84,18 @@ func TestFileClient_SetValues(t *testing.T) {
 		t.Errorf("expected primary data 'primary-data', got '%s'", client.primary)
 	}
 
-	// Check active data - the implementation creates a slice with make([]string, len(ks))
-	// which creates len(ks) empty strings, then appends the actual data
-	// Result: ["" (empty), "" (empty), "" (empty), "primary-data", "active1-data", "active2-data"]
-	if len(client.active) != 6 {
-		t.Errorf("expected 6 active items (due to implementation), got %d", len(client.active))
+	if len(client.active) != 3 {
+		t.Errorf("expected 3 active items, got %d", len(client.active))
 	}
 
-	// Check the actual data in the positions where it ends up
-	if client.active[3] != "primary-data" {
-		t.Errorf("expected active[3] = 'primary-data', got '%s'", client.active[3])
+	if client.active[0] != "primary-data" {
+		t.Errorf("expected active[0] = 'primary-data', got '%s'", client.active[0])
 	}
-	if client.active[4] != "active1-data" {
-		t.Errorf("expected active[4] = 'active1-data', got '%s'", client.active[4])
+	if client.active[1] != "active1-data" {
+		t.Errorf("expected active[1] = 'active1-data', got '%s'", client.active[1])
 	}
-	if client.active[5] != "active2-data" {
-		t.Errorf("expected active[5] = 'active2-data', got '%s'", client.active[5])
+	if client.active[2] != "active2-data" {
+		t.Errorf("expected active[2] = 'active2-data', got '%s'", client.active[2])
 	}
 
 	// Check key object

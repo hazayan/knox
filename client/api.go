@@ -78,7 +78,7 @@ func (c *fileClient) setValues(key *types.Key) {
 	c.keyObject = *key
 	c.primary = string(key.VersionList.GetPrimary().Data)
 	ks := key.VersionList.GetActive()
-	c.active = make([]string, len(ks))
+	c.active = make([]string, 0, len(ks))
 	for _, kv := range ks {
 		c.active = append(c.active, string(kv.Data))
 	}
