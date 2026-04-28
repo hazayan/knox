@@ -133,6 +133,58 @@ func TestAuditRouteOperationLogsKeyEventsWithoutSecrets(t *testing.T) {
 	assert.Contains(t, output, "key.access")
 	assert.Contains(t, output, "denied")
 	assert.Contains(t, output, "read")
+
+	out.Reset()
+	auditRouteOperation(
+		"postversion",
+		principal,
+		map[string]string{
+			"keyID": "app:test",
+			"data":  "bmV3LXNlY3JldA==",
+		},
+		&server.HTTPError{Subcode: types.UnauthorizedCode, Message: "denied"},
+		http.StatusForbidden,
+		"/v0/keys/app:test/versions/",
+	)
+
+	output = out.String()
+	assert.Contains(t, output, "key.access")
+	assert.Contains(t, output, "add_version")
+	assert.Contains(t, output, "denied")
+	assert.NotContains(t, output, "bmV3LXNlY3JldA==")
+
+	out.Reset()
+	auditRouteOperation(
+		"putaccess",
+		principal,
+		map[string]string{
+			"keyID":  "app:test",
+			"access": `{"type":"User","id":"bob","access_type":"Read"}`,
+		},
+		&server.HTTPError{Subcode: types.InternalServerErrorCode, Message: "failed"},
+		http.StatusInternalServerError,
+		"/v0/keys/app:test/access/",
+	)
+
+	output = out.String()
+	assert.Contains(t, output, "acl.change")
+	assert.Contains(t, output, "error")
+	assert.NotContains(t, output, "bob")
+
+	out.Reset()
+	auditRouteOperation(
+		"getaccess",
+		principal,
+		map[string]string{"keyID": "app:test"},
+		nil,
+		http.StatusOK,
+		"/v0/keys/app:test/access/",
+	)
+
+	output = out.String()
+	assert.Contains(t, output, "key.access")
+	assert.Contains(t, output, "get_acl")
+	assert.Contains(t, output, "success")
 }
 
 // TestServerStartup tests basic server startup and shutdown.
