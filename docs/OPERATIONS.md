@@ -90,3 +90,7 @@ The server exposes unauthenticated operational endpoints:
 
 Use these for local supervision checks only. They should not replace exercising
 real key create/get/rotate operations during backup or upgrade testing.
+
+`/health` is a liveness check for the server process. `/ready` checks whether
+the configured storage backend is reachable and should be used before sending
+real key traffic.

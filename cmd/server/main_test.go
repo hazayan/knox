@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -36,6 +37,36 @@ type apiResponse struct {
 	Timestamp int64           `json:"ts"`
 	Message   string          `json:"message"`
 	Data      json.RawMessage `json:"data"`
+}
+
+type failingPingBackend struct{}
+
+func (failingPingBackend) GetKey(context.Context, string) (*types.Key, error) {
+	return nil, storage.ErrKeyNotFound
+}
+
+func (failingPingBackend) PutKey(context.Context, *types.Key) error {
+	return nil
+}
+
+func (failingPingBackend) DeleteKey(context.Context, string) error {
+	return storage.ErrKeyNotFound
+}
+
+func (failingPingBackend) ListKeys(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+func (failingPingBackend) UpdateKey(context.Context, string, func(*types.Key) (*types.Key, error)) error {
+	return nil
+}
+
+func (failingPingBackend) Ping(context.Context) error {
+	return errors.New("storage unavailable")
+}
+
+func (failingPingBackend) Close() error {
+	return nil
 }
 
 func decodeAPIResponseData(t *testing.T, body io.Reader, target any) apiResponse {
@@ -331,8 +362,33 @@ func TestHealthEndpoints(t *testing.T) {
 
 			assert.Equal(t, tt.expected, resp.StatusCode)
 			assert.Equal(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
+			assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 		})
 	}
+}
+
+func TestOperationalEndpointSemanticsWithUnavailableStorage(t *testing.T) {
+	t.Run("health_remains_live", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		rec := httptest.NewRecorder()
+
+		healthHandler().ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "healthy", rec.Body.String())
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	})
+
+	t.Run("readiness_reports_unavailable_storage", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+		rec := httptest.NewRecorder()
+
+		readinessHandler(failingPingBackend{}).ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+		assert.Equal(t, "not ready", rec.Body.String())
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+	})
 }
 
 // TestMetricsEndpoint tests the Prometheus metrics endpoint.

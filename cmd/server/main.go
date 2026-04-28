@@ -129,7 +129,7 @@ func createTestServerWithMasterKey(cfg *config.ServerConfig, masterKey []byte) (
 	if cfg.Observability.Metrics.Enabled {
 		router.HandleFunc(cfg.Observability.Metrics.Endpoint, secureMetricsHandler(promhttp.Handler())).Methods("GET")
 	}
-	router.HandleFunc("/health", publicOperationalMiddleware(healthHandler(backend))).Methods("GET")
+	router.HandleFunc("/health", publicOperationalMiddleware(healthHandler())).Methods("GET")
 	router.HandleFunc("/ready", publicOperationalMiddleware(readinessHandler(backend))).Methods("GET")
 
 	// Create test server
@@ -253,7 +253,7 @@ func runServer(_ *cobra.Command, _ []string) error {
 	}
 
 	// Add health check endpoints
-	router.HandleFunc("/health", publicOperationalMiddleware(healthHandler(storageBackend))).Methods("GET")
+	router.HandleFunc("/health", publicOperationalMiddleware(healthHandler())).Methods("GET")
 	router.HandleFunc("/ready", publicOperationalMiddleware(readinessHandler(storageBackend))).Methods("GET")
 	logging.Info("Health check endpoints: /health, /ready")
 
@@ -868,23 +868,9 @@ func secureCompare(a, b string) bool {
 
 // Health check handlers
 
-func healthHandler(backend storage.Backend) http.HandlerFunc {
+func healthHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-
-		if err := backend.Ping(ctx); err != nil {
-			// Log the actual error for debugging
-			logging.Errorf("Health check failed: %v", err)
-
-			// Return generic error to client (don't leak internal details)
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprint(w, "unhealthy")
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "healthy")
+		writeOperationalStatus(w, http.StatusOK, "healthy")
 	}
 }
 
@@ -898,14 +884,19 @@ func readinessHandler(backend storage.Backend) http.HandlerFunc {
 			logging.Errorf("Readiness check failed: %v", err)
 
 			// Return generic error to client (don't leak internal details)
-			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprint(w, "not ready")
+			writeOperationalStatus(w, http.StatusServiceUnavailable, "not ready")
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "ready")
+		writeOperationalStatus(w, http.StatusOK, "ready")
 	}
+}
+
+func writeOperationalStatus(w http.ResponseWriter, status int, body string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	fmt.Fprint(w, body)
 }
 
 // updateMetricsPeriodically updates metrics from storage backend.
