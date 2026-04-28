@@ -548,6 +548,10 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 
 	authRequestAttempted := false
 	attemptedAuthTypes := []string{}
+	encodedBody := ""
+	if body != nil {
+		encodedBody = body.Encode()
+	}
 
 	for _, authHandler := range c.AuthHandlers {
 		authToken, authType, clientOverride := authHandler()
@@ -556,21 +560,6 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 		}
 		authRequestAttempted = true
 		attemptedAuthTypes = append(attemptedAuthTypes, authType)
-
-		// Create the request per authHandler to prevent body from being reused between requests.
-		// This is due to the body being non-reusable after the first read.
-		r, err := http.NewRequest(method, "https://"+c.Host+path, bytes.NewBufferString(body.Encode()))
-		if err != nil {
-			return err
-		}
-
-		// Get user from env variable and machine hostname from elsewhere.
-		r.Header.Set("Authorization", authToken)
-		r.Header.Set("User-Agent", fmt.Sprintf("Knox_Client/%s", c.Version))
-
-		if body != nil {
-			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		}
 
 		var cli HTTP
 		if clientOverride != nil {
@@ -583,6 +572,21 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 		resp.Data = data
 		// Contains retry logic if we decode a 500 error.
 		for i := 1; i <= maxRetryAttempts; i++ {
+			// Create a fresh request for each attempt because request bodies are
+			// consumed by the transport and cannot be safely reused on retry.
+			r, err := http.NewRequest(method, "https://"+c.Host+path, bytes.NewBufferString(encodedBody))
+			if err != nil {
+				return err
+			}
+
+			// Get user from env variable and machine hostname from elsewhere.
+			r.Header.Set("Authorization", authToken)
+			r.Header.Set("User-Agent", fmt.Sprintf("Knox_Client/%s", c.Version))
+
+			if body != nil {
+				r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			}
+
 			err = getHTTPResp(cli, r, resp)
 			if err != nil {
 				return err

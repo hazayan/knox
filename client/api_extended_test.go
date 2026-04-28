@@ -4,8 +4,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -212,6 +214,48 @@ func TestNetworkResilience(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "persistent server error")
 		assert.Equal(t, maxRetryAttempts, attempts)
+	})
+
+	t.Run("RetryPreservesRequestBody", func(t *testing.T) {
+		attempts := 0
+		authHandlers := []AuthHandler{
+			func() (string, string, HTTP) {
+				return "TEST_TOKEN", "test", nil
+			},
+		}
+		body := url.Values{}
+		body.Set("id", "app:test")
+		body.Set("data", "c2VjcmV0")
+
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			attempts++
+			requestBody, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			assert.Equal(t, body.Encode(), string(requestBody))
+			assert.Equal(t, "application/x-www-form-urlencoded", r.Header.Get("Content-Type"))
+
+			if attempts == 1 {
+				resp := &types.Response{Status: "error", Code: types.InternalServerErrorCode, Message: "server error"}
+				w.WriteHeader(http.StatusInternalServerError)
+				require.NoError(t, json.NewEncoder(w).Encode(resp))
+				return
+			}
+
+			resp := &types.Response{Status: "ok", Message: "success"}
+			require.NoError(t, json.NewEncoder(w).Encode(resp))
+		}))
+		defer srv.Close()
+
+		client := NewUncachedClient(
+			strings.TrimPrefix(srv.URL, "https://"),
+			srv.Client(),
+			authHandlers,
+			"test",
+		)
+
+		err := client.getHTTPData("POST", "/v0/keys/", body, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 2, attempts)
 	})
 
 	t.Run("NoRetryOnClientError", func(t *testing.T) {
