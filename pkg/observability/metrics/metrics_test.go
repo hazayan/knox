@@ -131,7 +131,7 @@ func TestRecordStorageOperation(t *testing.T) {
 	StorageOperationsTotal.Reset()
 	StorageOperationDuration.Reset()
 
-	backend := "postgres"
+	backend := "sqlite"
 	operation := "GetKey"
 	status := "success"
 	duration := 0.012
@@ -247,8 +247,8 @@ func TestMultipleRecordings(t *testing.T) {
 	RecordDBusOperation("SearchItems", "success", 0.015)
 
 	// Record multiple storage operations
-	RecordStorageOperation("postgres", "GetKey", "success", 0.005)
-	RecordStorageOperation("postgres", "PutKey", "success", 0.008)
+	RecordStorageOperation("sqlite", "GetKey", "success", 0.005)
+	RecordStorageOperation("sqlite", "PutKey", "success", 0.008)
 	RecordStorageOperation("memory", "GetKey", "success", 0.003)
 
 	// Verify request counts
@@ -351,6 +351,6 @@ func BenchmarkRecordStorageOperation(b *testing.B) {
 	b.ResetTimer()
 
 	for range b.N {
-		RecordStorageOperation("postgres", "GetKey", "success", 0.005)
+		RecordStorageOperation("sqlite", "GetKey", "success", 0.005)
 	}
 }

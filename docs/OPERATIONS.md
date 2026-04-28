@@ -9,8 +9,8 @@ Recommended default:
 
 - run one Knox server in a trusted environment
 - bind to a private address or loopback behind a local reverse proxy
-- use the filesystem backend first, then Postgres if multi-host access becomes
-  necessary
+- use the filesystem backend first, or SQLite if a single database file is
+  preferable
 - keep the master key outside the repository and outside regular shell history
 - back up both the storage directory and the master key material
 

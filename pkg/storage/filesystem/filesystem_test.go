@@ -262,7 +262,7 @@ func TestBackend_ListKeys(t *testing.T) {
 		"app1_database",
 		"app1_api_key",
 		"app2_redis",
-		"app3_postgres",
+		"app3_sqlite",
 	}
 
 	for _, keyID := range keys {

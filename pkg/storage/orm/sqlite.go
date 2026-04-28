@@ -16,8 +16,7 @@ func init() {
 
 // NewSQLiteBackend creates a new SQLite-based storage backend using GORM.
 func NewSQLiteBackend(cfg storage.Config) (storage.Backend, error) {
-	// For SQLite, we'll use FilesystemDir as the database file path
-	dbPath := cfg.FilesystemDir
+	dbPath := cfg.SQLitePath
 	if dbPath == "" {
 		dbPath = "knox.db" // Default SQLite database file
 	}
@@ -28,7 +27,7 @@ func NewSQLiteBackend(cfg storage.Config) (storage.Backend, error) {
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
-		PrepareStmt: true,
+		PrepareStmt: false,
 	}
 
 	// Open database connection with SQLite dialect

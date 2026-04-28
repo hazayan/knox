@@ -850,18 +850,16 @@ func TestContextCancellationInStorage(t *testing.T) {
 // TestConfigPopulated tests configuration with populated values.
 func TestConfigPopulated(t *testing.T) {
 	cfg := Config{
-		Backend:                  "postgres",
-		FilesystemDir:            "/tmp/knox",
-		PostgresConnectionString: "postgresql://user:pass@localhost/knox",
-		PostgresMaxConnections:   50,
-		EtcdEndpoints:            []string{"localhost:2379"},
-		EtcdPrefix:               "/knox",
-		ReadOnly:                 true,
+		Backend:       "sqlite",
+		FilesystemDir: "/tmp/knox/keys",
+		SQLitePath:    "/tmp/knox/knox.db",
+		EtcdEndpoints: []string{"localhost:2379"},
+		EtcdPrefix:    "/knox",
+		ReadOnly:      true,
 	}
-	assert.Equal(t, "postgres", cfg.Backend)
-	assert.Equal(t, "/tmp/knox", cfg.FilesystemDir)
-	assert.Equal(t, "postgresql://user:pass@localhost/knox", cfg.PostgresConnectionString)
-	assert.Equal(t, 50, cfg.PostgresMaxConnections)
+	assert.Equal(t, "sqlite", cfg.Backend)
+	assert.Equal(t, "/tmp/knox/keys", cfg.FilesystemDir)
+	assert.Equal(t, "/tmp/knox/knox.db", cfg.SQLitePath)
 	assert.Equal(t, []string{"localhost:2379"}, cfg.EtcdEndpoints)
 	assert.Equal(t, "/knox", cfg.EtcdPrefix)
 	assert.True(t, cfg.ReadOnly)

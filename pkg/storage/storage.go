@@ -108,15 +108,14 @@ type Transaction interface {
 // Config holds configuration for initializing a storage backend.
 type Config struct {
 	// Backend specifies which storage implementation to use.
-	// Valid values: "memory", "filesystem", "postgres", "etcd"
+	// Valid values: "memory", "filesystem", "sqlite", "etcd"
 	Backend string
 
 	// Filesystem backend configuration
 	FilesystemDir string
 
-	// PostgreSQL backend configuration
-	PostgresConnectionString string
-	PostgresMaxConnections   int
+	// SQLite backend configuration
+	SQLitePath string
 
 	// etcd backend configuration
 	EtcdEndpoints []string
