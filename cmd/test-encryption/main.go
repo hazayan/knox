@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"github.com/hazayan/knox/pkg/storage/postgres"
+	"github.com/hazayan/knox/pkg/storage"
+	_ "github.com/hazayan/knox/pkg/storage/orm"
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server/keydb"
 )
@@ -97,36 +99,30 @@ func main() {
 	fmt.Println("  - DBAdapter.Get() deserializes DBKey from wrapper.Data")
 	fmt.Println("  - Result: Backend only handles encrypted bytes")
 
-	// Test 5: Check database storage (if PostgreSQL is configured)
-	fmt.Println("\nTest 5: Database storage check...")
-	pgURL := os.Getenv("KNOX_DB_URL")
-	if pgURL == "" {
-		fmt.Println("⚠ SKIP: KNOX_DB_URL not set, skipping database test")
-	} else {
-		fmt.Printf("  Connecting to: %s\n", maskPassword(pgURL))
-		backend, err := postgres.New(pgURL, 10)
-		if err != nil {
-			fmt.Printf("⚠ SKIP: Could not connect to database: %v\n", err)
-		} else {
-			fmt.Println("  ✓ Database connection successful")
-			fmt.Println("  Note: Run actual storage tests with integration test suite")
-			_ = backend
-		}
+	// Test 5: Check SQLite storage wiring.
+	fmt.Println("\nTest 5: SQLite storage check...")
+	tmpDir, err := os.MkdirTemp("", "knox-encryption-test-*")
+	if err != nil {
+		fmt.Printf("❌ FAILED: Could not create temporary directory: %v\n", err)
+		os.Exit(1)
 	}
+	defer os.RemoveAll(tmpDir)
+
+	backend, err := storage.NewBackend(storage.Config{
+		Backend:    "sqlite",
+		SQLitePath: filepath.Join(tmpDir, "knox.db"),
+	})
+	if err != nil {
+		fmt.Printf("❌ FAILED: Could not create SQLite backend: %v\n", err)
+		os.Exit(1)
+	}
+	defer backend.Close()
+	fmt.Println("  ✓ SQLite backend creation successful")
+	fmt.Println("  Note: Run actual storage tests with integration test suite")
 
 	fmt.Println("\n=== ALL TESTS PASSED ===")
 	fmt.Println("\n✓ Encryption at rest is correctly implemented:")
 	fmt.Println("  - Secrets are encrypted before storage")
 	fmt.Println("  - Backends only handle encrypted data")
 	fmt.Println("  - No plaintext secrets in database")
-}
-
-func maskPassword(dbURL string) string {
-	// Mask password in connection string for logging
-	if idx := strings.Index(dbURL, "@"); idx > 0 {
-		if idx2 := strings.LastIndex(dbURL[:idx], ":"); idx2 > 0 {
-			return dbURL[:idx2+1] + "****" + dbURL[idx:]
-		}
-	}
-	return dbURL
 }

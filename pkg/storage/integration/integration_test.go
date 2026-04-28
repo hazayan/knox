@@ -9,7 +9,7 @@ import (
 	"github.com/hazayan/knox/pkg/storage"
 	_ "github.com/hazayan/knox/pkg/storage/filesystem" // Register filesystem backend
 	_ "github.com/hazayan/knox/pkg/storage/memory"     // Register memory backend
-	_ "github.com/hazayan/knox/pkg/storage/postgres"   // Register postgres backend
+	_ "github.com/hazayan/knox/pkg/storage/orm"        // Register SQLite backend
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -22,9 +22,8 @@ server:
     cert_file: "/etc/knox/server.crt"
     key_file: "/etc/knox/server.key"
 storage:
-  backend: "postgres"
-  postgres_connection_string: "postgresql://user:pass@localhost/knox"
-  postgres_max_connections: 100
+  backend: "sqlite"
+  sqlite_path: "/var/lib/knox/knox.db"
 auth:
   providers:
     - type: "mtls"
@@ -55,9 +54,8 @@ limits:
 		// TLS config is empty by default unless explicitly set
 		assert.Equal(t, "", cfg.TLS.CertFile)
 		assert.Equal(t, "", cfg.TLS.KeyFile)
-		assert.Equal(t, "postgres", cfg.Storage.Backend)
-		assert.Equal(t, "postgresql://user:pass@localhost/knox", cfg.Storage.PostgresConnectionString)
-		assert.Equal(t, 100, cfg.Storage.PostgresMaxConnections)
+		assert.Equal(t, "sqlite", cfg.Storage.Backend)
+		assert.Equal(t, "/var/lib/knox/knox.db", cfg.Storage.SQLitePath)
 		assert.Len(t, cfg.Auth.Providers, 1)
 		assert.Equal(t, "mtls", cfg.Auth.Providers[0].Type)
 		assert.Equal(t, "/etc/knox/ca.crt", cfg.Auth.Providers[0].CAFile)
@@ -117,7 +115,7 @@ storage:
 	// Verify defaults are set
 	assert.Equal(t, "0.0.0.0:9000", cfg.BindAddress)
 	assert.Equal(t, "memory", cfg.Storage.Backend)
-	assert.Equal(t, 25, cfg.Storage.PostgresMaxConnections)  // Default value
+	assert.Equal(t, "/var/lib/knox/knox.db", cfg.Storage.SQLitePath)
 	assert.True(t, cfg.Observability.Metrics.Enabled)        // Default value
 	assert.Equal(t, "info", cfg.Observability.Logging.Level) // Default value
 	assert.Equal(t, 100, cfg.Limits.RateLimitPerPrincipal)   // Default value
@@ -261,19 +259,17 @@ func TestParseDuration(t *testing.T) {
 // TestStorageConfig_ToStorageConfig tests conversion to storage config.
 func TestStorageConfig_ToStorageConfig(t *testing.T) {
 	storageCfg := config.StorageConfig{
-		Backend:                  "postgres",
-		FilesystemDir:            "/var/lib/knox",
-		PostgresConnectionString: "postgresql://user:pass@localhost/knox",
-		PostgresMaxConnections:   50,
-		EtcdEndpoints:            []string{"localhost:2379"},
-		EtcdPrefix:               "knox",
+		Backend:       "sqlite",
+		FilesystemDir: "/var/lib/knox/keys",
+		SQLitePath:    "/var/lib/knox/knox.db",
+		EtcdEndpoints: []string{"localhost:2379"},
+		EtcdPrefix:    "knox",
 	}
 
 	result := storageCfg.ToStorageConfig()
-	assert.Equal(t, "postgres", result.Backend)
-	assert.Equal(t, "/var/lib/knox", result.FilesystemDir)
-	assert.Equal(t, "postgresql://user:pass@localhost/knox", result.PostgresConnectionString)
-	assert.Equal(t, 50, result.PostgresMaxConnections)
+	assert.Equal(t, "sqlite", result.Backend)
+	assert.Equal(t, "/var/lib/knox/keys", result.FilesystemDir)
+	assert.Equal(t, "/var/lib/knox/knox.db", result.SQLitePath)
 	assert.Equal(t, []string{"localhost:2379"}, result.EtcdEndpoints)
 	assert.Equal(t, "knox", result.EtcdPrefix)
 }
