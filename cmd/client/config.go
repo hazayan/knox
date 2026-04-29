@@ -198,8 +198,8 @@ func newConfigProfileAddCmd() *cobra.Command {
 		Long: `Add a new configuration profile.
 
 Examples:
-  knox config profile add production --server knox.prod.example.com:9000
-  knox config profile add staging --server knox.staging.example.com:9000`,
+  knox config profile add server-a --server knox-a.example:9000
+  knox config profile add server-b --server knox-b.example:9000`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			profileName := args[0]
@@ -320,7 +320,7 @@ func newConfigProfileUseCmd() *cobra.Command {
 		Long: `Set the default profile to use.
 
 Examples:
-  knox config profile use production
+  knox config profile use server-a
   knox config profile use default`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -516,7 +516,7 @@ knox:
   # prefix_mappings:
   #   "service:auth": "service_auth"
   #   "app:database": "database_credentials"
-  #   "infra:secrets": "infrastructure"
+  #   "work:secrets": "work_secrets"
 
 encryption:
   # Supported encryption algorithms

@@ -13,8 +13,8 @@ currently exposes these command groups:
 - `version`: print CLI version information
 - `completion`: generate shell completion
 
-Status: alpha. The CLI is usable, but legacy client/cache behavior still needs
-cleanup before it should be considered stable.
+Status: usable for the documented server workflows. Legacy client/register cache
+code still exists for compatibility but is not the primary CLI path.
 
 ## Build
 

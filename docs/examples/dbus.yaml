@@ -32,7 +32,7 @@ knox:
   prefix_mappings:
     # "service:auth": "service_auth"      # Example: Knox keys "service:auth:*" → D-Bus collection "service_auth"
     # "app:database": "database_creds"    # Example: Knox keys "app:database:*" → D-Bus collection "database_creds"
-    # "infra:secrets": "infrastructure"   # Example: Knox keys "infra:secrets:*" → D-Bus collection "infrastructure"
+    # "work:secrets": "work_secrets"      # Example: Knox keys "work:secrets:*" → D-Bus collection "work_secrets"
 
 encryption:
   # Supported encryption algorithms
