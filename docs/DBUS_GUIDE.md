@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Knox D-Bus bridge (`knox-dbus`) implements the [FreeDesktop Secret Service API](https://specifications.freedesktop.org/secret-service-spec/latest/), allowing desktop applications to store secrets in Knox transparently.
+The Knox D-Bus bridge (`knox-dbus`) implements the [FreeDesktop Secret Service API](https://specifications.freedesktop.org/secret-service-spec/latest/), allowing compatible desktop applications to store secrets in Knox.
 
 The goal is to let applications that already use libsecret or the Secret
 Service API store secrets in Knox without application-specific plugins. This
@@ -21,7 +21,7 @@ daily use.
 ```
 ┌─────────────────────────────────────────┐
 │    Desktop Applications                 │
-│  Firefox, Chrome, SSH, Git, etc.        │
+│  Secret Service compatible clients      │
 └──────────────┬──────────────────────────┘
                │ D-Bus Secret Service API
                │ (org.freedesktop.secrets)
@@ -60,7 +60,7 @@ dbus:
   service_name: "org.freedesktop.secrets"
 
 knox:
-  server: "localhost:9000"  # Your Knox server
+  server: "localhost:9000"  # Knox server address
   tls:
     ca_cert: ""
     client_cert: ""
@@ -76,7 +76,7 @@ knox:
   # prefix_mappings:
   #   "service:auth": "service_auth"
   #   "app:database": "database_credentials"
-  #   "infra:secrets": "infrastructure"
+  #   "work:secrets": "work_secrets"
 
 encryption:
   algorithms:
@@ -132,31 +132,28 @@ secret-tool lookup application test
 
 ### Using with Applications
 
-#### Firefox
+#### Browser And Application Checks
 
-Firefox will automatically detect and use the Secret Service:
+Some browsers and desktop applications can use Secret Service. Verify behavior
+per application before relying on it:
 
 1. Start knox-dbus
-2. Open Firefox
-3. Save a password
-4. It's now stored in Knox!
+2. Open the application
+3. Save a test secret or credential
+4. Confirm the resulting key appears in Knox
 
 Check Knox:
 ```bash
 knox key list dbus:
-# Should show: dbus:default:firefox_login_...
 ```
 
-#### Chrome/Chromium
+#### Chromium-Based Browsers
 
-Chrome uses Secret Service on Linux by default:
+Chromium-based browsers may use Secret Service depending on platform and build
+settings:
 
 ```bash
-# Start Chrome (it will auto-detect knox-dbus)
-google-chrome
-
-# Or force Secret Service backend
-google-chrome --password-store=gnome-libsecret
+chromium --password-store=gnome-libsecret
 ```
 
 #### SSH Keys (ssh-agent)
@@ -172,9 +169,7 @@ google-chrome --password-store=gnome-libsecret
 # Configure Git to use libsecret
 git config --global credential.helper libsecret
 
-# Now Git credentials go to Knox
-git clone https://github.com/user/repo.git
-# Enter credentials - stored in Knox!
+# Enter a test credential, then verify it appears through Secret Service
 ```
 
 ## Key Mapping
@@ -229,7 +224,7 @@ knox:
   prefix_mappings:
     "service:auth": "service_auth"      # Knox keys "service:auth:*" → D-Bus collection "service_auth"
     "app:database": "database_creds"    # Knox keys "app:database:*" → D-Bus collection "database_creds"
-    "infra:secrets": "infrastructure"   # Knox keys "infra:secrets:*" → D-Bus collection "infrastructure"
+    "work:secrets": "work_secrets"      # Knox keys "work:secrets:*" → D-Bus collection "work_secrets"
 ```
 
 #### How It Works
@@ -244,7 +239,7 @@ knox:
 | `dbus:default:firefox_password` | `Default` | `firefox_password` | ✅ Yes |
 | `dbus:session:temp_token` | `Session` | `temp_token` | ✅ Yes |
 | `service:auth:github_token` | `service_auth` | `github_token` | ✅ Yes |
-| `app:database:prod_password` | `database_creds` | `prod_password` | ✅ Yes |
+| `app:database:db_password` | `database_creds` | `db_password` | ✅ Yes |
 | `other:prefix:should_not_appear` | *(none)* | *(none)* | ❌ No |
 
 #### Key Benefits
@@ -260,13 +255,13 @@ If you have existing Knox keys with various prefixes and want to expose them via
 
 ```yaml
 prefix_mappings:
-  "legacy:passwords": "legacy_passwords"
+  "imported:passwords": "imported_passwords"
   "new:api:keys": "api_keys"
-  "team:infra:secrets": "infrastructure"
+  "work:secrets": "work_secrets"
 ```
 
 The D-Bus bridge will:
-1. Create collections `legacy_passwords`, `api_keys`, `infrastructure`
+1. Create collections `imported_passwords`, `api_keys`, `work_secrets`
 2. Load all matching Knox keys into their respective collections
 3. Expose them via the D-Bus Secret Service API
 
@@ -300,16 +295,16 @@ Two-layer encryption:
 
 ### Multiple Knox Servers
 
-Use different namespaces for different environments:
+Use different namespaces for different Knox servers:
 
 ```yaml
-# ~/.config/knox/dbus-prod.yaml
+# ~/.config/knox/dbus-secondary.yaml
 knox:
-  server: "knox.prod.example.com:9000"
-  namespace_prefix: "dbus-prod"
+  server: "knox-secondary.example:9000"
+  namespace_prefix: "dbus-secondary"
 
 # Start multiple bridges on different buses
-knox-dbus --config ~/.config/knox/dbus-prod.yaml
+knox-dbus --config ~/.config/knox/dbus-secondary.yaml
 ```
 
 ### Custom Collections
@@ -445,9 +440,8 @@ print("Deleted")
 ### Browser Testing
 
 1. Start knox-dbus
-2. Open Firefox
-3. Go to any login page
-4. Save credentials
+2. Open a browser that is configured to use Secret Service
+3. Save a test credential
 5. Check Knox:
    ```bash
    knox key list dbus:default:
@@ -485,7 +479,6 @@ Typical usage:
 | Backend | Knox server | Local encrypted file | Local encrypted file |
 | Remote storage | ✅ Yes | ❌ No | ❌ No |
 | Knox-side audit path | Partial | ❌ No | ❌ No |
-| Home-network server | ✅ Yes | ❌ No | ❌ No |
 | ACL enforcement | ✅ Yes (Knox) | ⚠️ Limited | ⚠️ Limited |
 | Offline access | ❌ No | ✅ Yes | ✅ Yes |
 
@@ -513,7 +506,7 @@ Typical usage:
 2. **Restrict ACLs**: Limit dbus namespace access in Knox
 3. **Audit regularly**: Monitor Knox audit logs
 4. **Rotate credentials**: Regularly rotate Knox auth tokens
-5. **Network security**: Use VPN or private network for Knox
+5. **Transport security**: restrict exposure and use TLS for remote access
 
 ## Debugging
 
