@@ -8,7 +8,7 @@ specific distribution, init system, or desktop session.
 Recommended default:
 
 - run one Knox server in a trusted environment
-- bind to a private address or loopback behind a local reverse proxy
+- bind to loopback or an address appropriate for the deployment
 - use the filesystem backend first, or SQLite if a single database file is
   preferable
 - keep the master key outside the repository and outside regular shell history
@@ -88,8 +88,8 @@ The server exposes unauthenticated operational endpoints:
 /ready
 ```
 
-Use these for local supervision checks only. They should not replace exercising
-real key create/get/rotate operations during backup or upgrade testing.
+Use these for supervision checks only. They should not replace exercising real
+key create/get/rotate operations during backup or upgrade testing.
 
 `/health` is a liveness check for the server process. `/ready` checks whether
 the configured storage backend is reachable and should be used before sending

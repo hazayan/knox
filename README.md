@@ -16,9 +16,9 @@ Knox is under active stabilization. The codebase has meaningful pieces in place:
 - D-Bus Secret Service bridge implementation
 - Tests across crypto, storage, server, client, and D-Bus packages
 
-The implementation does not yet live up to the older production claims in the
-documentation. Treat it as alpha software until the full test suite is green and
-the operational path is documented end to end.
+The current server, storage, crypto, and CLI paths are covered by the Go test
+suite. The D-Bus bridge still needs live verification with Secret Service
+clients before it should be treated as a dependable desktop secret store.
 
 ## Intended Use
 
@@ -29,7 +29,7 @@ Unix server or workstation
   knox-server
   filesystem or SQLite storage
   master key from /etc/knox/master.key or KNOX_MASTER_KEY_FILE
-  TLS and simple auth suitable for a private environment
+  TLS and simple auth appropriate for the deployment
 
 Unix workstation or laptop
   knox CLI
@@ -43,7 +43,7 @@ local scripts and services
 
 Prerequisites:
 
-- Go 1.21 or later
+- Go 1.24 or later
 
 Build the three main binaries:
 
@@ -130,8 +130,7 @@ knox key rotate app:test --data "new-secret-value"
 knox acl get app:test
 ```
 
-The CLI and older client library still need cleanup around legacy cache/register
-behavior. See [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) for current command details.
+See [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) for current command details.
 
 ## Desktop Integration
 
@@ -146,16 +145,17 @@ for daily use.
 
 ## Stabilization Checklist
 
-Knox should not be considered sturdy until:
+Current stabilization state:
 
 - `go test ./...` passes
-- the server has one canonical route path
-- storage backend create/update semantics are consistent
+- the server uses one canonical route path
+- storage backend create/update/delete semantics are tested
+- supported backends are limited to memory, filesystem, SQLite, and etcd
 - audit logging covers key and ACL operations without logging secret values
-- master-key rotation cannot remove old cryptors while data still needs them
+- master-key rotation protects data that still needs previous cryptors
 - generic service-manager examples exist
 - backup and restore are documented and tested
-- D-Bus behavior is verified with `secret-tool`
+- D-Bus behavior still needs live verification with `secret-tool`
 
 ## Documentation
 

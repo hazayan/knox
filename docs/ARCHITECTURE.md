@@ -4,7 +4,7 @@
 
 This fork is scoped as a small self-hosted Unix secret manager. It should be
 simple enough to run on ordinary servers, workstations, and laptops, and
-recoverable without specialized infrastructure.
+recoverable without specialized services.
 
 The design priority is:
 
@@ -48,7 +48,7 @@ Unix workstation or laptop
   optional /usr/local/bin/knox-dbus
 ```
 
-For the first sturdy release, prefer filesystem storage. SQLite is available
+For a simple deployment, prefer filesystem storage. SQLite is available
 through the ORM backend when a single database file is preferable. etcd is not
 recommended for the default profile because it adds operational complexity that
 does not help a simple single-server use case.
@@ -65,9 +65,9 @@ client or knox-dbus
   -> storage adapter persists encrypted DBKey payload
 ```
 
-Storage backends should not receive plaintext secret data in the production
-server path. The current stabilization work must keep one canonical server route
-path so tests and real deployments exercise the same encryption and ACL logic.
+Storage backends should not receive plaintext secret data in the server path.
+The router keeps one canonical key API path so tests and real deployments
+exercise the same encryption and ACL logic.
 
 ## Storage
 
@@ -78,12 +78,10 @@ Supported packages in the tree:
 - `memory`: tests and ephemeral development
 - `filesystem`: recommended first default backend
 - `sqlite`: ORM-backed single-file SQL storage
-- `etcd`: advanced/experimental for this fork's scope
+- `etcd`: advanced backend for deployments that already operate etcd
 
-Backend behavior must be made consistent before the project can be considered
-sturdy. In particular, create/update semantics should be identical across
-backends, and backend conformance tests should cover key creation, replacement,
-deletion, listing, and atomic update behavior.
+Backend behavior is covered by shared storage tests for key creation,
+replacement, deletion, listing, and atomic update behavior.
 
 ## Encryption
 
@@ -126,9 +124,8 @@ Knox keys use ACLs with these access levels:
 - `Write`: add/rotate versions
 - `Admin`: modify ACLs and delete keys
 
-ACL behavior belongs in the key manager and server route handlers. Any direct
-storage route that bypasses this path is test-only at best and should not be
-part of the production router.
+ACL behavior belongs in the key manager and server route handlers. Storage
+backends are persistence implementations, not alternate API surfaces.
 
 ## Observability
 
@@ -156,16 +153,21 @@ Audit logs must never include secret values.
 Operational examples should cover common Unix service-manager and desktop
 session startup patterns without making any one init system a requirement.
 
-## Stabilization Milestones
+## Stabilization State
 
-1. Documentation truth pass
-2. `go test ./...` green
-3. One canonical server route path
-4. Backend conformance tests and storage semantics cleanup
-5. Master-key and rotation safety fixes
-6. CLI workflow alignment
-7. Unix service-manager examples
-8. D-Bus verification with `secret-tool`
+Completed:
+
+- Documentation truth pass
+- `go test ./...` green
+- One canonical server route path
+- Backend conformance tests and storage semantics cleanup
+- Master-key and rotation safety fixes
+- CLI workflow alignment
+- Generic Unix service-manager examples
+
+Remaining manual verification:
+
+- D-Bus verification with `secret-tool` and real Secret Service clients
 
 ## Definition Of Sturdy
 
