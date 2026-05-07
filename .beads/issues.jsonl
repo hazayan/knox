@@ -1,0 +1,1 @@
+{"_type":"issue","id":"knox-g2y","title":"Fix client path traversal validation test","status":"closed","priority":2,"issue_type":"bug","owner":"yassine@hazayan.dev","created_at":"2026-05-07T22:19:17Z","created_by":"yassine","updated_at":"2026-05-07T22:23:40Z","closed_at":"2026-05-07T22:23:40Z","close_reason":"done","dependency_count":0,"dependent_count":0,"comment_count":0}

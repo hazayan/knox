@@ -109,6 +109,10 @@ PowerShell:
 // - Only allows files with allowedExts (e.g., .txt, .json, .pem)
 // Returns error if any rule is violated.
 func validateAndReadFile(filePath string, allowedDirs, allowedExts []string) ([]byte, error) {
+	if hasParentPathElement(filePath) {
+		return nil, errors.New("path traversal detected in file path")
+	}
+
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve absolute path: %w", err)
@@ -126,11 +130,6 @@ func validateAndReadFile(filePath string, allowedDirs, allowedExts []string) ([]
 		return nil, fmt.Errorf("file extension not allowed: %s", filepath.Ext(absPath))
 	}
 
-	// Check for path traversal
-	if strings.Contains(absPath, "..") {
-		return nil, errors.New("path traversal detected in file path")
-	}
-
 	// Check allowed directories
 	dirAllowed := false
 	for _, dir := range allowedDirs {
@@ -138,7 +137,11 @@ func validateAndReadFile(filePath string, allowedDirs, allowedExts []string) ([]
 		if err != nil {
 			continue
 		}
-		if strings.HasPrefix(absPath, absDir) {
+		relPath, err := filepath.Rel(absDir, absPath)
+		if err != nil {
+			continue
+		}
+		if relPath != ".." && !strings.HasPrefix(relPath, ".."+string(filepath.Separator)) && !filepath.IsAbs(relPath) {
 			dirAllowed = true
 			break
 		}
@@ -152,6 +155,15 @@ func validateAndReadFile(filePath string, allowedDirs, allowedExts []string) ([]
 
 	// #nosec G304 -- absPath is strictly validated above (directory, extension, traversal)
 	return os.ReadFile(absPath)
+}
+
+func hasParentPathElement(path string) bool {
+	for _, elem := range strings.Split(filepath.ToSlash(path), "/") {
+		if elem == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // createHTTPClient creates an HTTP client with TLS configuration.
