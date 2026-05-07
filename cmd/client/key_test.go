@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/hazayan/knox/pkg/observability/logging"
@@ -1063,13 +1062,26 @@ func TestFileValidation(t *testing.T) {
 	})
 
 	t.Run("PathTraversal", func(t *testing.T) {
-		// Use a path that would be within allowed directory but contains path traversal
-		_, err := validateAndReadFile("test/../../etc/passwd.txt", []string{"/tmp"}, []string{".txt"})
+		allowedDir := t.TempDir()
+
+		traversalPath := allowedDir + string(filepath.Separator) + "test" + string(filepath.Separator) + ".." + string(filepath.Separator) + ".." + string(filepath.Separator) + "escape.txt"
+		_, err := validateAndReadFile(traversalPath, []string{allowedDir}, []string{".txt"})
 		require.Error(t, err)
-		// The path traversal check happens after path resolution, so the actual error may be about directory permissions
-		// Check for either error message that indicates security validation
-		assert.True(t, strings.Contains(err.Error(), "path traversal detected") ||
-			strings.Contains(err.Error(), "not within allowed directories"),
-			"Expected security validation error, got: %s", err.Error())
+		assert.Contains(t, err.Error(), "path traversal detected")
+	})
+
+	t.Run("AllowedDirectoryPrefixBypass", func(t *testing.T) {
+		baseDir := t.TempDir()
+		allowedDir := filepath.Join(baseDir, "allowed")
+		require.NoError(t, os.MkdirAll(allowedDir, 0o700))
+
+		evilDir := filepath.Join(baseDir, "allowed-evil")
+		require.NoError(t, os.MkdirAll(evilDir, 0o700))
+		evilFile := filepath.Join(evilDir, "secret.txt")
+		require.NoError(t, os.WriteFile(evilFile, []byte("secret"), 0o600))
+
+		_, err := validateAndReadFile(evilFile, []string{allowedDir}, []string{".txt"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not within allowed directories")
 	})
 }
