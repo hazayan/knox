@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "knox",
+  "project_id": "7e476648-11c5-40e8-8253-4259f2618499"
+}
