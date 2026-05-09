@@ -1,3 +1,4 @@
 [00001] [2026-05-07T22:19:17Z] [TROUBLESHOOTING] Reproduced the client file validation behavior and found the prior path traversal test was environment-dependent because absolute path normalization removed parent path elements before validation.
 [00002] [2026-05-07T22:23:06Z] [FIX] Hardened cmd/client file validation to reject parent path elements before normalization and to validate allowed directories with filepath.Rel instead of string prefix matching.
 [00003] [2026-05-07T22:23:06Z] [TEST] Added client file validation coverage for raw path traversal and allowed-directory prefix bypass cases.
+[00004] [2026-05-09T01:51:00Z] [CONFIG] Encrypted the Beads issues export with git-crypt, granted GPG key 83D121B5F6A8A730 access, and documented the default encrypted Beads policy.
