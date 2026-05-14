@@ -51,8 +51,8 @@ static int knox_fido2_enroll(
 	const char *rp_id,
 	const char *rp_name,
 	const char *pin,
-	const unsigned char *challenge,
-	size_t challenge_len,
+	const unsigned char *client_data,
+	size_t client_data_len,
 	const unsigned char *user_id,
 	size_t user_id_len,
 	unsigned char **credential_id,
@@ -79,7 +79,7 @@ static int knox_fido2_enroll(
 	if ((rc = fido_cred_set_type(cred, COSE_ES256)) != FIDO_OK) {
 		goto out;
 	}
-	if ((rc = fido_cred_set_clientdata_hash(cred, challenge, challenge_len)) != FIDO_OK) {
+	if ((rc = fido_cred_set_clientdata(cred, client_data, client_data_len)) != FIDO_OK) {
 		goto out;
 	}
 	if ((rc = fido_cred_set_rp(cred, rp_id, rp_name)) != FIDO_OK) {
@@ -129,8 +129,8 @@ static int knox_fido2_hmac_secret(
 	const char *device_path,
 	const char *rp_id,
 	const char *pin,
-	const unsigned char *challenge,
-	size_t challenge_len,
+	const unsigned char *client_data,
+	size_t client_data_len,
 	const unsigned char *credential_id,
 	size_t credential_id_len,
 	const unsigned char *salt,
@@ -156,7 +156,7 @@ static int knox_fido2_hmac_secret(
 	if ((rc = fido_dev_open(dev, device_path)) != FIDO_OK) {
 		goto out;
 	}
-	if ((rc = fido_assert_set_clientdata_hash(assert, challenge, challenge_len)) != FIDO_OK) {
+	if ((rc = fido_assert_set_clientdata(assert, client_data, client_data_len)) != FIDO_OK) {
 		goto out;
 	}
 	if ((rc = fido_assert_set_rp(assert, rp_id)) != FIDO_OK) {
@@ -225,11 +225,9 @@ static const char *knox_fido2_strerr(int rc) {
 import "C"
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"sync"
@@ -237,6 +235,11 @@ import (
 )
 
 var fido2InitOnce sync.Once
+
+var (
+	fido2ClientData = []byte("knox-fido2-master-key-wrapping")
+	fido2UserID     = []byte("knox-server")
+)
 
 func fido2EnrollCredential(rpID, rpName string, options Fido2DeviceOptions) ([]byte, error) {
 	devicePath, err := resolveFido2Device(options.Device)
@@ -247,15 +250,6 @@ func fido2EnrollCredential(rpID, rpName string, options Fido2DeviceOptions) ([]b
 	if err != nil {
 		return nil, err
 	}
-	challenge := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, challenge); err != nil {
-		return nil, fmt.Errorf("failed to generate fido2 enrollment challenge: %w", err)
-	}
-	userID := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, userID); err != nil {
-		return nil, fmt.Errorf("failed to generate fido2 user id: %w", err)
-	}
-
 	cDevicePath := C.CString(devicePath)
 	cRPID := C.CString(rpID)
 	cRPName := C.CString(rpName)
@@ -277,10 +271,10 @@ func fido2EnrollCredential(rpID, rpName string, options Fido2DeviceOptions) ([]b
 		cRPID,
 		cRPName,
 		cPIN,
-		(*C.uchar)(unsafe.Pointer(&challenge[0])),
-		C.size_t(len(challenge)),
-		(*C.uchar)(unsafe.Pointer(&userID[0])),
-		C.size_t(len(userID)),
+		(*C.uchar)(unsafe.Pointer(&fido2ClientData[0])),
+		C.size_t(len(fido2ClientData)),
+		(*C.uchar)(unsafe.Pointer(&fido2UserID[0])),
+		C.size_t(len(fido2UserID)),
 		&credentialID,
 		&credentialIDLen,
 	)
@@ -311,11 +305,6 @@ func fido2HMACSecret(metadata Fido2CredentialMetadata, options Fido2DeviceOption
 	if err != nil {
 		return nil, fmt.Errorf("invalid fido2 salt: %w", err)
 	}
-	challenge := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, challenge); err != nil {
-		return nil, fmt.Errorf("failed to generate fido2 assertion challenge: %w", err)
-	}
-
 	cDevicePath := C.CString(devicePath)
 	cRPID := C.CString(metadata.RPID)
 	var cPIN *C.char
@@ -334,8 +323,8 @@ func fido2HMACSecret(metadata Fido2CredentialMetadata, options Fido2DeviceOption
 		cDevicePath,
 		cRPID,
 		cPIN,
-		(*C.uchar)(unsafe.Pointer(&challenge[0])),
-		C.size_t(len(challenge)),
+		(*C.uchar)(unsafe.Pointer(&fido2ClientData[0])),
+		C.size_t(len(fido2ClientData)),
 		(*C.uchar)(unsafe.Pointer(&credentialID[0])),
 		C.size_t(len(credentialID)),
 		(*C.uchar)(unsafe.Pointer(&salt[0])),

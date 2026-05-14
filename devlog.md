@@ -8,3 +8,4 @@
 [00008] [2026-05-14T02:26:51Z] [ISSUE] Tracked the production libfido2 TrustKey hardware provider as knox-1b7 because the current provider boundary intentionally avoids overclaiming hardware support.
 [00009] [2026-05-14T13:01:54Z] [IMPLEMENTATION] Added a libfido2-backed Knox FIDO2 provider for credential enrollment and hmac-secret derivation behind the libfido2 build tag, with default-build stubs that fail explicitly when hardware support is not compiled in.
 [00010] [2026-05-14T13:01:54Z] [TEST] Added stub and opt-in libfido2 integration coverage for FIDO2 master-key wrapping and compile-checked both default and libfido2-tagged crypto/server test paths.
+[00011] [2026-05-14T13:15:20Z] [FIX] Aligned the Knox libfido2 provider with the working kunci/client-data flow and validated real TrustKey T120 enrollment, initialization, unlock, backup, restore, and restored unlock-test commands.
