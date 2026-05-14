@@ -18,6 +18,7 @@ import (
 type ServerConfig struct {
 	BindAddress   string              `mapstructure:"bind_address"`
 	TLS           TLSConfig           `mapstructure:"tls"`
+	MasterKey     MasterKeyConfig     `mapstructure:"master_key"`
 	Storage       StorageConfig       `mapstructure:"storage"`
 	Auth          AuthConfig          `mapstructure:"auth"`
 	Observability ObservabilityConfig `mapstructure:"observability"`
@@ -30,6 +31,14 @@ type TLSConfig struct {
 	KeyFile    string `mapstructure:"key_file"`
 	ClientCA   string `mapstructure:"client_ca"`
 	MinVersion string `mapstructure:"min_version"` // TLS1.2, TLS1.3
+}
+
+type MasterKeyConfig struct {
+	Backend          string `mapstructure:"backend"`
+	EncryptedKeyFile string `mapstructure:"encrypted_key_file"`
+	MetadataFile     string `mapstructure:"metadata_file"`
+	Device           string `mapstructure:"device"`
+	PinFile          string `mapstructure:"pin_file"`
 }
 
 // StorageConfig holds storage backend configuration.
@@ -162,6 +171,7 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 
 	// Set defaults
 	v.SetDefault("bind_address", "0.0.0.0:9000")
+	v.SetDefault("master_key.backend", "default")
 	v.SetDefault("storage.backend", "filesystem")
 	v.SetDefault("storage.filesystem_dir", "/var/lib/knox/keys")
 	v.SetDefault("storage.sqlite_path", "/var/lib/knox/knox.db")

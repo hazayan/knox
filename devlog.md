@@ -3,3 +3,6 @@
 [00003] [2026-05-07T22:23:06Z] [TEST] Added client file validation coverage for raw path traversal and allowed-directory prefix bypass cases.
 [00004] [2026-05-09T01:51:00Z] [CONFIG] Encrypted the Beads issues export with git-crypt, granted GPG key 83D121B5F6A8A730 access, and documented the default encrypted Beads policy.
 [00005] [2026-05-14T01:42:15Z] [PLANNING] Documented the Knox FIDO2 master-key wrapping milestone, including explicit enrollment/init/migration commands, distinct backup credentials, and the boundary where kha configures Knox instead of implementing a parallel secret store.
+[00006] [2026-05-14T02:26:51Z] [IMPLEMENTATION] Added encrypted Knox master-key bundles, configurable master-key loading, and admin commands for metadata creation, initialization, migration, unlock testing, backup, and restore with distinct backup metadata support.
+[00007] [2026-05-14T02:26:51Z] [TEST] Added focused crypto, config, and server command coverage for FIDO2-style master-key wrapping using a test-only hmac-secret provider boundary.
+[00008] [2026-05-14T02:26:51Z] [ISSUE] Tracked the production libfido2 TrustKey hardware provider as knox-1b7 because the current provider boundary intentionally avoids overclaiming hardware support.

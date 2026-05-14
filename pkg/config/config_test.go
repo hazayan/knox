@@ -24,6 +24,10 @@ server:
 storage:
   backend: "sqlite"
   sqlite_path: "/var/lib/knox/knox.db"
+master_key:
+  backend: "fido2"
+  encrypted_key_file: "/var/db/knox/master.key.fido2"
+  metadata_file: "/usr/local/etc/knox/fido2-credential.json"
 auth:
   providers:
     - type: "mtls"
@@ -56,6 +60,9 @@ limits:
 		assert.Equal(t, "", cfg.TLS.KeyFile)
 		assert.Equal(t, "sqlite", cfg.Storage.Backend)
 		assert.Equal(t, "/var/lib/knox/knox.db", cfg.Storage.SQLitePath)
+		assert.Equal(t, "fido2", cfg.MasterKey.Backend)
+		assert.Equal(t, "/var/db/knox/master.key.fido2", cfg.MasterKey.EncryptedKeyFile)
+		assert.Equal(t, "/usr/local/etc/knox/fido2-credential.json", cfg.MasterKey.MetadataFile)
 		assert.Len(t, cfg.Auth.Providers, 1)
 		assert.Equal(t, "mtls", cfg.Auth.Providers[0].Type)
 		assert.Equal(t, "/etc/knox/ca.crt", cfg.Auth.Providers[0].CAFile)
@@ -114,6 +121,7 @@ storage:
 
 	// Verify defaults are set
 	assert.Equal(t, "0.0.0.0:9000", cfg.BindAddress)
+	assert.Equal(t, "default", cfg.MasterKey.Backend)
 	assert.Equal(t, "memory", cfg.Storage.Backend)
 	assert.Equal(t, "/var/lib/knox/knox.db", cfg.Storage.SQLitePath)
 	assert.True(t, cfg.Observability.Metrics.Enabled)        // Default value
