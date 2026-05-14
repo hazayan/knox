@@ -48,6 +48,11 @@ type Fido2CredentialMetadata struct {
 	DeriveInfo   string `json:"derive_info"`
 }
 
+type Fido2DeviceOptions struct {
+	Device  string
+	PinFile string
+}
+
 type MasterKeyBundle struct {
 	Version    int                     `json:"version"`
 	Kind       string                  `json:"kind"`
@@ -66,6 +71,7 @@ type MasterKeyBundleEnvelope struct {
 type Fido2WrappingKeyProvider struct {
 	Metadata   Fido2CredentialMetadata
 	HMACSecret []byte
+	Device     Fido2DeviceOptions
 }
 
 func NewFido2Metadata(rpID, rpName, deriveInfo string) (Fido2CredentialMetadata, error) {
@@ -157,15 +163,21 @@ func (m Fido2CredentialMetadata) Validate() error {
 }
 
 func NewFido2WrappingKeyProviderFromMetadataFile(path string) (*Fido2WrappingKeyProvider, error) {
+	return NewFido2WrappingKeyProviderFromMetadataFileWithOptions(path, Fido2DeviceOptions{})
+}
+
+func NewFido2WrappingKeyProviderFromMetadataFileWithOptions(path string, options Fido2DeviceOptions) (*Fido2WrappingKeyProvider, error) {
 	metadata, err := LoadFido2Metadata(path)
 	if err != nil {
 		return nil, err
 	}
-	secret, err := fakeFido2HMACSecret()
-	if err != nil {
-		return nil, err
+	if secret, ok, err := fakeFido2HMACSecret(); ok || err != nil {
+		if err != nil {
+			return nil, err
+		}
+		return &Fido2WrappingKeyProvider{Metadata: metadata, HMACSecret: secret, Device: options}, nil
 	}
-	return &Fido2WrappingKeyProvider{Metadata: metadata, HMACSecret: secret}, nil
+	return &Fido2WrappingKeyProvider{Metadata: metadata, Device: options}, nil
 }
 
 func NewFido2WrappingKeyProvider(metadata Fido2CredentialMetadata, hmacSecret []byte) (*Fido2WrappingKeyProvider, error) {
@@ -189,7 +201,15 @@ func (p *Fido2WrappingKeyProvider) WrappingKey() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid fido2 salt: %w", err)
 	}
-	reader := hkdf.New(sha256.New, p.HMACSecret, salt, []byte(p.Metadata.DeriveInfo))
+	hmacSecret := p.HMACSecret
+	if len(hmacSecret) == 0 {
+		hmacSecret, err = fido2HMACSecret(p.Metadata, p.Device)
+		if err != nil {
+			return nil, err
+		}
+		defer clearBytes(hmacSecret)
+	}
+	reader := hkdf.New(sha256.New, hmacSecret, salt, []byte(p.Metadata.DeriveInfo))
 	key := make([]byte, MasterKeyLen)
 	if _, err := io.ReadFull(reader, key); err != nil {
 		return nil, fmt.Errorf("failed to derive fido2 wrapping key: %w", err)
@@ -361,19 +381,55 @@ func RestoreMasterKeyBundle(backup []byte, backupWrapping WrappingKeyProvider, o
 	return EncryptMasterKeyBundle(masterKey, outputWrapping, MasterKeyBundleKind)
 }
 
-func fakeFido2HMACSecret() ([]byte, error) {
+func EnrollFido2Metadata(rpID, rpName, deriveInfo string, options Fido2DeviceOptions) (Fido2CredentialMetadata, error) {
+	if _, ok, err := fakeFido2HMACSecret(); ok || err != nil {
+		if err != nil {
+			return Fido2CredentialMetadata{}, err
+		}
+		return NewFido2Metadata(rpID, rpName, deriveInfo)
+	}
+	if strings.TrimSpace(rpID) == "" {
+		return Fido2CredentialMetadata{}, errors.New("rp_id cannot be empty")
+	}
+	if strings.TrimSpace(rpName) == "" {
+		rpName = rpID
+	}
+	if strings.TrimSpace(deriveInfo) == "" {
+		deriveInfo = DefaultFido2DeriveInfo
+	}
+	salt := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return Fido2CredentialMetadata{}, fmt.Errorf("failed to generate fido2 salt: %w", err)
+	}
+	credentialID, err := fido2EnrollCredential(rpID, rpName, options)
+	if err != nil {
+		return Fido2CredentialMetadata{}, err
+	}
+	return Fido2CredentialMetadata{
+		Version:      1,
+		RPID:         rpID,
+		RPName:       rpName,
+		CredentialID: base64.RawURLEncoding.EncodeToString(credentialID),
+		Salt:         base64.RawURLEncoding.EncodeToString(salt),
+		UV:           "discouraged",
+		UP:           true,
+		DeriveInfo:   deriveInfo,
+	}, nil
+}
+
+func fakeFido2HMACSecret() ([]byte, bool, error) {
 	value := os.Getenv(FakeFido2SecretEnvironmentValue)
 	if value == "" {
-		return nil, errors.New("real FIDO2 hmac-secret provider is not implemented in this build; set KNOX_FIDO2_FAKE_SECRET_B64 only for tests")
+		return nil, false, nil
 	}
 	secret, err := base64.StdEncoding.DecodeString(strings.TrimSpace(value))
 	if err != nil {
-		return nil, fmt.Errorf("invalid fake fido2 hmac secret: %w", err)
+		return nil, true, fmt.Errorf("invalid fake fido2 hmac secret: %w", err)
 	}
 	if len(secret) < 32 {
-		return nil, errors.New("fake fido2 hmac secret must be at least 32 bytes")
+		return nil, true, errors.New("fake fido2 hmac secret must be at least 32 bytes")
 	}
-	return secret, nil
+	return secret, true, nil
 }
 
 func validateAbsoluteCleanPath(path, label string) error {

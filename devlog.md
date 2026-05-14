@@ -6,3 +6,5 @@
 [00006] [2026-05-14T02:26:51Z] [IMPLEMENTATION] Added encrypted Knox master-key bundles, configurable master-key loading, and admin commands for metadata creation, initialization, migration, unlock testing, backup, and restore with distinct backup metadata support.
 [00007] [2026-05-14T02:26:51Z] [TEST] Added focused crypto, config, and server command coverage for FIDO2-style master-key wrapping using a test-only hmac-secret provider boundary.
 [00008] [2026-05-14T02:26:51Z] [ISSUE] Tracked the production libfido2 TrustKey hardware provider as knox-1b7 because the current provider boundary intentionally avoids overclaiming hardware support.
+[00009] [2026-05-14T13:01:54Z] [IMPLEMENTATION] Added a libfido2-backed Knox FIDO2 provider for credential enrollment and hmac-secret derivation behind the libfido2 build tag, with default-build stubs that fail explicitly when hardware support is not compiled in.
+[00010] [2026-05-14T13:01:54Z] [TEST] Added stub and opt-in libfido2 integration coverage for FIDO2 master-key wrapping and compile-checked both default and libfido2-tagged crypto/server test paths.

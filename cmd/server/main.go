@@ -210,6 +210,8 @@ func runServer(_ *cobra.Command, _ []string) error {
 		Backend:          cfg.MasterKey.Backend,
 		EncryptedKeyFile: cfg.MasterKey.EncryptedKeyFile,
 		MetadataFile:     cfg.MasterKey.MetadataFile,
+		Device:           cfg.MasterKey.Device,
+		PinFile:          cfg.MasterKey.PinFile,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to load master key with backend %q: %w", cfg.MasterKey.Backend, err)

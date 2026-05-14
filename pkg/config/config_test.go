@@ -28,6 +28,8 @@ master_key:
   backend: "fido2"
   encrypted_key_file: "/var/db/knox/master.key.fido2"
   metadata_file: "/usr/local/etc/knox/fido2-credential.json"
+  device: "auto"
+  pin_file: "/run/knox/fido2.pin"
 auth:
   providers:
     - type: "mtls"
@@ -63,6 +65,8 @@ limits:
 		assert.Equal(t, "fido2", cfg.MasterKey.Backend)
 		assert.Equal(t, "/var/db/knox/master.key.fido2", cfg.MasterKey.EncryptedKeyFile)
 		assert.Equal(t, "/usr/local/etc/knox/fido2-credential.json", cfg.MasterKey.MetadataFile)
+		assert.Equal(t, "auto", cfg.MasterKey.Device)
+		assert.Equal(t, "/run/knox/fido2.pin", cfg.MasterKey.PinFile)
 		assert.Len(t, cfg.Auth.Providers, 1)
 		assert.Equal(t, "mtls", cfg.Auth.Providers[0].Type)
 		assert.Equal(t, "/etc/knox/ca.crt", cfg.Auth.Providers[0].CAFile)
