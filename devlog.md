@@ -9,3 +9,4 @@
 [00009] [2026-05-14T13:01:54Z] [IMPLEMENTATION] Added a libfido2-backed Knox FIDO2 provider for credential enrollment and hmac-secret derivation behind the libfido2 build tag, with default-build stubs that fail explicitly when hardware support is not compiled in.
 [00010] [2026-05-14T13:01:54Z] [TEST] Added stub and opt-in libfido2 integration coverage for FIDO2 master-key wrapping and compile-checked both default and libfido2-tagged crypto/server test paths.
 [00011] [2026-05-14T13:15:20Z] [FIX] Aligned the Knox libfido2 provider with the working kunci/client-data flow and validated real TrustKey T120 enrollment, initialization, unlock, backup, restore, and restored unlock-test commands.
+[00012] [2026-05-14T18:18:37Z] [FIX] Changed libfido2 hmac-secret derivation to avoid requiring user-presence touch during daemon master-key unlock, preserving PIN plus physical authenticator requirements for unattended service startup.
