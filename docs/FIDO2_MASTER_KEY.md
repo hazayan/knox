@@ -46,11 +46,17 @@ the wrapped Knox master key and must be backed up with the storage.
 ## Implementation Status
 
 The current implementation includes the encrypted master-key bundle format,
-server config selection, admin commands, and tests for FIDO2-style wrapping. The
-hardware provider is still a boundary: tests use `KNOX_FIDO2_FAKE_SECRET_B64`
-to supply the hmac-secret output. Production use still needs the libfido2-backed
-provider that talks to the TrustKey device and records the real credential ID at
-enrollment.
+server config selection, admin commands, and a libfido2-backed hardware
+provider. Normal builds keep the fake provider available for tests through
+`KNOX_FIDO2_FAKE_SECRET_B64`; production builds that need TrustKey/FIDO2
+hardware support must be built with:
+
+```sh
+go build -tags libfido2 ./cmd/server
+```
+
+The build host needs libfido2 headers and pkg-config metadata. On FreeBSD that
+means installing the `security/libfido2` package before building the port.
 
 ## Commands
 
@@ -61,23 +67,31 @@ knox-server key fido2-enroll \
   --metadata-file /usr/local/etc/knox/fido2-credential.json \
   --rp-id ishum-knox \
   --rp-name "ishum Knox" \
-  --derive-info "knox master key fido2 v1"
+  --derive-info "knox master key fido2 v1" \
+  --fido2-device auto \
+  --fido2-pin-file /run/knox/fido2.pin
 
 knox-server key init \
   --backend fido2 \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json
+  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --fido2-device auto \
+  --fido2-pin-file /run/knox/fido2.pin
 
 knox-server key migrate \
   --backend fido2 \
   --master-key-file /etc/knox/master.key \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json
+  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --fido2-device auto \
+  --fido2-pin-file /run/knox/fido2.pin
 
 knox-server key unlock-test \
   --backend fido2 \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json
+  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --fido2-device auto \
+  --fido2-pin-file /run/knox/fido2.pin
 ```
 
 Normal server startup must not silently enroll, initialize, migrate, or rewrite
@@ -98,13 +112,17 @@ knox-server key backup \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
   --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
   --backup-fido2-metadata-file /usr/local/etc/knox/backup-fido2-credential.json \
+  --fido2-device auto \
+  --fido2-pin-file /run/knox/fido2.pin \
   --output knox-master-key.knox-backup
 
 knox-server key restore \
   --input knox-master-key.knox-backup \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
   --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
-  --backup-fido2-metadata-file /usr/local/etc/knox/backup-fido2-credential.json
+  --backup-fido2-metadata-file /usr/local/etc/knox/backup-fido2-credential.json \
+  --fido2-device auto \
+  --fido2-pin-file /run/knox/fido2.pin
 ```
 
 Storage backup still needs the selected storage backend data, for example

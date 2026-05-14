@@ -16,6 +16,8 @@ type MasterKeyConfig struct {
 	Backend          string
 	EncryptedKeyFile string
 	MetadataFile     string
+	Device           string
+	PinFile          string
 }
 
 // LoadMasterKey loads the master encryption key from various sources.
@@ -38,7 +40,10 @@ func LoadMasterKeyWithConfig(config MasterKeyConfig) ([]byte, error) {
 		if strings.TrimSpace(config.MetadataFile) == "" {
 			return nil, errors.New("fido2 master key backend requires metadata_file")
 		}
-		wrapping, err := NewFido2WrappingKeyProviderFromMetadataFile(config.MetadataFile)
+		wrapping, err := NewFido2WrappingKeyProviderFromMetadataFileWithOptions(config.MetadataFile, Fido2DeviceOptions{
+			Device:  config.Device,
+			PinFile: config.PinFile,
+		})
 		if err != nil {
 			return nil, err
 		}

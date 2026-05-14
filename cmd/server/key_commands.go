@@ -13,6 +13,8 @@ type keyCommandOptions struct {
 	encryptedKeyFile   string
 	metadataFile       string
 	backupMetadataFile string
+	device             string
+	pinFile            string
 	rpID               string
 	rpName             string
 	deriveInfo         string
@@ -41,7 +43,7 @@ func newKeyFido2EnrollCommand() *cobra.Command {
 		Use:   "fido2-enroll",
 		Short: "Create Knox FIDO2 credential metadata",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			metadata, err := crypto.NewFido2Metadata(opts.rpID, opts.rpName, opts.deriveInfo)
+			metadata, err := crypto.EnrollFido2Metadata(opts.rpID, opts.rpName, opts.deriveInfo, fido2DeviceOptions(opts))
 			if err != nil {
 				return err
 			}
@@ -56,6 +58,7 @@ func newKeyFido2EnrollCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.rpID, "rp-id", "", "FIDO2 relying party ID")
 	cmd.Flags().StringVar(&opts.rpName, "rp-name", "", "FIDO2 relying party display name")
 	cmd.Flags().StringVar(&opts.deriveInfo, "derive-info", crypto.DefaultFido2DeriveInfo, "HKDF info label")
+	addFido2DeviceFlags(cmd, &opts)
 	mustMarkRequired(cmd, "rp-id")
 	return cmd
 }
@@ -161,6 +164,8 @@ func newKeyBackupCommand() *cobra.Command {
 			outputWrapping, err := wrappingProvider(keyCommandOptions{
 				backend:      opts.backend,
 				metadataFile: backupMetadataFile,
+				device:       opts.device,
+				pinFile:      opts.pinFile,
 			})
 			if err != nil {
 				return err
@@ -200,6 +205,8 @@ func newKeyRestoreCommand() *cobra.Command {
 			backupWrapping, err := wrappingProvider(keyCommandOptions{
 				backend:      opts.backend,
 				metadataFile: backupMetadataFile,
+				device:       opts.device,
+				pinFile:      opts.pinFile,
 			})
 			if err != nil {
 				return err
@@ -230,14 +237,27 @@ func addMasterKeyBundleFlags(cmd *cobra.Command, opts *keyCommandOptions) {
 	cmd.Flags().StringVar(&opts.backend, "backend", "fido2", "Master key wrapping backend")
 	cmd.Flags().StringVar(&opts.encryptedKeyFile, "encrypted-key-file", "/var/db/knox/master.key.fido2", "Encrypted Knox master-key bundle path")
 	cmd.Flags().StringVar(&opts.metadataFile, "fido2-metadata-file", "/usr/local/etc/knox/fido2-credential.json", "FIDO2 credential metadata file")
+	addFido2DeviceFlags(cmd, opts)
 }
 
 func wrappingProvider(opts keyCommandOptions) (crypto.WrappingKeyProvider, error) {
 	switch opts.backend {
 	case "fido2":
-		return crypto.NewFido2WrappingKeyProviderFromMetadataFile(opts.metadataFile)
+		return crypto.NewFido2WrappingKeyProviderFromMetadataFileWithOptions(opts.metadataFile, fido2DeviceOptions(opts))
 	default:
 		return nil, fmt.Errorf("unsupported wrapping backend: %s", opts.backend)
+	}
+}
+
+func addFido2DeviceFlags(cmd *cobra.Command, opts *keyCommandOptions) {
+	cmd.Flags().StringVar(&opts.device, "fido2-device", "auto", "FIDO2 device path or auto")
+	cmd.Flags().StringVar(&opts.pinFile, "fido2-pin-file", "", "File containing the FIDO2 PIN")
+}
+
+func fido2DeviceOptions(opts keyCommandOptions) crypto.Fido2DeviceOptions {
+	return crypto.Fido2DeviceOptions{
+		Device:  opts.device,
+		PinFile: opts.pinFile,
 	}
 }
 
