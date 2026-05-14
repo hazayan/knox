@@ -151,6 +151,7 @@ func main() {
 		Long:  `Knox is a service for storing and rotating secrets, keys, and passwords.`,
 		RunE:  runServer,
 	}
+	rootCmd.AddCommand(newKeyCommand())
 
 	rootCmd.Flags().StringVarP(&cfgFile, "config", "c", "/etc/knox/server.yaml", "Path to configuration file")
 	rootCmd.Flags().String("version", "", "Print version and exit")
@@ -205,9 +206,13 @@ func runServer(_ *cobra.Command, _ []string) error {
 	logging.Info("Storage backend health check passed")
 
 	// Load master encryption key
-	masterKey, err := crypto.LoadMasterKey()
+	masterKey, err := crypto.LoadMasterKeyWithConfig(crypto.MasterKeyConfig{
+		Backend:          cfg.MasterKey.Backend,
+		EncryptedKeyFile: cfg.MasterKey.EncryptedKeyFile,
+		MetadataFile:     cfg.MasterKey.MetadataFile,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to load master key: %w (set KNOX_MASTER_KEY env var)", err)
+		return fmt.Errorf("failed to load master key with backend %q: %w", cfg.MasterKey.Backend, err)
 	}
 	logging.Info("Master encryption key loaded successfully")
 

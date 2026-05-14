@@ -11,12 +11,44 @@ import (
 	"strings"
 )
 
+// MasterKeyConfig selects how the Knox master key is loaded.
+type MasterKeyConfig struct {
+	Backend          string
+	EncryptedKeyFile string
+	MetadataFile     string
+}
+
 // LoadMasterKey loads the master encryption key from various sources.
 // Priority order:
 // 1. KNOX_MASTER_KEY environment variable (base64 or hex encoded)
 // 2. KNOX_MASTER_KEY_FILE environment variable (path to key file)
 // 3. Default key file location.
 func LoadMasterKey() ([]byte, error) {
+	return LoadMasterKeyWithConfig(MasterKeyConfig{})
+}
+
+func LoadMasterKeyWithConfig(config MasterKeyConfig) ([]byte, error) {
+	switch strings.TrimSpace(config.Backend) {
+	case "", "env", "file", "default":
+		return loadLegacyMasterKey()
+	case "fido2":
+		if strings.TrimSpace(config.EncryptedKeyFile) == "" {
+			return nil, errors.New("fido2 master key backend requires encrypted_key_file")
+		}
+		if strings.TrimSpace(config.MetadataFile) == "" {
+			return nil, errors.New("fido2 master key backend requires metadata_file")
+		}
+		wrapping, err := NewFido2WrappingKeyProviderFromMetadataFile(config.MetadataFile)
+		if err != nil {
+			return nil, err
+		}
+		return DecryptMasterKeyBundleFile(config.EncryptedKeyFile, wrapping)
+	default:
+		return nil, fmt.Errorf("unsupported master key backend: %s", config.Backend)
+	}
+}
+
+func loadLegacyMasterKey() ([]byte, error) {
 	// Try environment variable first
 	if keyStr := os.Getenv("KNOX_MASTER_KEY"); keyStr != "" {
 		return decodeMasterKey(keyStr)
