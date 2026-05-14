@@ -98,6 +98,11 @@ The server needs a 32-byte master key. Supported sources, in priority order:
 2. `KNOX_MASTER_KEY_FILE`, pointing to an absolute path
 3. `/etc/knox/master.key`
 
+The planned hardened deployment wraps this master key with a local FIDO2
+authenticator using the hmac-secret extension. See
+[FIDO2 Master Key Wrapping](docs/FIDO2_MASTER_KEY.md) for the design and backup
+requirements.
+
 Key files must be owner-only, for example:
 
 ```bash
@@ -162,5 +167,6 @@ Current stabilization state:
 - [Architecture](docs/ARCHITECTURE.md)
 - [CLI Guide](docs/CLI_GUIDE.md)
 - [D-Bus Guide](docs/DBUS_GUIDE.md)
+- [FIDO2 Master Key Wrapping](docs/FIDO2_MASTER_KEY.md)
 - [Operations](docs/OPERATIONS.md)
 - [Documentation Index](docs/INDEX.md)

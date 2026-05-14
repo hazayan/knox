@@ -57,6 +57,18 @@ Exact user-service commands vary by service manager.
 Backups are only useful if they include the encrypted storage and the master key
 material needed to decrypt it.
 
+For the planned FIDO2-backed master-key mode, backup must include:
+
+- the Knox storage backend data,
+- the encrypted master-key bundle,
+- the non-secret FIDO2 metadata for the restore target,
+- a tested encrypted backup artifact for the master key.
+
+Use a distinct FIDO2 credential for backup artifacts where possible. Sharing the
+same physical authenticator with other trust services is acceptable, but Knox
+should use its own credential and metadata. See
+[FIDO2 Master Key Wrapping](FIDO2_MASTER_KEY.md).
+
 For the filesystem backend:
 
 1. Stop `knox-server`.

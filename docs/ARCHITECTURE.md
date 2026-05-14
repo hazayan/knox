@@ -94,12 +94,19 @@ Master key sources:
 2. `KNOX_MASTER_KEY_FILE`
 3. `/etc/knox/master.key`
 
+Planned hardened deployments should add a FIDO2-backed master-key source. In
+that mode the persisted master key is an encrypted local bundle, and the
+wrapping key is derived from the authenticator's hmac-secret output. This should
+mirror the kunci-server keystore pattern while using a Knox-specific RP ID,
+credential, salt, and metadata file.
+
 The default operational path should document and test:
 
 - generating a master key
 - file permission checks
+- FIDO2 enrollment and unlock-test behavior
 - server restart behavior
-- backup and restore
+- backup and restore, including a FIDO2-encrypted backup artifact
 - rotation without data loss
 
 The TLA+ specs under `spec/tla` describe intended safety properties. They verify
