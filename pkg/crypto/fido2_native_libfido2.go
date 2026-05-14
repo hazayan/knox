@@ -171,7 +171,7 @@ static int knox_fido2_hmac_secret(
 	if ((rc = fido_assert_set_hmac_salt(assert, salt, salt_len)) != FIDO_OK) {
 		goto out;
 	}
-	if ((rc = fido_assert_set_up(assert, FIDO_OPT_TRUE)) != FIDO_OK) {
+	if ((rc = fido_assert_set_up(assert, FIDO_OPT_FALSE)) != FIDO_OK) {
 		goto out;
 	}
 	if ((rc = fido_assert_set_uv(assert, FIDO_OPT_FALSE)) != FIDO_OK) {
