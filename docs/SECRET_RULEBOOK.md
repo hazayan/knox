@@ -151,7 +151,7 @@ build:foji-bsd:prod:signing-key
 Host-bound FIDO2 PIN:
 
 ```text
-host:identity-a:prod:pin:fido2
+host:identity-primary:prod:pin:fido2
 ```
 
 Kanidm backup artifact passphrase:

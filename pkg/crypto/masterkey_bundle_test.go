@@ -15,7 +15,7 @@ import (
 
 func testFido2Provider(t *testing.T, info string) *crypto.Fido2WrappingKeyProvider {
 	t.Helper()
-	metadata, err := crypto.NewFido2Metadata("identity-a-knox", "identity-a Knox", info)
+	metadata, err := crypto.NewFido2Metadata("fixture-knox", "Fixture Knox", info)
 	require.NoError(t, err)
 	provider, err := crypto.NewFido2WrappingKeyProvider(metadata, []byte("0123456789abcdef0123456789abcdef"))
 	require.NoError(t, err)
@@ -24,7 +24,7 @@ func testFido2Provider(t *testing.T, info string) *crypto.Fido2WrappingKeyProvid
 
 func TestFido2MetadataRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "fido2.json")
-	metadata, err := crypto.NewFido2Metadata("identity-a-knox", "identity-a Knox", crypto.DefaultFido2DeriveInfo)
+	metadata, err := crypto.NewFido2Metadata("fixture-knox", "Fixture Knox", crypto.DefaultFido2DeriveInfo)
 	require.NoError(t, err)
 
 	err = crypto.SaveFido2Metadata(path, metadata)
@@ -119,7 +119,7 @@ func TestLoadMasterKeyWithFido2ConfigUsesBundle(t *testing.T) {
 	secret := []byte("0123456789abcdef0123456789abcdef")
 	t.Setenv(crypto.FakeFido2SecretEnvironmentValue, base64.StdEncoding.EncodeToString(secret))
 
-	metadata, err := crypto.NewFido2Metadata("identity-a-knox", "identity-a Knox", crypto.DefaultFido2DeriveInfo)
+	metadata, err := crypto.NewFido2Metadata("fixture-knox", "Fixture Knox", crypto.DefaultFido2DeriveInfo)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SaveFido2Metadata(metadataPath, metadata))
 	provider, err := crypto.NewFido2WrappingKeyProvider(metadata, secret)

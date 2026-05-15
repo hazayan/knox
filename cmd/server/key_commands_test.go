@@ -22,13 +22,13 @@ func TestKeyCommandsInitUnlockBackupRestore(t *testing.T) {
 	cmd := newKeyFido2EnrollCommand()
 	cmd.SetArgs([]string{
 		"--metadata-file", metadataPath,
-		"--rp-id", "identity-a-knox",
-		"--rp-name", "identity-a Knox",
+		"--rp-id", "fixture-knox",
+		"--rp-name", "Fixture Knox",
 	})
 	require.NoError(t, cmd.Execute())
 	assert.FileExists(t, metadataPath)
 
-	backupMetadata, err := crypto.NewFido2Metadata("identity-a-knox-backup", "identity-a Knox backup", crypto.DefaultFido2BackupDeriveInfo)
+	backupMetadata, err := crypto.NewFido2Metadata("fixture-knox-backup", "Fixture Knox backup", crypto.DefaultFido2BackupDeriveInfo)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SaveFido2Metadata(backupMetadataPath, backupMetadata))
 
@@ -85,7 +85,7 @@ func TestKeyMigrateCommand(t *testing.T) {
 	bundlePath := filepath.Join(dir, "master.key.fido2")
 	t.Setenv(crypto.FakeFido2SecretEnvironmentValue, base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef")))
 
-	metadata, err := crypto.NewFido2Metadata("identity-a-knox", "identity-a Knox", crypto.DefaultFido2DeriveInfo)
+	metadata, err := crypto.NewFido2Metadata("fixture-knox", "Fixture Knox", crypto.DefaultFido2DeriveInfo)
 	require.NoError(t, err)
 	require.NoError(t, crypto.SaveFido2Metadata(metadataPath, metadata))
 	masterKey, err := crypto.GenerateMasterKey()

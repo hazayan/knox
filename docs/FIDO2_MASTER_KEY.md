@@ -24,9 +24,9 @@ protects at-rest material and restart/unlock paths. It does not protect secrets
 from a fully compromised running server process.
 
 Use a separate credential from other services on the same physical
-authenticator. Sharing the TrustKey device with `kunci-server` is acceptable,
-but Knox should use its own RP ID, credential ID, salt, metadata file, and
-backup credential.
+authenticator. Sharing a physical authenticator with `kunci-server` is
+acceptable, but Knox should use its own RP ID, credential ID, salt, metadata
+file, and backup credential.
 
 ## Proposed Config
 
@@ -48,7 +48,7 @@ the wrapped Knox master key and must be backed up with the storage.
 The current implementation includes the encrypted master-key bundle format,
 server config selection, admin commands, and a libfido2-backed hardware
 provider. Normal builds keep the fake provider available for tests through
-`KNOX_FIDO2_FAKE_SECRET_B64`; production builds that need TrustKey/FIDO2
+`KNOX_FIDO2_FAKE_SECRET_B64`; production builds that need hardware FIDO2
 hardware support must be built with:
 
 ```sh
@@ -65,8 +65,8 @@ All sensitive state changes are explicit:
 ```sh
 knox-server key fido2-enroll \
   --metadata-file /usr/local/etc/knox/fido2-credential.json \
-  --rp-id identity-a-knox \
-  --rp-name "identity-a Knox" \
+  --rp-id identity-primary-knox \
+  --rp-name "Identity Primary Knox" \
   --derive-info "knox master key fido2 v1" \
   --fido2-device auto \
   --fido2-pin-file /run/knox/fido2.pin
