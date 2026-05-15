@@ -162,8 +162,9 @@ knox server info --json
 ```
 
 Profiles with explicit `http://` or `https://` server URLs use that scheme.
-Profiles without a scheme use HTTPS when TLS files are configured and HTTP
-otherwise.
+Profiles can also set `scheme: "http"` or `scheme: "https"` alongside a plain
+`server: "host:port"` value. Profiles without either form use HTTPS when TLS
+files are configured and HTTP otherwise.
 
 ## Authentication
 

@@ -233,6 +233,13 @@ func NewClient(host string, client HTTP, authHandlers []AuthHandler, keyFolder, 
 	}
 }
 
+func NewClientWithScheme(host, scheme string, client HTTP, authHandlers []AuthHandler, keyFolder, version string) APIClient {
+	return &HTTPClient{
+		KeyFolder:      keyFolder,
+		UncachedClient: NewUncachedClientWithScheme(host, scheme, client, authHandlers, version),
+	}
+}
+
 // validateCacheFilePath ensures the cache file path is safe and allowed.
 func validateCacheFilePath(baseDir, file string) (string, error) {
 	if file == "" {
@@ -391,6 +398,8 @@ func (c *HTTPClient) UpdateVersion(keyID, versionID string, status types.Version
 type UncachedHTTPClient struct {
 	// Host is used as the host for http connections
 	Host string
+	// Scheme is the HTTP transport scheme, usually http or https.
+	Scheme string
 	// AuthHandlers contains a list of auth handlers which return the authorization string for authenticating to knox. Users should be prefixed by 0u, machines by 0m. On fail, return empty string.
 	AuthHandlers []AuthHandler
 	// DefaultClient is the http client for making network calls
@@ -402,8 +411,21 @@ type UncachedHTTPClient struct {
 // NewUncachedClient creates a new uncached client to connect to talk to Knox.
 // NOTE: passing multiple authHandlers can cause severe performance issues, use with caution.
 func NewUncachedClient(host string, client HTTP, authHandlers []AuthHandler, version string) *UncachedHTTPClient {
+	scheme, cleanHost := normalizeEndpoint("https", host)
 	return &UncachedHTTPClient{
-		Host:          host,
+		Host:          cleanHost,
+		Scheme:        scheme,
+		DefaultClient: client,
+		AuthHandlers:  authHandlers,
+		Version:       version,
+	}
+}
+
+func NewUncachedClientWithScheme(host, scheme string, client HTTP, authHandlers []AuthHandler, version string) *UncachedHTTPClient {
+	normalizedScheme, cleanHost := normalizeEndpoint(scheme, host)
+	return &UncachedHTTPClient{
+		Host:          cleanHost,
+		Scheme:        normalizedScheme,
 		DefaultClient: client,
 		AuthHandlers:  authHandlers,
 		Version:       version,
@@ -574,7 +596,7 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 		for i := 1; i <= maxRetryAttempts; i++ {
 			// Create a fresh request for each attempt because request bodies are
 			// consumed by the transport and cannot be safely reused on retry.
-			r, err := http.NewRequest(method, "https://"+c.Host+path, bytes.NewBufferString(encodedBody))
+			r, err := http.NewRequest(method, c.baseURL()+path, bytes.NewBufferString(encodedBody))
 			if err != nil {
 				return err
 			}
@@ -615,6 +637,31 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 	return fmt.Errorf("%w: attempted auth types: %v", errUnsuccessfulAuth, attemptedAuthTypes)
 }
 
+func (c *UncachedHTTPClient) baseURL() string {
+	scheme, host := normalizeEndpoint(c.Scheme, c.Host)
+	return scheme + "://" + host
+}
+
+func normalizeEndpoint(defaultScheme, endpoint string) (string, string) {
+	scheme := strings.ToLower(strings.TrimSpace(defaultScheme))
+	if scheme == "" {
+		scheme = "https"
+	}
+	if scheme != "http" && scheme != "https" {
+		scheme = "https"
+	}
+
+	host := strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if parsed, err := url.Parse(host); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+		parsedScheme := strings.ToLower(parsed.Scheme)
+		if parsedScheme == "http" || parsedScheme == "https" {
+			scheme = parsedScheme
+		}
+		host = parsed.Host
+	}
+	return scheme, host
+}
+
 func getHTTPResp(cli HTTP, r *http.Request, resp *types.Response) error {
 	w, err := cli.Do(r)
 	if err != nil {
@@ -631,7 +678,8 @@ func MockClient(host, keyFolder string) *HTTPClient {
 	return &HTTPClient{
 		KeyFolder: keyFolder,
 		UncachedClient: &UncachedHTTPClient{
-			Host: host,
+			Host:   host,
+			Scheme: "https",
 			AuthHandlers: []AuthHandler{func() (string, string, HTTP) {
 				return "TESTAUTH", "TESTAUTHTYPE", nil
 			}},

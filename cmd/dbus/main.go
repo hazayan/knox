@@ -129,8 +129,9 @@ func createKnoxClient(cfg *config.DBusConfig) (client.APIClient, error) {
 	authHandlers := createAuthHandlers(cfg)
 
 	// Create Knox client
-	knoxClient := client.NewClient(
+	knoxClient := client.NewClientWithScheme(
 		cfg.Knox.Server,
+		cfg.Knox.Scheme,
 		httpClient,
 		authHandlers,
 		"", // No cache for D-Bus bridge

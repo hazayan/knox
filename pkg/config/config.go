@@ -120,6 +120,7 @@ type ClientConfig struct {
 // ClientProfile represents a client connection profile.
 type ClientProfile struct {
 	Server string          `mapstructure:"server" json:"server" yaml:"server"`
+	Scheme string          `mapstructure:"scheme" json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	TLS    ClientTLSConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
 	Cache  CacheConfig     `mapstructure:"cache" json:"cache" yaml:"cache"`
 }
@@ -154,6 +155,7 @@ type DBusConnectionConfig struct {
 // DBusKnoxConfig holds Knox server configuration for the D-Bus bridge.
 type DBusKnoxConfig struct {
 	Server          string            `mapstructure:"server"`
+	Scheme          string            `mapstructure:"scheme"`
 	TLS             ClientTLSConfig   `mapstructure:"tls"`
 	NamespacePrefix string            `mapstructure:"namespace_prefix"`
 	PrefixMappings  map[string]string `mapstructure:"prefix_mappings"`
@@ -217,6 +219,7 @@ func LoadClientConfig(path string) (*ClientConfig, error) {
 				Profiles: map[string]ClientProfile{
 					"default": {
 						Server: "localhost:9000",
+						Scheme: "http",
 						Cache: CacheConfig{
 							Enabled:   true,
 							Directory: cacheDir,
@@ -246,6 +249,7 @@ func LoadDBusConfig(path string) (*DBusConfig, error) {
 	v.SetDefault("dbus.bus_type", "session")
 	v.SetDefault("dbus.service_name", "org.freedesktop.secrets")
 	v.SetDefault("knox.server", "localhost:9000")
+	v.SetDefault("knox.scheme", "http")
 	v.SetDefault("knox.namespace_prefix", "dbus")
 	v.SetDefault("encryption.algorithms", []string{"plain", "dh-ietf1024-sha256-aes128-cbc-pkcs7"})
 

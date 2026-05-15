@@ -38,6 +38,23 @@ func TestNewClient(t *testing.T) {
 	})
 }
 
+func TestUncachedHTTPClientEndpointScheme(t *testing.T) {
+	t.Run("DefaultPreservesHTTPSCompatibility", func(t *testing.T) {
+		client := NewUncachedClient("localhost:8080", nil, nil, "1.0.0")
+		assert.Equal(t, "https://localhost:8080", client.baseURL())
+	})
+
+	t.Run("ExplicitHTTP", func(t *testing.T) {
+		client := NewUncachedClientWithScheme("localhost:8080", "http", nil, nil, "1.0.0")
+		assert.Equal(t, "http://localhost:8080", client.baseURL())
+	})
+
+	t.Run("ServerURLOverridesScheme", func(t *testing.T) {
+		client := NewUncachedClientWithScheme("http://localhost:8080/", "https", nil, nil, "1.0.0")
+		assert.Equal(t, "http://localhost:8080", client.baseURL())
+	})
+}
+
 // TestValidateCacheFilePath tests the cache file path validation.
 func TestValidateCacheFilePath(t *testing.T) {
 	tempDir := t.TempDir()

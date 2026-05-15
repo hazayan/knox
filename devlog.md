@@ -13,3 +13,4 @@
 [00013] [2026-05-14T22:04:01Z] [FIX] Restored user-presence requests for libfido2 hmac-secret derivation after hardware validation showed the attached authenticator rejects UP=false with FIDO_ERR_UP_REQUIRED.
 [00014] [2026-05-15T21:40:07Z] [DOCUMENTATION] Added a Knox secret rulebook covering operator secret requests, secret naming conventions, Kha references, rotation, and bootstrap-secret handling.
 [00015] [2026-05-15T22:02:38Z] [SECURITY] Sanitized current-tree FIDO2 examples, tests, and operational notes to remove host-specific and hardware-model details before continuing repository scrub work.
+[00016] [2026-05-15T22:36:28Z] [FIX] Made Knox API transport scheme configurable for CLI, D-Bus, and client-library communication so HTTP can be used until TLS provisioning is ready.

@@ -125,6 +125,10 @@ Initialize client configuration:
 knox config init --server 127.0.0.1:9000
 ```
 
+Client and D-Bus profiles use `scheme: "http"` or `scheme: "https"` with a
+plain `host:port` server value. A full `http://` or `https://` server URL also
+works and takes precedence over the separate scheme field.
+
 Common workflows:
 
 ```bash

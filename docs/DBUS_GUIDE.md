@@ -61,6 +61,7 @@ dbus:
 
 knox:
   server: "localhost:9000"  # Knox server address
+  scheme: "http"            # Use "https" once TLS is configured
   tls:
     ca_cert: ""
     client_cert: ""

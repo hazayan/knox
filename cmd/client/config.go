@@ -31,6 +31,7 @@ func newConfigCmd() *cobra.Command {
 func newConfigInitCmd() *cobra.Command {
 	var (
 		server     string
+		scheme     string
 		caCert     string
 		clientCert string
 		clientKey  string
@@ -69,6 +70,7 @@ Examples:
 				Profiles: map[string]config.ClientProfile{
 					"default": {
 						Server: server,
+						Scheme: scheme,
 						TLS: config.ClientTLSConfig{
 							CACert:     caCert,
 							ClientCert: clientCert,
@@ -99,6 +101,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVar(&server, "server", "localhost:9000", "Knox server address")
+	cmd.Flags().StringVar(&scheme, "scheme", "http", "Knox server URL scheme (http or https)")
 	cmd.Flags().StringVar(&caCert, "ca-cert", "", "CA certificate file")
 	cmd.Flags().StringVar(&clientCert, "client-cert", "", "Client certificate file")
 	cmd.Flags().StringVar(&clientKey, "client-key", "", "Client key file")
@@ -186,6 +189,7 @@ func newConfigProfileCmd() *cobra.Command {
 func newConfigProfileAddCmd() *cobra.Command {
 	var (
 		server     string
+		scheme     string
 		caCert     string
 		clientCert string
 		clientKey  string
@@ -227,6 +231,7 @@ Examples:
 			// Add new profile
 			localCfg.Profiles[profileName] = config.ClientProfile{
 				Server: server,
+				Scheme: scheme,
 				TLS: config.ClientTLSConfig{
 					CACert:     caCert,
 					ClientCert: clientCert,
@@ -255,6 +260,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVar(&server, "server", "", "Knox server address (required)")
+	cmd.Flags().StringVar(&scheme, "scheme", "http", "Knox server URL scheme (http or https)")
 	cmd.Flags().StringVar(&caCert, "ca-cert", "", "CA certificate file")
 	cmd.Flags().StringVar(&clientCert, "client-cert", "", "Client certificate file")
 	cmd.Flags().StringVar(&clientKey, "client-key", "", "Client key file")
@@ -497,6 +503,7 @@ dbus:
 knox:
   # Knox server connection
   server: "localhost:9000"
+  scheme: "http"
 
   # TLS Configuration (optional)
   tls:
