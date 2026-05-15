@@ -162,6 +162,10 @@ func serverBaseURL(prof *config.ClientProfile) string {
 	if strings.HasPrefix(server, "http://") || strings.HasPrefix(server, "https://") {
 		return server
 	}
+	scheme := strings.ToLower(strings.TrimSpace(prof.Scheme))
+	if scheme == "http" || scheme == "https" {
+		return scheme + "://" + server
+	}
 	if profileUsesTLS(prof) {
 		return "https://" + server
 	}

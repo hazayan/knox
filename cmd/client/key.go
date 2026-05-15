@@ -585,7 +585,7 @@ func getAPIClient() (client.APIClient, error) {
 		}
 	}
 
-	knoxClient := client.NewClient(prof.Server, httpClient, authHandlers, cacheFolder, version)
+	knoxClient := client.NewClientWithScheme(prof.Server, prof.Scheme, httpClient, authHandlers, cacheFolder, version)
 	return knoxClient, nil
 }
 

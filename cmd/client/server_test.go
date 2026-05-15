@@ -84,6 +84,7 @@ func TestServerInfoCmdJSON(t *testing.T) {
 func TestServerBaseURL(t *testing.T) {
 	assert.Equal(t, "http://localhost:9000", serverBaseURL(&config.ClientProfile{Server: "localhost:9000"}))
 	assert.Equal(t, "http://127.0.0.1:9000", serverBaseURL(&config.ClientProfile{Server: "http://127.0.0.1:9000/"}))
+	assert.Equal(t, "https://localhost:9000", serverBaseURL(&config.ClientProfile{Server: "localhost:9000", Scheme: "https"}))
 	assert.Equal(t, "https://localhost:9000", serverBaseURL(&config.ClientProfile{
 		Server: "localhost:9000",
 		TLS: config.ClientTLSConfig{

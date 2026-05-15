@@ -10,6 +10,7 @@ dbus:
 knox:
   # Knox server address
   server: "localhost:9000"
+  scheme: "http"
 
   # TLS configuration
   tls:
