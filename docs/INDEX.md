@@ -8,4 +8,6 @@
    key design and backup model
 6. **[OPERATIONS](OPERATIONS.md)** - Unix operations, backups, and local health
    checks
-7. **[EXAMPLES](examples)** - Generic service and D-Bus configuration templates
+7. **[SECRET RULEBOOK](SECRET_RULEBOOK.md)** - Secret request workflow and
+   naming policy for Knox-backed automation
+8. **[EXAMPLES](examples)** - Generic service and D-Bus configuration templates

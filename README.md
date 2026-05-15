@@ -169,4 +169,5 @@ Current stabilization state:
 - [D-Bus Guide](docs/DBUS_GUIDE.md)
 - [FIDO2 Master Key Wrapping](docs/FIDO2_MASTER_KEY.md)
 - [Operations](docs/OPERATIONS.md)
+- [Secret Rulebook](docs/SECRET_RULEBOOK.md)
 - [Documentation Index](docs/INDEX.md)

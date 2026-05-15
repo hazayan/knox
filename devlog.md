@@ -11,3 +11,4 @@
 [00011] [2026-05-14T13:15:20Z] [FIX] Aligned the Knox libfido2 provider with the working kunci/client-data flow and validated real TrustKey T120 enrollment, initialization, unlock, backup, restore, and restored unlock-test commands.
 [00012] [2026-05-14T18:18:37Z] [FIX] Changed libfido2 hmac-secret derivation to avoid requiring user-presence touch during daemon master-key unlock, preserving PIN plus physical authenticator requirements for unattended service startup.
 [00013] [2026-05-14T22:04:01Z] [FIX] Restored user-presence requests for libfido2 hmac-secret derivation after identity-a validation showed the attached token rejects UP=false with FIDO_ERR_UP_REQUIRED.
+[00014] [2026-05-15T21:40:07Z] [DOCUMENTATION] Added a Knox secret rulebook covering operator secret requests, secret naming conventions, Kha references, rotation, and bootstrap-secret handling.
