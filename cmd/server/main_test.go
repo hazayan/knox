@@ -39,6 +39,41 @@ type apiResponse struct {
 	Data      json.RawMessage `json:"data"`
 }
 
+const testFido2SigningKey = "0123456789abcdef0123456789abcdef"
+
+func configureTestFido2Auth(t *testing.T, cfg *config.ServerConfig) {
+	t.Helper()
+
+	keyFile := filepath.Join(t.TempDir(), "fido2-token.key")
+	require.NoError(t, os.WriteFile(keyFile, []byte(testFido2SigningKey+"\n"), 0o600))
+	credentialsFile := filepath.Join(t.TempDir(), "fido2-principals.json")
+	cfg.Auth = config.AuthConfig{
+		Fido2: config.Fido2AuthConfig{
+			Enabled:             true,
+			RPID:                "localhost",
+			RPName:              "Knox Test",
+			Origins:             []string{"https://localhost"},
+			TokenIssuer:         "knox-test",
+			TokenTTL:            "15m",
+			TokenSigningKeyFile: keyFile,
+			CredentialsFile:     credentialsFile,
+		},
+		Providers: []config.AuthProviderConfig{
+			{Type: "fido2"},
+		},
+	}
+}
+
+func testFido2AuthToken(t *testing.T) string {
+	t.Helper()
+
+	issuer, err := auth.NewFido2TokenIssuer("knox-test", []byte(testFido2SigningKey), 15*time.Minute)
+	require.NoError(t, err)
+	token, _, err := issuer.MintUserToken("testuser", []string{"testgroup"})
+	require.NoError(t, err)
+	return token
+}
+
 type failingPingBackend struct{}
 
 func (failingPingBackend) GetKey(context.Context, string) (*types.Key, error) {
@@ -491,7 +526,7 @@ func TestKeyOperations(t *testing.T) {
 	defer testServer.Close()
 
 	client := createTestClient(t, testServer)
-	authToken := "test-token"
+	authToken := testFido2AuthToken(t)
 
 	t.Run("CreateKey", func(t *testing.T) {
 		// Create key
@@ -678,7 +713,7 @@ func TestAuthentication(t *testing.T) {
 	})
 
 	t.Run("AuthenticatedRequest", func(t *testing.T) {
-		resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/test-key/", "GET", "valid-token", nil)
+		resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/test-key/", "GET", testFido2AuthToken(t), nil)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
@@ -693,7 +728,7 @@ func TestErrorHandling(t *testing.T) {
 	defer testServer.Close()
 
 	client := createTestClient(t, testServer)
-	authToken := "test-token"
+	authToken := testFido2AuthToken(t)
 
 	t.Run("NonExistentKey", func(t *testing.T) {
 		resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/non-existent-key/", "GET", authToken, nil)
@@ -706,7 +741,7 @@ func TestErrorHandling(t *testing.T) {
 	t.Run("InvalidJSON", func(t *testing.T) {
 		req, err := http.NewRequest("POST", testServer.URL+"/v0/keys/", strings.NewReader("invalid json"))
 		require.NoError(t, err)
-		req.Header.Set("Authorization", "Token "+authToken)
+		req.Header.Set("Authorization", "0u"+authToken)
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := client.Do(req)
@@ -756,13 +791,6 @@ func TestStorageBackends(t *testing.T) {
 				Backend:       "filesystem",
 				FilesystemDir: tmpDir,
 			},
-			Auth: config.AuthConfig{
-				Providers: []config.AuthProviderConfig{
-					{
-						Type: "mock",
-					},
-				},
-			},
 			Observability: config.ObservabilityConfig{
 				Logging: config.LoggingConfig{
 					Level:  "error",
@@ -770,6 +798,7 @@ func TestStorageBackends(t *testing.T) {
 				},
 			},
 		}
+		configureTestFido2Auth(t, cfg)
 
 		testServer, err := createTestServer(cfg)
 		require.NoError(t, err)
@@ -790,13 +819,6 @@ func TestStorageBackends(t *testing.T) {
 				Backend:    "sqlite",
 				SQLitePath: filepath.Join(t.TempDir(), "knox.db"),
 			},
-			Auth: config.AuthConfig{
-				Providers: []config.AuthProviderConfig{
-					{
-						Type: "mock",
-					},
-				},
-			},
 			Observability: config.ObservabilityConfig{
 				Logging: config.LoggingConfig{
 					Level:  "error",
@@ -804,6 +826,7 @@ func TestStorageBackends(t *testing.T) {
 				},
 			},
 		}
+		configureTestFido2Auth(t, cfg)
 
 		testServer, err := createTestServer(cfg)
 		require.NoError(t, err)
@@ -829,11 +852,6 @@ func TestFilesystemBackendPersistsAcrossRestartWithSameMasterKey(t *testing.T) {
 			Backend:       "filesystem",
 			FilesystemDir: tmpDir,
 		},
-		Auth: config.AuthConfig{
-			Providers: []config.AuthProviderConfig{
-				{Type: "mock"},
-			},
-		},
 		Observability: config.ObservabilityConfig{
 			Logging: config.LoggingConfig{
 				Level:  "error",
@@ -841,13 +859,14 @@ func TestFilesystemBackendPersistsAcrossRestartWithSameMasterKey(t *testing.T) {
 			},
 		},
 	}
+	configureTestFido2Auth(t, cfg)
 
 	firstServer, err := createTestServerWithMasterKey(cfg, masterKey)
 	require.NoError(t, err)
 	require.NoError(t, firstServer.Start())
 
 	client := createTestClient(t, firstServer.Server)
-	authToken := "test-token"
+	authToken := testFido2AuthToken(t)
 	keyID := "restore:test:key"
 	secret := []byte("persistent-secret")
 
@@ -903,13 +922,13 @@ func TestFilesystemBackupRestoreWithMasterKeyFile(t *testing.T) {
 	loadedMasterKey, err := crypto.LoadMasterKey()
 	require.NoError(t, err)
 
-	cfg := filesystemServerConfig(sourceDir)
+	cfg := filesystemServerConfig(t, sourceDir)
 	sourceServer, err := createTestServerWithMasterKey(cfg, loadedMasterKey)
 	require.NoError(t, err)
 	require.NoError(t, sourceServer.Start())
 
 	client := createTestClient(t, sourceServer.Server)
-	authToken := "test-token"
+	authToken := testFido2AuthToken(t)
 	keyID := "backup:test:key"
 	originalSecret := []byte("backup-secret")
 	rotatedSecret := []byte("restored-rotation-secret")
@@ -933,7 +952,7 @@ func TestFilesystemBackupRestoreWithMasterKeyFile(t *testing.T) {
 	restoredMasterKey, err := crypto.LoadMasterKey()
 	require.NoError(t, err)
 
-	restoredCfg := filesystemServerConfig(restoredDir)
+	restoredCfg := filesystemServerConfig(t, restoredDir)
 	restoredServer, err := createTestServerWithMasterKey(restoredCfg, restoredMasterKey)
 	require.NoError(t, err)
 	require.NoError(t, restoredServer.Start())
@@ -976,7 +995,7 @@ func TestMiddlewareStack(t *testing.T) {
 	t.Run("MetricsTracking", func(t *testing.T) {
 		// Make a few requests to generate metrics
 		for range 3 {
-			resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/test-metric/", "GET", "test-token", nil)
+			resp, err := makeAuthenticatedRequest(client, testServer.URL+"/v0/keys/test-metric/", "GET", testFido2AuthToken(t), nil)
 			if err == nil {
 				resp.Body.Close()
 			}
@@ -1025,13 +1044,6 @@ func createAndStartTestServer(t *testing.T, backend string) *httptest.Server {
 		Storage: config.StorageConfig{
 			Backend: backend,
 		},
-		Auth: config.AuthConfig{
-			Providers: []config.AuthProviderConfig{
-				{
-					Type: "mock",
-				},
-			},
-		},
 		Observability: config.ObservabilityConfig{
 			Logging: config.LoggingConfig{
 				Level:  "error",
@@ -1047,6 +1059,7 @@ func createAndStartTestServer(t *testing.T, backend string) *httptest.Server {
 	if backend == "filesystem" {
 		cfg.Storage.FilesystemDir = t.TempDir()
 	}
+	configureTestFido2Auth(t, cfg)
 
 	server, err := createTestServer(cfg)
 	require.NoError(t, err)
@@ -1057,17 +1070,14 @@ func createAndStartTestServer(t *testing.T, backend string) *httptest.Server {
 	return server.Server
 }
 
-func filesystemServerConfig(dir string) *config.ServerConfig {
-	return &config.ServerConfig{
+func filesystemServerConfig(t *testing.T, dir string) *config.ServerConfig {
+	t.Helper()
+
+	cfg := &config.ServerConfig{
 		BindAddress: "localhost:0",
 		Storage: config.StorageConfig{
 			Backend:       "filesystem",
 			FilesystemDir: dir,
-		},
-		Auth: config.AuthConfig{
-			Providers: []config.AuthProviderConfig{
-				{Type: "mock"},
-			},
 		},
 		Observability: config.ObservabilityConfig{
 			Logging: config.LoggingConfig{
@@ -1076,6 +1086,8 @@ func filesystemServerConfig(dir string) *config.ServerConfig {
 			},
 		},
 	}
+	configureTestFido2Auth(t, cfg)
+	return cfg
 }
 
 func createTestClient(t *testing.T, _ *httptest.Server) *http.Client {
@@ -1117,7 +1129,7 @@ func makeAuthenticatedRequest(client *http.Client, url, method, authToken string
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+authToken)
+	req.Header.Set("Authorization", "0u"+authToken)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -1128,7 +1140,7 @@ func makeAuthenticatedRequest(client *http.Client, url, method, authToken string
 func testBasicKeyOperations(t *testing.T, client *http.Client, baseURL string) {
 	t.Helper()
 
-	authToken := "test-token"
+	authToken := testFido2AuthToken(t)
 	keyID := "test:basic:key"
 
 	// Create key

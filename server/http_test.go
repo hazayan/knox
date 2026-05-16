@@ -58,13 +58,34 @@ func setup() {
 	decorators := [](func(http.HandlerFunc) http.HandlerFunc){
 		AddHeader("Content-Type", "application/json"),
 		AddHeader("X-Content-Type-Options", "nosniff"),
-		Authentication([]auth.Provider{auth.MockGitHubProvider()}, nil),
+		Authentication([]auth.Provider{testUserProvider{}}, nil),
 	}
 	var err error
 	router, err = GetRouter(cryptor, db, decorators, make([]Route, 0))
 	if err != nil {
 		panic(err)
 	}
+}
+
+type testUserProvider struct{}
+
+func (testUserProvider) Name() string {
+	return "test-user"
+}
+
+func (testUserProvider) Version() byte {
+	return '0'
+}
+
+func (testUserProvider) Type() byte {
+	return 'u'
+}
+
+func (testUserProvider) Authenticate(token string, _ *http.Request) (types.Principal, error) {
+	if token != "testuser" {
+		return nil, fmt.Errorf("invalid test token")
+	}
+	return auth.NewUser("testuser", []string{"testgroup"}), nil
 }
 
 func getKeys(t *testing.T) []string {

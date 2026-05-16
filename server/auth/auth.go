@@ -1,14 +1,11 @@
 // Package auth provides authentication providers for the Knox server.
-// It handles various authentication methods including mTLS, SPIFFE, and GitHub OAuth.
+// It handles local authentication methods including mTLS, SPIFFE, and FIDO2-issued tokens.
 package auth
 
 import (
-	"bytes"
 	"crypto/x509"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -249,81 +246,6 @@ func (p *SpiffeFallbackProvider) Type() byte {
 	return (&MTLSAuthProvider{}).Type()
 }
 
-// GitHubProvider implements user authentication through github.com.
-type GitHubProvider struct {
-	client httpClient
-}
-
-// NewGitHubProvider initializes GitHubProvider with an HTTP client with a timeout.
-func NewGitHubProvider(httpTimeout time.Duration) *GitHubProvider {
-	return &GitHubProvider{&http.Client{Timeout: httpTimeout}}
-}
-
-// Version is set to 0 for GitHubProvider.
-func (p *GitHubProvider) Version() byte {
-	return '0'
-}
-
-// Name is the name of the provider for logging.
-func (p *GitHubProvider) Name() string {
-	return "github"
-}
-
-// Type is set to u for GitHubProvider since it authenticates users.
-func (p *GitHubProvider) Type() byte {
-	return 'u'
-}
-
-// Authenticate uses the token to get user data from github.com.
-func (p *GitHubProvider) Authenticate(token string, _ *http.Request) (types.Principal, error) {
-	user := &GitHubLoginFormat{}
-	if err := p.getAPI("https://api.github.com/user", token, user); err != nil {
-		return nil, err
-	}
-
-	groupsJSON := &GitHubOrgFormat{}
-	if err := p.getAPI("https://api.github.com/user/orgs", token, groupsJSON); err != nil {
-		return nil, err
-	}
-	groups := make([]string, len(*groupsJSON))
-	for i, g := range *groupsJSON {
-		groups[i] = g.Name
-	}
-
-	return NewUser(user.Name, groups), nil
-}
-
-func (p *GitHubProvider) getAPI(url, token string, v any) error {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Authorization", "Bearer "+token)
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("API request returned status: %s", resp.Status)
-	}
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(v)
-	return err
-}
-
-// GitHubLoginFormat specifies the json return format for /user field.
-type GitHubLoginFormat struct {
-	Name string `json:"login"`
-}
-
-// GitHubOrgFormat specifies the JSON return format for /user/org.
-type GitHubOrgFormat []GitHubLoginFormat
-
-type httpClient interface {
-	Do(req *http.Request) (resp *http.Response, err error)
-}
-
 // IsUser returns true if the principal, or first principal in the case of mux, is a user.
 func IsUser(p types.Principal) bool {
 	if mux, ok := p.(types.PrincipalMux); ok {
@@ -502,44 +424,4 @@ func (s service) CanAccess(acl types.ACL, t types.AccessType) bool {
 		}
 	}
 	return false
-}
-
-type mockHTTPClient struct{}
-
-func (c *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	resp := &http.Response{}
-	resp.Proto = "HTTP/1.1"
-	resp.ProtoMajor = 1
-	resp.ProtoMinor = 1
-	a := req.Header.Get("Authorization")
-	if a == "" || a == "Bearer notvalid" {
-		resp.StatusCode = 400
-		resp.Body = io.NopCloser(bytes.NewBuffer(nil))
-		resp.Status = "400 Unauthorized"
-
-		return resp, nil
-	}
-	switch req.URL.Path {
-	case "/user":
-		data := "{\"login\":\"testuser\"}"
-		resp.Body = io.NopCloser(bytes.NewBufferString(data))
-		resp.StatusCode = 200
-		return resp, nil
-	case "/user/orgs":
-		data := "[{\"login\":\"testgroup\"}]"
-		resp.Body = io.NopCloser(bytes.NewBufferString(data))
-		resp.StatusCode = 200
-		return resp, nil
-	default:
-		resp.StatusCode = 404
-		resp.Body = io.NopCloser(bytes.NewBuffer(nil))
-		resp.Status = "404 Not found"
-		return resp, nil
-	}
-}
-
-// MockGitHubProvider returns a mocked out authentication header with a simple mock "server".
-// If there exists an authorization header with user token that does not equal 'notvalid', it will log in as 'testuser'.
-func MockGitHubProvider() *GitHubProvider {
-	return &GitHubProvider{&mockHTTPClient{}}
 }

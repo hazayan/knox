@@ -72,8 +72,18 @@ storage:
   # sqlite_path: "/var/lib/knox/knox.db"
 
 auth:
+  fido2:
+    enabled: true
+    rp_id: "knox.example.net"
+    rp_name: "Knox"
+    origins:
+      - "https://knox.example.net"
+    token_issuer: "knox"
+    token_ttl: "15m"
+    token_signing_key_file: "/usr/local/etc/knox/fido2-token.key"
+    credentials_file: "/usr/local/etc/knox/fido2-principals.json"
   providers:
-    - type: "mock"
+    - type: "fido2"
 
 observability:
   metrics:

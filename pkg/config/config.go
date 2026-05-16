@@ -75,7 +75,7 @@ type AuthConfig struct {
 
 // AuthProviderConfig holds configuration for a single auth provider.
 type AuthProviderConfig struct {
-	Type        string `mapstructure:"type"` // spiffe, mtls, token
+	Type        string `mapstructure:"type"` // spiffe, mtls, fido2
 	TrustDomain string `mapstructure:"trust_domain"`
 	CAFile      string `mapstructure:"ca_file"`
 }
