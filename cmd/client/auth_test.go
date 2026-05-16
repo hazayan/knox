@@ -118,3 +118,26 @@ func TestAuthLogoutMissingToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, out.String(), "No stored token")
 }
+
+func TestAuthFido2CommandStructure(t *testing.T) {
+	cmd := newAuthFido2Cmd()
+	require.NotNil(t, cmd)
+
+	subcommands := map[string]bool{}
+	for _, subcmd := range cmd.Commands() {
+		subcommands[subcmd.Name()] = true
+	}
+
+	assert.True(t, subcommands["begin"])
+	assert.True(t, subcommands["finish"])
+}
+
+func TestReadAssertion(t *testing.T) {
+	data, err := readAssertion("-", strings.NewReader(`{"id":"credential"}`))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"id":"credential"}`, string(data))
+
+	_, err = readAssertion("-", strings.NewReader(`{`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "valid JSON")
+}

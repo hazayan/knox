@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/gorilla/mux"
 	pkgauth "github.com/hazayan/knox/pkg/auth"
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/crypto"
@@ -127,6 +129,10 @@ func createTestServerWithMasterKey(cfg *config.ServerConfig, masterKey []byte) (
 	if err != nil {
 		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create test router: %w", err)
+	}
+	if err := registerFido2AuthRoutes(router, cfg); err != nil {
+		_ = backend.Close()
+		return nil, err
 	}
 	if cfg.Observability.Metrics.Enabled {
 		router.HandleFunc(cfg.Observability.Metrics.Endpoint, secureMetricsHandler(promhttp.Handler())).Methods("GET")
@@ -252,6 +258,9 @@ func runServer(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create router: %w", err)
 	}
+	if err := registerFido2AuthRoutes(router, cfg); err != nil {
+		return err
+	}
 
 	// Add metrics endpoint if enabled
 	if cfg.Observability.Metrics.Enabled {
@@ -362,6 +371,16 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 			logging.Debugf("Added GitHub auth provider to list")
 			logging.Info("✓ Configured GitHub OAuth auth provider")
 
+		case "fido2":
+			provider, err := newFido2TokenProvider(cfg.Auth.Fido2)
+			if err != nil {
+				logging.Errorf("Failed to configure FIDO2 auth provider: %v", err)
+				continue
+			}
+			providers = append(providers, provider)
+			logging.Debugf("Added FIDO2 auth provider to list")
+			logging.Info("✓ Configured FIDO2 auth provider")
+
 		case "mock":
 			// Create mock auth provider for testing
 			provider := auth.MockGitHubProvider()
@@ -381,6 +400,59 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 	}
 
 	return providers
+}
+
+func newFido2TokenProvider(cfg config.Fido2AuthConfig) (auth.Provider, error) {
+	issuer, err := newFido2TokenIssuerFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return auth.NewFido2TokenProvider(issuer), nil
+}
+
+func newFido2TokenIssuerFromConfig(cfg config.Fido2AuthConfig) (*auth.Fido2TokenIssuer, error) {
+	if !cfg.Enabled {
+		return nil, errors.New("auth.fido2.enabled must be true")
+	}
+	if cfg.TokenSigningKeyFile == "" {
+		return nil, errors.New("auth.fido2.token_signing_key_file is required")
+	}
+	key, err := os.ReadFile(cfg.TokenSigningKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read FIDO2 token signing key: %w", err)
+	}
+	ttl, err := time.ParseDuration(cfg.TokenTTL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid auth.fido2.token_ttl: %w", err)
+	}
+	return auth.NewFido2TokenIssuer(cfg.TokenIssuer, []byte(strings.TrimSpace(string(key))), ttl)
+}
+
+func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig) error {
+	if !cfg.Auth.Fido2.Enabled {
+		return nil
+	}
+	if cfg.Auth.Fido2.CredentialsFile == "" {
+		return errors.New("auth.fido2.credentials_file is required")
+	}
+	issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
+	if err != nil {
+		return err
+	}
+	store, err := server.NewWebAuthnPrincipalStoreFromFile(cfg.Auth.Fido2.CredentialsFile)
+	if err != nil {
+		return err
+	}
+	service, err := server.NewWebAuthnCeremonyService(&webauthn.Config{
+		RPID:          cfg.Auth.Fido2.RPID,
+		RPDisplayName: cfg.Auth.Fido2.RPName,
+		RPOrigins:     cfg.Auth.Fido2.Origins,
+	}, store, issuer)
+	if err != nil {
+		return fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
+	}
+	server.RegisterFido2AuthRoutes(router, service)
+	return nil
 }
 
 // loadCAPool loads a CA certificate pool from a file.

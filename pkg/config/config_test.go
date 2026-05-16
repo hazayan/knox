@@ -31,6 +31,16 @@ master_key:
   device: "auto"
   pin_file: "/run/knox/fido2.pin"
 auth:
+  fido2:
+    enabled: true
+    rp_id: "knox.example.net"
+    rp_name: "Knox"
+    origins:
+      - "https://knox.example.net"
+    token_issuer: "knox-test"
+    token_ttl: "10m"
+    token_signing_key_file: "/etc/knox/fido2-token.key"
+    credentials_file: "/etc/knox/fido2-principals.json"
   providers:
     - type: "mtls"
       ca_file: "/etc/knox/ca.crt"
@@ -67,6 +77,14 @@ limits:
 		assert.Equal(t, "/usr/local/etc/knox/fido2-credential.json", cfg.MasterKey.MetadataFile)
 		assert.Equal(t, "auto", cfg.MasterKey.Device)
 		assert.Equal(t, "/run/knox/fido2.pin", cfg.MasterKey.PinFile)
+		assert.True(t, cfg.Auth.Fido2.Enabled)
+		assert.Equal(t, "knox.example.net", cfg.Auth.Fido2.RPID)
+		assert.Equal(t, "Knox", cfg.Auth.Fido2.RPName)
+		assert.Equal(t, []string{"https://knox.example.net"}, cfg.Auth.Fido2.Origins)
+		assert.Equal(t, "knox-test", cfg.Auth.Fido2.TokenIssuer)
+		assert.Equal(t, "10m", cfg.Auth.Fido2.TokenTTL)
+		assert.Equal(t, "/etc/knox/fido2-token.key", cfg.Auth.Fido2.TokenSigningKeyFile)
+		assert.Equal(t, "/etc/knox/fido2-principals.json", cfg.Auth.Fido2.CredentialsFile)
 		assert.Len(t, cfg.Auth.Providers, 1)
 		assert.Equal(t, "mtls", cfg.Auth.Providers[0].Type)
 		assert.Equal(t, "/etc/knox/ca.crt", cfg.Auth.Providers[0].CAFile)
@@ -128,6 +146,8 @@ storage:
 	assert.Equal(t, "default", cfg.MasterKey.Backend)
 	assert.Equal(t, "memory", cfg.Storage.Backend)
 	assert.Equal(t, "/var/lib/knox/knox.db", cfg.Storage.SQLitePath)
+	assert.Equal(t, "knox", cfg.Auth.Fido2.TokenIssuer)
+	assert.Equal(t, "15m", cfg.Auth.Fido2.TokenTTL)
 	assert.True(t, cfg.Observability.Metrics.Enabled)        // Default value
 	assert.Equal(t, "info", cfg.Observability.Logging.Level) // Default value
 	assert.Equal(t, 100, cfg.Limits.RateLimitPerPrincipal)   // Default value

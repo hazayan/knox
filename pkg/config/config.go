@@ -70,6 +70,7 @@ func (c StorageConfig) ToStorageConfig() storage.Config {
 // AuthConfig holds authentication configuration.
 type AuthConfig struct {
 	Providers []AuthProviderConfig `mapstructure:"providers"`
+	Fido2     Fido2AuthConfig      `mapstructure:"fido2"`
 }
 
 // AuthProviderConfig holds configuration for a single auth provider.
@@ -77,6 +78,18 @@ type AuthProviderConfig struct {
 	Type        string `mapstructure:"type"` // spiffe, mtls, token
 	TrustDomain string `mapstructure:"trust_domain"`
 	CAFile      string `mapstructure:"ca_file"`
+}
+
+// Fido2AuthConfig holds WebAuthn/FIDO2 authentication configuration.
+type Fido2AuthConfig struct {
+	Enabled             bool     `mapstructure:"enabled"`
+	RPID                string   `mapstructure:"rp_id"`
+	RPName              string   `mapstructure:"rp_name"`
+	Origins             []string `mapstructure:"origins"`
+	TokenIssuer         string   `mapstructure:"token_issuer"`
+	TokenTTL            string   `mapstructure:"token_ttl"`
+	TokenSigningKeyFile string   `mapstructure:"token_signing_key_file"`
+	CredentialsFile     string   `mapstructure:"credentials_file"`
 }
 
 // ObservabilityConfig holds observability configuration.
@@ -186,6 +199,8 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 	v.SetDefault("limits.rate_limit_per_principal", 100)
 	v.SetDefault("limits.max_key_size", "1MB")
 	v.SetDefault("limits.max_keys_per_list", 1000)
+	v.SetDefault("auth.fido2.token_issuer", "knox")
+	v.SetDefault("auth.fido2.token_ttl", "15m")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("failed to read config: %w", err)

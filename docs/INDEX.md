@@ -6,8 +6,9 @@
 4. **[DBUS GUIDE](DBUS_GUIDE.md)** - Desktop integration setup
 5. **[FIDO2 MASTER KEY](FIDO2_MASTER_KEY.md)** - Planned FIDO2-wrapped master
    key design and backup model
-6. **[OPERATIONS](OPERATIONS.md)** - Unix operations, backups, and local health
+6. **[FIDO2 AUTH](FIDO2_AUTH.md)** - WebAuthn login and Knox token model
+7. **[OPERATIONS](OPERATIONS.md)** - Unix operations, backups, and local health
    checks
-7. **[SECRET RULEBOOK](SECRET_RULEBOOK.md)** - Secret request workflow and
+8. **[SECRET RULEBOOK](SECRET_RULEBOOK.md)** - Secret request workflow and
    naming policy for Knox-backed automation
-8. **[EXAMPLES](examples)** - Generic service and D-Bus configuration templates
+9. **[EXAMPLES](examples)** - Generic service and D-Bus configuration templates

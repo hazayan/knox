@@ -20,3 +20,5 @@
 [00020] [2026-05-16T19:49:05Z] [FIX] Unified Knox key ID validation by making Key.Validate use the shared route-level validator and added coverage for hyphenated, dotted, and traversal-like key IDs.
 [00021] [2026-05-16T19:53:50Z] [PLANNING] Rechecked the Knox FIDO2 authentication-provider scope against current go-webauthn documentation and kept the bead open because a correct implementation needs explicit WebAuthn challenge, finish, credential storage, and token-minting paths.
 [00022] [2026-05-16T19:53:50Z] [TROUBLESHOOTING] Recorded that the Knox restore drill is blocked until a FIDO2 authenticator is visible on the local or backup trust host.
+[00023] [2026-05-16T20:08:41Z] [IMPLEMENTATION] Added the Knox FIDO2 authentication foundation with a go-webauthn login ceremony service, public begin and finish route boundary, HMAC-signed short-lived Knox tokens, server configuration, and CLI begin and finish commands.
+[00024] [2026-05-16T20:08:41Z] [TEST] Added focused coverage for FIDO2 token validation, WebAuthn session creation, public auth routes, server provider setup, config loading, and CLI assertion handling.
