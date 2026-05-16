@@ -15,3 +15,4 @@
 [00015] [2026-05-15T22:02:38Z] [SECURITY] Sanitized current-tree FIDO2 examples, tests, and operational notes to remove host-specific and hardware-model details before continuing repository scrub work.
 [00016] [2026-05-15T22:36:28Z] [FIX] Made Knox API transport scheme configurable for CLI, D-Bus, and client-library communication so HTTP can be used until TLS provisioning is ready.
 [00017] [2026-05-15T23:38:37Z] [PLANNING] Tracked FIDO2 authentication provider and key ID validation follow-ups after the Kanidm bootstrap migration exposed separate authentication and identifier-format gaps.
+[00018] [2026-05-16T19:22:40Z] [SECURITY] Rechecked the Knox current tree for known internal host and domain identifiers and validated the result with the full Go test suite after installing the lsof test dependency.
