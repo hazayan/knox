@@ -25,3 +25,5 @@
 [00025] [2026-05-16T20:43:46Z] [TEST] Added an opt-in libfido2 hardware WebAuthn drill that registers an authenticator, completes Knox FIDO2 login, reads a key through the minted token, and checks tampered and expired token rejection.
 [00026] [2026-05-16T20:43:46Z] [TROUBLESHOOTING] Hardware drill compilation and normal test coverage pass, but live validation is blocked because the attached authenticator rejects the supplied PIN file.
 [00027] [2026-05-16T20:52:17Z] [TEST] Validated the Knox FIDO2 hardware drill with the attached authenticator and real CLI finish flow after extending the libfido2 touch timeout.
+[00028] [2026-05-16T21:10:30Z] [IMPLEMENTATION] Added authenticated Knox FIDO2 credential registration and import flows with durable credentials-file persistence and CLI registration/import commands.
+[00029] [2026-05-16T21:10:30Z] [TEST] Added focused coverage for FIDO2 admin routes and durable credential imports, then validated the full Go test suite.

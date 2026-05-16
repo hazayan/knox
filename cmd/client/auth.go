@@ -153,6 +153,8 @@ func newAuthFido2Cmd() *cobra.Command {
 	}
 	cmd.AddCommand(newAuthFido2BeginCmd())
 	cmd.AddCommand(newAuthFido2FinishCmd())
+	cmd.AddCommand(newAuthFido2RegisterCmd())
+	cmd.AddCommand(newAuthFido2ImportCmd())
 	return cmd
 }
 
@@ -237,9 +239,144 @@ func newAuthFido2FinishCmd() *cobra.Command {
 	return cmd
 }
 
+func newAuthFido2RegisterCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "register",
+		Short: "Register Knox FIDO2 credentials",
+	}
+	cmd.AddCommand(newAuthFido2RegisterBeginCmd())
+	cmd.AddCommand(newAuthFido2RegisterFinishCmd())
+	return cmd
+}
+
+func newAuthFido2RegisterBeginCmd() *cobra.Command {
+	var principalType string
+	var subject string
+	var displayName string
+	var groups []string
+
+	cmd := &cobra.Command{
+		Use:   "begin",
+		Short: "Begin an authenticated FIDO2 credential registration",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
+				return errors.New("principal type and subject are required")
+			}
+			prof, httpClient, authToken, err := authenticatedProfileClient()
+			if err != nil {
+				return err
+			}
+			req := map[string]any{
+				"principal_type": principalType,
+				"subject":        subject,
+				"display_name":   displayName,
+				"groups":         compactStrings(groups),
+			}
+			var resp fido2BeginResponse
+			if err := postJSONWithAuth(httpClient, profileURL(prof, "/v0/auth/fido2/credentials/begin"), authToken, req, &resp); err != nil {
+				return err
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(resp)
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringVar(&displayName, "display-name", "", "FIDO2 display name")
+	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
+	return cmd
+}
+
+func newAuthFido2RegisterFinishCmd() *cobra.Command {
+	var sessionID string
+	var credentialFile string
+
+	cmd := &cobra.Command{
+		Use:   "finish",
+		Short: "Finish an authenticated FIDO2 credential registration",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(sessionID) == "" {
+				return errors.New("session id is required")
+			}
+			credential, err := readAssertion(credentialFile, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+			prof, httpClient, authToken, err := authenticatedProfileClient()
+			if err != nil {
+				return err
+			}
+			req := map[string]any{
+				"session_id": sessionID,
+				"credential": json.RawMessage(credential),
+			}
+			var resp fido2CredentialResponse
+			if err := postJSONWithAuth(httpClient, profileURL(prof, "/v0/auth/fido2/credentials/finish"), authToken, req, &resp); err != nil {
+				return err
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(resp)
+		},
+	}
+	cmd.Flags().StringVar(&sessionID, "session-id", "", "FIDO2 registration session ID")
+	cmd.Flags().StringVar(&credentialFile, "credential-file", "-", "JSON credential file, or - for stdin")
+	return cmd
+}
+
+func newAuthFido2ImportCmd() *cobra.Command {
+	var principalType string
+	var subject string
+	var displayName string
+	var groups []string
+	var userHandle string
+	var credentialFile string
+
+	cmd := &cobra.Command{
+		Use:   "import",
+		Short: "Import a Knox FIDO2 credential record",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
+				return errors.New("principal type and subject are required")
+			}
+			credential, err := readAssertion(credentialFile, cmd.InOrStdin())
+			if err != nil {
+				return err
+			}
+			prof, httpClient, authToken, err := authenticatedProfileClient()
+			if err != nil {
+				return err
+			}
+			req := map[string]any{
+				"principal_type": principalType,
+				"subject":        subject,
+				"display_name":   displayName,
+				"groups":         compactStrings(groups),
+				"user_handle":    strings.TrimSpace(userHandle),
+				"credential":     json.RawMessage(credential),
+			}
+			var resp fido2CredentialResponse
+			if err := postJSONWithAuth(httpClient, profileURL(prof, "/v0/auth/fido2/credentials/import"), authToken, req, &resp); err != nil {
+				return err
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(resp)
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringVar(&displayName, "display-name", "", "FIDO2 display name")
+	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
+	cmd.Flags().StringVar(&userHandle, "user-handle", "", "Base64url WebAuthn user handle")
+	cmd.Flags().StringVar(&credentialFile, "credential-file", "-", "JSON credential record file, or - for stdin")
+	return cmd
+}
+
 type fido2BeginResponse struct {
 	SessionID string          `json:"session_id"`
 	Options   json.RawMessage `json:"options"`
+}
+
+type fido2CredentialResponse struct {
+	PrincipalType string `json:"principal_type"`
+	Subject       string `json:"subject"`
+	CredentialID  string `json:"credential_id"`
 }
 
 type fido2FinishRequest struct {
@@ -267,6 +404,20 @@ func unauthenticatedProfileClient() (*config.ClientProfile, *http.Client, error)
 	return prof, httpClient, nil
 }
 
+func authenticatedProfileClient() (*config.ClientProfile, *http.Client, string, error) {
+	prof, httpClient, err := unauthenticatedProfileClient()
+	if err != nil {
+		return nil, nil, "", err
+	}
+	for _, handler := range createAuthHandlers(prof) {
+		token, _, _ := handler()
+		if strings.TrimSpace(token) != "" {
+			return prof, httpClient, token, nil
+		}
+	}
+	return nil, nil, "", errors.New("no Knox auth token available")
+}
+
 func profileURL(prof *config.ClientProfile, path string) string {
 	scheme := strings.TrimSpace(prof.Scheme)
 	if scheme == "" {
@@ -276,11 +427,23 @@ func profileURL(prof *config.ClientProfile, path string) string {
 }
 
 func postJSON(httpClient *http.Client, url string, req any, resp any) error {
+	return postJSONWithAuth(httpClient, url, "", req, resp)
+}
+
+func postJSONWithAuth(httpClient *http.Client, url string, authToken string, req any, resp any) error {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to encode request: %w", err)
 	}
-	httpResp, err := httpClient.Post(url, "application/json", bytes.NewReader(body))
+	httpReq, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if authToken != "" {
+		httpReq.Header.Set("Authorization", authToken)
+	}
+	httpResp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
@@ -311,6 +474,17 @@ func readAssertion(path string, stdin io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read assertion file: %w", err)
 	}
 	return validateAssertion(data)
+}
+
+func compactStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func validateAssertion(data []byte) ([]byte, error) {

@@ -31,9 +31,28 @@ normal Knox API authentication middleware.
   - input: session ID and WebAuthn assertion response
   - output: short-lived Knox token, expiry, and authenticated principal
 
-Registration is intentionally an administrative flow. The first production
-version should support offline/imported credential records before exposing
-self-service registration.
+Registration is an administrative flow and is wrapped by the normal Knox API
+authentication middleware:
+
+- `POST /v0/auth/fido2/credentials/begin`
+  - input: principal kind, subject, optional display name, and optional groups
+  - output: WebAuthn credential creation options and an opaque session ID
+
+- `POST /v0/auth/fido2/credentials/finish`
+  - input: session ID and WebAuthn credential creation response
+  - output: the persisted credential ID and mapped principal
+
+- `POST /v0/auth/fido2/credentials/import`
+  - input: principal metadata and one serialized `go-webauthn` credential record
+  - output: the persisted credential ID and mapped principal
+
+The CLI exposes the same administrative flow under:
+
+```sh
+knox auth fido2 register begin --principal-type user --subject alice
+knox auth fido2 register finish --session-id "$SESSION" --credential-file credential.json
+knox auth fido2 import --principal-type user --subject alice --credential-file credential-record.json
+```
 
 ## Token
 
@@ -85,11 +104,11 @@ Credential imports use a JSON array of principals:
 ```
 
 The `credentials` values are serialized `go-webauthn` credential records. The
-registration flow will later produce these records directly.
+registration and import flows update this file durably with owner-only file
+permissions.
 
 ## Validation Plan
 
-The first milestone uses an interface-backed ceremony service and fake tests so
-server routing, token minting, token validation, and CLI storage can be tested
-without hardware. Hardware validation comes after a FIDO2 authenticator is
-visible to the host running the tests.
+Normal tests cover server routing, token minting, token validation, credential
+registration/import persistence, and CLI storage without hardware. The opt-in
+hardware drill is gated behind the `fido2hardware libfido2` build tags.
