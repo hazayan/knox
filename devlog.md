@@ -17,3 +17,6 @@
 [00017] [2026-05-15T23:38:37Z] [PLANNING] Tracked FIDO2 authentication provider and key ID validation follow-ups after the Kanidm bootstrap migration exposed separate authentication and identifier-format gaps.
 [00018] [2026-05-16T19:22:40Z] [SECURITY] Rechecked the Knox current tree for known internal host and domain identifiers and validated the result with the full Go test suite after installing the lsof test dependency.
 [00019] [2026-05-16T19:23:57Z] [SECURITY] Rewrote reachable Git history to replace internal host identifiers and remove obsolete TLS/config artifacts that contained internal service names.
+[00020] [2026-05-16T19:49:05Z] [FIX] Unified Knox key ID validation by making Key.Validate use the shared route-level validator and added coverage for hyphenated, dotted, and traversal-like key IDs.
+[00021] [2026-05-16T19:53:50Z] [PLANNING] Rechecked the Knox FIDO2 authentication-provider scope against current go-webauthn documentation and kept the bead open because a correct implementation needs explicit WebAuthn challenge, finish, credential storage, and token-minting paths.
+[00022] [2026-05-16T19:53:50Z] [TROUBLESHOOTING] Recorded that the Knox restore drill is blocked until a FIDO2 authenticator is visible on the local or backup trust host.
