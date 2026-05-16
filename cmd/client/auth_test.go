@@ -130,6 +130,21 @@ func TestAuthFido2CommandStructure(t *testing.T) {
 
 	assert.True(t, subcommands["begin"])
 	assert.True(t, subcommands["finish"])
+	assert.True(t, subcommands["register"])
+	assert.True(t, subcommands["import"])
+}
+
+func TestAuthFido2RegisterCommandStructure(t *testing.T) {
+	cmd := newAuthFido2RegisterCmd()
+	require.NotNil(t, cmd)
+
+	subcommands := map[string]bool{}
+	for _, subcmd := range cmd.Commands() {
+		subcommands[subcmd.Name()] = true
+	}
+
+	assert.True(t, subcommands["begin"])
+	assert.True(t, subcommands["finish"])
 }
 
 func TestReadAssertion(t *testing.T) {

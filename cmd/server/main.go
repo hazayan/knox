@@ -130,7 +130,7 @@ func createTestServerWithMasterKey(cfg *config.ServerConfig, masterKey []byte) (
 		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create test router: %w", err)
 	}
-	if err := registerFido2AuthRoutes(router, cfg); err != nil {
+	if err := registerFido2AuthRoutes(router, cfg, decorators); err != nil {
 		_ = backend.Close()
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func runServer(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create router: %w", err)
 	}
-	if err := registerFido2AuthRoutes(router, cfg); err != nil {
+	if err := registerFido2AuthRoutes(router, cfg, decorators); err != nil {
 		return err
 	}
 
@@ -428,7 +428,7 @@ func newFido2TokenIssuerFromConfig(cfg config.Fido2AuthConfig) (*auth.Fido2Token
 	return auth.NewFido2TokenIssuer(cfg.TokenIssuer, []byte(strings.TrimSpace(string(key))), ttl)
 }
 
-func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig) error {
+func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig, decorators []func(http.HandlerFunc) http.HandlerFunc) error {
 	if !cfg.Auth.Fido2.Enabled {
 		return nil
 	}
@@ -452,6 +452,7 @@ func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig) error
 		return fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
 	}
 	server.RegisterFido2AuthRoutes(router, service)
+	server.RegisterFido2AdminRoutes(router, service, decorators)
 	return nil
 }
 

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -42,10 +44,16 @@ type WebAuthnPrincipalStore interface {
 	LookupWebAuthnPrincipal(principalType, subject string) (WebAuthnPrincipal, error)
 }
 
-// InMemoryWebAuthnPrincipalStore is a test and bootstrap store for WebAuthn
-// principals. Production deployments should replace it with durable storage.
+type WebAuthnPrincipalWriter interface {
+	WebAuthnPrincipalStore
+	SaveWebAuthnPrincipal(principal WebAuthnPrincipal) error
+}
+
+// InMemoryWebAuthnPrincipalStore stores WebAuthn principals in memory. It can
+// optionally persist the complete principal set to a JSON file.
 type InMemoryWebAuthnPrincipalStore struct {
 	mu         sync.RWMutex
+	path       string
 	principals map[string]WebAuthnPrincipal
 }
 
@@ -56,15 +64,22 @@ func NewInMemoryWebAuthnPrincipalStore() *InMemoryWebAuthnPrincipalStore {
 }
 
 func NewWebAuthnPrincipalStoreFromFile(path string) (*InMemoryWebAuthnPrincipalStore, error) {
+	store := NewInMemoryWebAuthnPrincipalStore()
+	store.path = path
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return store, nil
+		}
 		return nil, fmt.Errorf("failed to read webauthn principal file: %w", err)
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return store, nil
 	}
 	var records []webAuthnPrincipalFileRecord
 	if err := json.Unmarshal(data, &records); err != nil {
 		return nil, fmt.Errorf("failed to parse webauthn principal file: %w", err)
 	}
-	store := NewInMemoryWebAuthnPrincipalStore()
 	for _, record := range records {
 		principal, err := record.toPrincipal()
 		if err != nil {
@@ -106,6 +121,19 @@ func (s *InMemoryWebAuthnPrincipalStore) Put(principal WebAuthnPrincipal) {
 	s.principals[principalKey(principal.PrincipalType, principal.Subject)] = principal
 }
 
+func (s *InMemoryWebAuthnPrincipalStore) SaveWebAuthnPrincipal(principal WebAuthnPrincipal) error {
+	if err := principal.Validate(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.principals[principalKey(principal.PrincipalType, principal.Subject)] = cloneWebAuthnPrincipal(principal)
+	if s.path == "" {
+		return nil
+	}
+	return s.writeLocked()
+}
+
 func (s *InMemoryWebAuthnPrincipalStore) LookupWebAuthnPrincipal(principalType, subject string) (WebAuthnPrincipal, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -113,7 +141,41 @@ func (s *InMemoryWebAuthnPrincipalStore) LookupWebAuthnPrincipal(principalType, 
 	if !ok {
 		return WebAuthnPrincipal{}, errors.New("webauthn principal not found")
 	}
-	return principal, nil
+	return cloneWebAuthnPrincipal(principal), nil
+}
+
+func (s *InMemoryWebAuthnPrincipalStore) writeLocked() error {
+	records := make([]webAuthnPrincipalFileRecord, 0, len(s.principals))
+	keys := make([]string, 0, len(s.principals))
+	for key := range s.principals {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		principal := s.principals[key]
+		record, err := principal.toFileRecord()
+		if err != nil {
+			return err
+		}
+		records = append(records, record)
+	}
+	data, err := json.MarshalIndent(records, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to encode webauthn principal file: %w", err)
+	}
+	data = append(data, '\n')
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+		return fmt.Errorf("failed to create webauthn principal directory: %w", err)
+	}
+	tmp := s.path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write webauthn principal file: %w", err)
+	}
+	if err := os.Rename(tmp, s.path); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("failed to replace webauthn principal file: %w", err)
+	}
+	return nil
 }
 
 type webAuthnLoginSession struct {
@@ -122,13 +184,20 @@ type webAuthnLoginSession struct {
 	Session       webauthn.SessionData
 }
 
+type webAuthnRegistrationSession struct {
+	Principal WebAuthnPrincipal
+	Session   webauthn.SessionData
+}
+
 // WebAuthnCeremonyService implements FIDO2 login using go-webauthn.
 type WebAuthnCeremonyService struct {
 	rp       *webauthn.WebAuthn
 	store    WebAuthnPrincipalStore
+	writer   WebAuthnPrincipalWriter
 	issuer   *auth.Fido2TokenIssuer
 	mu       sync.Mutex
 	sessions map[string]webAuthnLoginSession
+	registry map[string]webAuthnRegistrationSession
 }
 
 func NewWebAuthnCeremonyService(
@@ -149,8 +218,10 @@ func NewWebAuthnCeremonyService(
 	return &WebAuthnCeremonyService{
 		rp:       rp,
 		store:    store,
+		writer:   principalWriter(store),
 		issuer:   issuer,
 		sessions: map[string]webAuthnLoginSession{},
+		registry: map[string]webAuthnRegistrationSession{},
 	}, nil
 }
 
@@ -237,6 +308,46 @@ func (p WebAuthnPrincipal) toWebAuthnUser() webAuthnUser {
 		p.UserHandle = sum[:]
 	}
 	return webAuthnUser{principal: p}
+}
+
+func (p WebAuthnPrincipal) Validate() error {
+	if p.PrincipalType != "user" && p.PrincipalType != "machine" {
+		return errors.New("webauthn principal type must be user or machine")
+	}
+	if p.Subject == "" {
+		return errors.New("webauthn principal subject must not be empty")
+	}
+	return nil
+}
+
+func (p WebAuthnPrincipal) toFileRecord() (webAuthnPrincipalFileRecord, error) {
+	if err := p.Validate(); err != nil {
+		return webAuthnPrincipalFileRecord{}, err
+	}
+	return webAuthnPrincipalFileRecord{
+		PrincipalType: p.PrincipalType,
+		Subject:       p.Subject,
+		DisplayName:   p.DisplayName,
+		Groups:        append([]string(nil), p.Groups...),
+		UserHandle:    base64.RawURLEncoding.EncodeToString(p.toWebAuthnUser().WebAuthnID()),
+		Credentials:   append([]webauthn.Credential(nil), p.Credentials...),
+	}, nil
+}
+
+func cloneWebAuthnPrincipal(principal WebAuthnPrincipal) WebAuthnPrincipal {
+	return WebAuthnPrincipal{
+		PrincipalType: principal.PrincipalType,
+		Subject:       principal.Subject,
+		DisplayName:   principal.DisplayName,
+		Groups:        append([]string(nil), principal.Groups...),
+		UserHandle:    append([]byte(nil), principal.UserHandle...),
+		Credentials:   append([]webauthn.Credential(nil), principal.Credentials...),
+	}
+}
+
+func principalWriter(store WebAuthnPrincipalStore) WebAuthnPrincipalWriter {
+	writer, _ := store.(WebAuthnPrincipalWriter)
+	return writer
 }
 
 func (u webAuthnUser) WebAuthnID() []byte {
