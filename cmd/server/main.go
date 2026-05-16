@@ -364,13 +364,6 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 			logging.Debugf("Added mTLS auth provider to list")
 			logging.Infof("✓ Configured mTLS auth provider (CA: %s)", providerCfg.CAFile)
 
-		case "github":
-			// Create GitHub OAuth token auth provider
-			provider := auth.NewGitHubProvider(10 * time.Second)
-			providers = append(providers, provider)
-			logging.Debugf("Added GitHub auth provider to list")
-			logging.Info("✓ Configured GitHub OAuth auth provider")
-
 		case "fido2":
 			provider, err := newFido2TokenProvider(cfg.Auth.Fido2)
 			if err != nil {
@@ -380,13 +373,6 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 			providers = append(providers, provider)
 			logging.Debugf("Added FIDO2 auth provider to list")
 			logging.Info("✓ Configured FIDO2 auth provider")
-
-		case "mock":
-			// Create mock auth provider for testing
-			provider := auth.MockGitHubProvider()
-			providers = append(providers, provider)
-			logging.Debugf("Added mock auth provider to list")
-			logging.Info("✓ Configured mock auth provider for testing")
 
 		default:
 			logging.Warnf("Unknown auth provider type: %s", providerCfg.Type)
@@ -777,7 +763,11 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 			var providerName string
 
 			for _, provider := range providers {
-				principal, err = provider.Authenticate(authHeader, r)
+				payload := authHeader
+				if len(authHeader) > 2 && authHeader[0] == provider.Version() && authHeader[1] == provider.Type() {
+					payload = authHeader[2:]
+				}
+				principal, err = provider.Authenticate(payload, r)
 				if err == nil {
 					providerName = provider.Name()
 					break

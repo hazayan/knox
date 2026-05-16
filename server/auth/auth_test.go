@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -333,7 +334,7 @@ func TestMTLSBadHostname(t *testing.T) {
 
 func TestGetUser(t *testing.T) {
 	token := "valid"
-	a := MockGitHubProvider()
+	a := testUserTokenProvider{}
 	principal, err := a.Authenticate(token, nil)
 	if err != nil {
 		t.Error(err.Error())
@@ -355,11 +356,32 @@ func TestGetUser(t *testing.T) {
 
 func TestGetInvalidUser(t *testing.T) {
 	token := "notvalid"
-	a := MockGitHubProvider()
+	a := testUserTokenProvider{}
 	_, err := a.Authenticate(token, nil)
 	if err == nil {
 		t.Error("Expected Error with invalid token")
 	}
+}
+
+type testUserTokenProvider struct{}
+
+func (testUserTokenProvider) Name() string {
+	return "test-user-token"
+}
+
+func (testUserTokenProvider) Version() byte {
+	return '0'
+}
+
+func (testUserTokenProvider) Type() byte {
+	return 'u'
+}
+
+func (testUserTokenProvider) Authenticate(token string, _ *http.Request) (types.Principal, error) {
+	if token != "valid" {
+		return nil, errors.New("invalid test token")
+	}
+	return NewUser("testuser", []string{"testgroup"}), nil
 }
 
 const spiffeCA = `-----BEGIN CERTIFICATE-----

@@ -27,3 +27,6 @@
 [00027] [2026-05-16T20:52:17Z] [TEST] Validated the Knox FIDO2 hardware drill with the attached authenticator and real CLI finish flow after extending the libfido2 touch timeout.
 [00028] [2026-05-16T21:10:30Z] [IMPLEMENTATION] Added authenticated Knox FIDO2 credential registration and import flows with durable credentials-file persistence and CLI registration/import commands.
 [00029] [2026-05-16T21:10:30Z] [TEST] Added focused coverage for FIDO2 admin routes and durable credential imports, then validated the full Go test suite.
+[00030] [2026-05-17T18:05:34Z] [REFACTORING] Removed the GitHub authentication provider and runtime mock provider from Knox server authentication configuration.
+[00031] [2026-05-17T18:05:34Z] [FIX] Updated the production server authentication middleware to strip Knox provider prefixes before validating FIDO2-issued user tokens.
+[00032] [2026-05-17T18:05:34Z] [TEST] Migrated server integration tests from mock authentication to real FIDO2-signed test tokens and validated the hardware FIDO2 login drill with the attached authenticator.
