@@ -219,6 +219,29 @@ func TestServerStartup(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestSetupAuthProvidersFido2(t *testing.T) {
+	keyFile := filepath.Join(t.TempDir(), "fido2-token.key")
+	require.NoError(t, os.WriteFile(keyFile, []byte("0123456789abcdef0123456789abcdef\n"), 0o600))
+
+	cfg := &config.ServerConfig{
+		Auth: config.AuthConfig{
+			Fido2: config.Fido2AuthConfig{
+				Enabled:             true,
+				TokenIssuer:         "knox-test",
+				TokenTTL:            "15m",
+				TokenSigningKeyFile: keyFile,
+			},
+			Providers: []config.AuthProviderConfig{
+				{Type: "fido2"},
+			},
+		},
+	}
+
+	providers := setupAuthProviders(cfg)
+	require.Len(t, providers, 1)
+	assert.Equal(t, "fido2", providers[0].Name())
+}
+
 // TestRunServer tests the runServer function.
 func TestRunServer(t *testing.T) {
 	t.Run("RunServerWithMemoryBackend", func(t *testing.T) {

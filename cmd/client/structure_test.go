@@ -67,7 +67,7 @@ func TestCommandStructure(t *testing.T) {
 			subcommandNames[subcmd.Name()] = true
 		}
 
-		expectedSubcommands := []string{"login", "logout", "status"}
+		expectedSubcommands := []string{"login", "logout", "status", "fido2"}
 		for _, expected := range expectedSubcommands {
 			assert.True(t, subcommandNames[expected], "Auth command should have %s subcommand", expected)
 		}
