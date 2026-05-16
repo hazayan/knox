@@ -301,18 +301,25 @@ func TestKeyValidate(t *testing.T) {
 
 	validKeyID := "test_key"
 	invalidKeyID := "testkey "
+	extendedValidKeyID := "test-key.v1:primary"
+	pathTraversalKeyID := "test..key"
 
 	validHash := validKVL.Hash()
 	invalidHash := "INVALID_HASH"
 
 	validKey := types.Key{ID: validKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
+	extendedValidKey := types.Key{ID: extendedValidKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
 	invalidKey1 := types.Key{ID: invalidKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
 	invalidKey2 := types.Key{ID: validKeyID, ACL: invalidACL, VersionList: validKVL, VersionHash: validHash}
 	invalidKey3 := types.Key{ID: validKeyID, ACL: validACL, VersionList: invalidKVL, VersionHash: validHash}
 	invalidKey4 := types.Key{ID: validKeyID, ACL: validACL, VersionList: validKVL, VersionHash: invalidHash}
+	invalidKey5 := types.Key{ID: pathTraversalKeyID, ACL: validACL, VersionList: validKVL, VersionHash: validHash}
 
 	if validKey.Validate() != nil {
 		t.Error("Valid Key should validate successfully")
+	}
+	if extendedValidKey.Validate() != nil {
+		t.Error("Key ID accepted by route validation should validate successfully")
 	}
 	if invalidKey1.Validate() == nil {
 		t.Error("Invalid Key ID should fail to validate successfully")
@@ -325,6 +332,9 @@ func TestKeyValidate(t *testing.T) {
 	}
 	if invalidKey4.Validate() == nil {
 		t.Error("Invalid Version Hash should fail to validate successfully")
+	}
+	if invalidKey5.Validate() == nil {
+		t.Error("Path traversal Key ID should fail to validate successfully")
 	}
 }
 
