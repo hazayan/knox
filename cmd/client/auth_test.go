@@ -130,6 +130,7 @@ func TestAuthFido2CommandStructure(t *testing.T) {
 
 	assert.True(t, subcommands["begin"])
 	assert.True(t, subcommands["finish"])
+	assert.True(t, subcommands["login"])
 	assert.True(t, subcommands["register"])
 	assert.True(t, subcommands["import"])
 }
@@ -145,6 +146,7 @@ func TestAuthFido2RegisterCommandStructure(t *testing.T) {
 
 	assert.True(t, subcommands["begin"])
 	assert.True(t, subcommands["finish"])
+	assert.True(t, subcommands["hardware"])
 }
 
 func TestReadAssertion(t *testing.T) {

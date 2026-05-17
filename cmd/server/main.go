@@ -158,6 +158,7 @@ func main() {
 		RunE:  runServer,
 	}
 	rootCmd.AddCommand(newKeyCommand())
+	rootCmd.AddCommand(newAuthCommand())
 
 	rootCmd.Flags().StringVarP(&cfgFile, "config", "c", "/etc/knox/server.yaml", "Path to configuration file")
 	rootCmd.Flags().String("version", "", "Print version and exit")
@@ -166,6 +167,72 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func newAuthCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "auth",
+		Short: "Manage local Knox server authentication bootstrap",
+	}
+	cmd.AddCommand(newAuthMintTokenCommand())
+	return cmd
+}
+
+func newAuthMintTokenCommand() *cobra.Command {
+	var principalType string
+	var subject string
+	var groups []string
+
+	cmd := &cobra.Command{
+		Use:   "mint-token",
+		Short: "Mint a local FIDO2 Knox API token from server configuration",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
+				return errors.New("principal type and subject are required")
+			}
+			cfg, err := config.LoadServerConfig(cfgFile)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
+			if err != nil {
+				return err
+			}
+			var token string
+			var expires time.Time
+			switch principalType {
+			case "user":
+				token, expires, err = issuer.MintUserToken(subject, compactStrings(groups))
+			case "machine":
+				token, expires, err = issuer.MintMachineToken(subject)
+			default:
+				return errors.New("principal type must be user or machine")
+			}
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\n", token); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "token expires at %s\n", expires.Format(time.RFC3339))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
+	return cmd
+}
+
+func compactStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func runServer(_ *cobra.Command, _ []string) error {

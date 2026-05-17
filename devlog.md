@@ -30,3 +30,5 @@
 [00030] [2026-05-17T18:05:34Z] [REFACTORING] Removed the GitHub authentication provider and runtime mock provider from Knox server authentication configuration.
 [00031] [2026-05-17T18:05:34Z] [FIX] Updated the production server authentication middleware to strip Knox provider prefixes before validating FIDO2-issued user tokens.
 [00032] [2026-05-17T18:05:34Z] [TEST] Migrated server integration tests from mock authentication to real FIDO2-signed test tokens and validated the hardware FIDO2 login drill with the attached authenticator.
+[00033] [2026-05-17T19:36:27Z] [IMPLEMENTATION] Added hardware FIDO2 login and registration CLI commands plus a local server token-minting bootstrap command for authenticated credential enrollment.
+[00034] [2026-05-17T19:36:27Z] [TEST] Validated the new hardware FIDO2 login path with focused client, server, libfido2, full Go, and live authenticator drill coverage.
