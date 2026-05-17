@@ -91,15 +91,7 @@ func TestFido2HardwareLoginReadsKeyAndRejectsBadTokens(t *testing.T) {
 	server := hardwareRouter(t, issuer, service)
 	defer server.Close()
 
-	begin := fido2BeginLogin(t, server, subject)
-	loginSession := service.sessions[begin.SessionID].Session
-	assertionClientData := hardwareClientData(t, protocol.AssertCeremony, loginSession.Challenge)
-	hardwareAssertion, err := hardwareFido2GetAssertion(devicePath, rpID, pin, credential.ID, assertionClientData)
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-	assertion := credentialAssertionResponse(t, credential.ID, assertionClientData, hardwareAssertion, user.WebAuthnID())
-	token := fido2FinishLoginWithCLI(t, server, begin.SessionID, assertion)
+	token := fido2LoginWithCLI(t, server, devicePath, subject)
 
 	keyID := "fido2-hardware-drill"
 	secret := []byte("hardware-backed-login-read")
@@ -249,13 +241,9 @@ func fido2BeginLogin(t *testing.T, server *httptest.Server, subject string) Fido
 	return begin
 }
 
-func fido2FinishLoginWithCLI(t *testing.T, server *httptest.Server, sessionID string, assertion []byte) string {
+func fido2LoginWithCLI(t *testing.T, server *httptest.Server, devicePath string, subject string) string {
 	t.Helper()
 	tempDir := t.TempDir()
-	assertionFile := filepath.Join(tempDir, "assertion.json")
-	if err := os.WriteFile(assertionFile, assertion, 0o600); err != nil {
-		t.Fatalf("write assertion file: %v", err)
-	}
 
 	configFile := filepath.Join(tempDir, "client.yaml")
 	serverURL, err := neturl.Parse(server.URL)
@@ -283,11 +271,20 @@ func fido2FinishLoginWithCLI(t *testing.T, server *httptest.Server, sessionID st
 		t.Fatalf("write client config: %v", err)
 	}
 
-	cmd := exec.Command("go", "run", "../cmd/client", "--config", configFile, "auth", "fido2", "finish", "--session-id", sessionID, "--assertion-file", assertionFile)
+	cmd := exec.Command(
+		"go", "run", "-tags", "libfido2", "../cmd/client",
+		"--config", configFile,
+		"auth", "fido2", "login",
+		"--principal-type", "user",
+		"--subject", subject,
+		"--device", devicePath,
+		"--pin-file", os.Getenv("KNOX_FIDO2_PIN_FILE"),
+		"--origin", fido2HardwareOrigin,
+	)
 	cmd.Env = append(os.Environ(), "XDG_CONFIG_HOME="+tempDir)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("run knox auth fido2 finish: %v: %s", err, strings.TrimSpace(string(output)))
+		t.Fatalf("run knox auth fido2 login: %v: %s", err, strings.TrimSpace(string(output)))
 	}
 
 	tokenFile := filepath.Join(tempDir, "knox", "token")

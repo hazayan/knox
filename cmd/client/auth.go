@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -153,6 +155,7 @@ func newAuthFido2Cmd() *cobra.Command {
 	}
 	cmd.AddCommand(newAuthFido2BeginCmd())
 	cmd.AddCommand(newAuthFido2FinishCmd())
+	cmd.AddCommand(newAuthFido2LoginCmd())
 	cmd.AddCommand(newAuthFido2RegisterCmd())
 	cmd.AddCommand(newAuthFido2ImportCmd())
 	return cmd
@@ -239,6 +242,74 @@ func newAuthFido2FinishCmd() *cobra.Command {
 	return cmd
 }
 
+func newAuthFido2LoginCmd() *cobra.Command {
+	var principalType string
+	var subject string
+	var device string
+	var pinFile string
+	var origin string
+
+	cmd := &cobra.Command{
+		Use:   "login",
+		Short: "Run a FIDO2 hardware login ceremony and store the Knox token",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
+				return errors.New("principal type and subject are required")
+			}
+			prof, httpClient, err := unauthenticatedProfileClient()
+			if err != nil {
+				return err
+			}
+			req := map[string]string{
+				"principal_type": principalType,
+				"subject":        subject,
+			}
+			var begin fido2BeginResponse
+			if err := postJSON(httpClient, profileURL(prof, "/v0/auth/fido2/login/begin"), req, &begin); err != nil {
+				return err
+			}
+			assertion, err := fido2HardwareLoginAssertion(begin.Options, fido2HardwareOptions{
+				Device:  device,
+				PINFile: pinFile,
+				Origin:  profileOrigin(prof, origin),
+			})
+			if err != nil {
+				return err
+			}
+			finish := fido2FinishRequest{
+				SessionID: begin.SessionID,
+				Assertion: json.RawMessage(assertion),
+			}
+			var resp fido2FinishResponse
+			if err := postJSON(httpClient, profileURL(prof, "/v0/auth/fido2/login/finish"), finish, &resp); err != nil {
+				return err
+			}
+			tokenFile, err := authTokenPath()
+			if err != nil {
+				return err
+			}
+			if err := writeAuthTokenFile(tokenFile, resp.Token); err != nil {
+				return err
+			}
+			if jsonOutput {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
+					"status":     "stored",
+					"path":       tokenFile,
+					"expires_at": resp.ExpiresAt,
+				})
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Stored token: %s\n", tokenFile)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringVar(&device, "device", "auto", "FIDO2 device path or auto")
+	cmd.Flags().StringVar(&pinFile, "pin-file", "", "File containing the FIDO2 PIN")
+	cmd.Flags().StringVar(&origin, "origin", "", "WebAuthn origin override")
+	return cmd
+}
+
 func newAuthFido2RegisterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "register",
@@ -246,6 +317,7 @@ func newAuthFido2RegisterCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newAuthFido2RegisterBeginCmd())
 	cmd.AddCommand(newAuthFido2RegisterFinishCmd())
+	cmd.AddCommand(newAuthFido2RegisterHardwareCmd())
 	return cmd
 }
 
@@ -318,6 +390,65 @@ func newAuthFido2RegisterFinishCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&sessionID, "session-id", "", "FIDO2 registration session ID")
 	cmd.Flags().StringVar(&credentialFile, "credential-file", "-", "JSON credential file, or - for stdin")
+	return cmd
+}
+
+func newAuthFido2RegisterHardwareCmd() *cobra.Command {
+	var principalType string
+	var subject string
+	var displayName string
+	var groups []string
+	var device string
+	var pinFile string
+	var origin string
+
+	cmd := &cobra.Command{
+		Use:   "hardware",
+		Short: "Run an authenticated FIDO2 hardware credential registration",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
+				return errors.New("principal type and subject are required")
+			}
+			prof, httpClient, authToken, err := authenticatedProfileClient()
+			if err != nil {
+				return err
+			}
+			req := map[string]any{
+				"principal_type": principalType,
+				"subject":        subject,
+				"display_name":   displayName,
+				"groups":         compactStrings(groups),
+			}
+			var begin fido2BeginResponse
+			if err := postJSONWithAuth(httpClient, profileURL(prof, "/v0/auth/fido2/credentials/begin"), authToken, req, &begin); err != nil {
+				return err
+			}
+			credential, err := fido2HardwareRegistrationCredential(begin.Options, fido2HardwareOptions{
+				Device:  device,
+				PINFile: pinFile,
+				Origin:  profileOrigin(prof, origin),
+			})
+			if err != nil {
+				return err
+			}
+			finish := map[string]any{
+				"session_id": begin.SessionID,
+				"credential": json.RawMessage(credential),
+			}
+			var resp fido2CredentialResponse
+			if err := postJSONWithAuth(httpClient, profileURL(prof, "/v0/auth/fido2/credentials/finish"), authToken, finish, &resp); err != nil {
+				return err
+			}
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(resp)
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringVar(&displayName, "display-name", "", "FIDO2 display name")
+	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
+	cmd.Flags().StringVar(&device, "device", "auto", "FIDO2 device path or auto")
+	cmd.Flags().StringVar(&pinFile, "pin-file", "", "File containing the FIDO2 PIN")
+	cmd.Flags().StringVar(&origin, "origin", "", "WebAuthn origin override")
 	return cmd
 }
 
@@ -424,6 +555,30 @@ func profileURL(prof *config.ClientProfile, path string) string {
 		scheme = "http"
 	}
 	return scheme + "://" + strings.TrimRight(prof.Server, "/") + path
+}
+
+func profileOrigin(prof *config.ClientProfile, override string) string {
+	override = strings.TrimSpace(override)
+	if override != "" {
+		return strings.TrimRight(override, "/")
+	}
+	return strings.TrimRight(profileURL(prof, ""), "/")
+}
+
+func relyingPartyIDFromOrigin(origin string) string {
+	parsed, err := neturl.Parse(origin)
+	if err != nil || parsed.Hostname() == "" {
+		return origin
+	}
+	return parsed.Hostname()
+}
+
+func decodeBase64URL(value string, field string) ([]byte, error) {
+	data, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return nil, fmt.Errorf("invalid %s: %w", field, err)
+	}
+	return data, nil
 }
 
 func postJSON(httpClient *http.Client, url string, req any, resp any) error {
