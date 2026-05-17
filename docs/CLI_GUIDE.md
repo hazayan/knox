@@ -168,9 +168,46 @@ files are configured and HTTP otherwise.
 
 ## Authentication
 
-Supported client auth paths are still being consolidated. Current code supports
-environment or token-file based auth in the client layer, and TLS fields in the
-profile config.
+Knox servers must be initialized before normal use. The first initialization
+creates persistent global-admin state and prints a one-time bootstrap token:
+
+```bash
+knox-server --config /etc/knox/server.yaml init \
+  --principal-type user \
+  --subject admin \
+  --group knox-admins
+```
+
+Use that bootstrap token to authenticate, then register the administrator's
+hardware authenticator:
+
+```bash
+knox auth login token-value
+knox auth fido2 register hardware \
+  --principal-type user \
+  --subject admin \
+  --display-name admin
+```
+
+After registration, the normal login path is hardware-backed:
+
+```bash
+knox auth fido2 login --principal-type user --subject admin
+```
+
+Global administrators can administer FIDO2 credential enrollment. Secret access
+continues to use per-key ACLs.
+
+After initialization, local token minting is reserved for emergency recovery and
+is restricted to initialized global administrators:
+
+```bash
+knox-server --config /etc/knox/server.yaml auth mint-token \
+  --break-glass \
+  --principal-type user \
+  --subject admin \
+  --group knox-admins
+```
 
 Environment example:
 

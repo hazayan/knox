@@ -63,6 +63,9 @@ Minimal local example:
 ```yaml
 bind_address: "127.0.0.1:9000"
 
+initialization:
+  state_file: "/usr/local/etc/knox/init.json"
+
 storage:
   backend: "filesystem"
   filesystem_dir: "/var/lib/knox/keys"
@@ -120,6 +123,22 @@ install -d -m 0700 /etc/knox
 openssl rand -base64 32 > /etc/knox/master.key
 chmod 0600 /etc/knox/master.key
 ```
+
+Initialize the server before the first start. This creates the persistent
+initialization state and prints a one-time bootstrap token for the first global
+administrator:
+
+```bash
+knox-server --config /etc/knox/server.yaml init \
+  --principal-type user \
+  --subject admin \
+  --group knox-admins
+```
+
+The initialization state is created with owner-only permissions and cannot be
+created twice. FIDO2 credential administration is restricted to principals named
+in this state, or users in one of its admin groups. Per-secret ACLs remain
+separate from this global administrator role.
 
 Start the server:
 
