@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -370,6 +371,13 @@ func runServer(_ *cobra.Command, _ []string) error {
 	}
 	logging.Infof("Initialization state loaded: %s", cfg.Initialization.StateFile)
 
+	policyStore, err := server.NewACLPolicyStoreFromFile(cfg.AccessControl.PolicyFile)
+	if err != nil {
+		return err
+	}
+	server.SetACLPolicyResolver(policyStore.ACLForKey)
+	logging.Infof("ACL policy store loaded: %s", cfg.AccessControl.PolicyFile)
+
 	// Initialize storage backend
 	storageBackend, err := storage.NewBackend(cfg.Storage.ToStorageConfig())
 	if err != nil {
@@ -440,6 +448,7 @@ func runServer(_ *cobra.Command, _ []string) error {
 	if err := registerFido2AdminRoutes(router, cfg, decorators, initState); err != nil {
 		return err
 	}
+	registerPolicyRoutes(router, policyStore, decorators, initState)
 
 	// Add metrics endpoint if enabled
 	if cfg.Observability.Metrics.Enabled {
@@ -647,6 +656,84 @@ func registerFido2AdminRoutes(router *mux.Router, cfg *config.ServerConfig, deco
 	adminDecorators = append(adminDecorators, globalAdminMiddleware(initState))
 	server.RegisterFido2AdminRoutes(router, service, adminDecorators)
 	return nil
+}
+
+func registerPolicyRoutes(router *mux.Router, store *server.ACLPolicyStore, decorators []func(http.HandlerFunc) http.HandlerFunc, initState *server.InitializationState) {
+	decorator := func(f http.HandlerFunc) http.HandlerFunc { return f }
+	adminDecorators := append([]func(http.HandlerFunc) http.HandlerFunc{}, decorators...)
+	adminDecorators = append(adminDecorators, globalAdminMiddleware(initState))
+	for i := range adminDecorators {
+		j := len(adminDecorators) - i - 1
+		decorator = combineDecorators(adminDecorators[j], decorator)
+	}
+	router.HandleFunc("/v0/policies/", decorator(listPoliciesHandler(store))).Methods(http.MethodGet)
+	router.HandleFunc("/v0/policies/{name}", decorator(getPolicyHandler(store))).Methods(http.MethodGet)
+	router.HandleFunc("/v0/policies/{name}", decorator(putPolicyHandler(store))).Methods(http.MethodPut)
+	router.HandleFunc("/v0/policies/{name}", decorator(deletePolicyHandler(store))).Methods(http.MethodDelete)
+}
+
+func listPoliciesHandler(store *server.ACLPolicyStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		server.WriteData(w, store.List())
+	}
+}
+
+func getPolicyHandler(store *server.ACLPolicyStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		policy, err := store.Get(mux.Vars(r)["name"])
+		if err != nil {
+			writePolicyError(w, r, err)
+			return
+		}
+		server.WriteData(w, policy)
+	}
+}
+
+func putPolicyHandler(store *server.ACLPolicyStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var policy types.ACLPolicy
+		if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
+			server.WriteErr(&server.HTTPError{Subcode: types.BadRequestDataCode, Message: err.Error()})(w, r)
+			return
+		}
+		name := mux.Vars(r)["name"]
+		if policy.Name == "" {
+			policy.Name = name
+		}
+		if policy.Name != name {
+			server.WriteErr(&server.HTTPError{Subcode: types.BadRequestDataCode, Message: "policy name must match URL"})(w, r)
+			return
+		}
+		if err := store.Put(policy); err != nil {
+			writePolicyError(w, r, err)
+			return
+		}
+		server.WriteData(w, policy)
+	}
+}
+
+func deletePolicyHandler(store *server.ACLPolicyStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := store.Delete(mux.Vars(r)["name"]); err != nil {
+			writePolicyError(w, r, err)
+			return
+		}
+		server.WriteData(w, nil)
+	}
+}
+
+func writePolicyError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, server.ErrPolicyNotFound) {
+		server.WriteErr(&server.HTTPError{Subcode: types.NotFoundCode, Message: err.Error()})(w, r)
+		return
+	}
+	server.WriteErr(&server.HTTPError{Subcode: types.BadRequestDataCode, Message: err.Error()})(w, r)
+}
+
+func combineDecorators(f, g func(http.HandlerFunc) http.HandlerFunc) func(http.HandlerFunc) http.HandlerFunc {
+	return func(h http.HandlerFunc) http.HandlerFunc {
+		return f(g(h))
+	}
 }
 
 // loadCAPool loads a CA certificate pool from a file.

@@ -318,6 +318,22 @@ func (m *MockKnoxClient) PutAccess(_ string, _ ...types.Access) error {
 	return nil
 }
 
+func (m *MockKnoxClient) ListPolicies() ([]string, error) {
+	return nil, nil
+}
+
+func (m *MockKnoxClient) GetPolicy(_ string) (*types.ACLPolicy, error) {
+	return nil, nil
+}
+
+func (m *MockKnoxClient) PutPolicy(_ types.ACLPolicy) error {
+	return nil
+}
+
+func (m *MockKnoxClient) DeletePolicy(_ string) error {
+	return nil
+}
+
 func (m *MockKnoxClient) AddVersion(_ string, _ []byte) (uint64, error) {
 	return 0, nil
 }

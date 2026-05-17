@@ -170,6 +170,22 @@ func (m *IntegrationMockAPIClient) PutAccess(keyID string, acl ...types.Access) 
 	return errors.New("key not found")
 }
 
+func (m *IntegrationMockAPIClient) ListPolicies() ([]string, error) {
+	return nil, nil
+}
+
+func (m *IntegrationMockAPIClient) GetPolicy(_ string) (*types.ACLPolicy, error) {
+	return nil, errors.New("policy not found")
+}
+
+func (m *IntegrationMockAPIClient) PutPolicy(_ types.ACLPolicy) error {
+	return nil
+}
+
+func (m *IntegrationMockAPIClient) DeletePolicy(_ string) error {
+	return nil
+}
+
 func (m *IntegrationMockAPIClient) AddVersion(keyID string, data []byte) (uint64, error) {
 	if key, ok := m.keys[keyID]; ok {
 		newVersionID := uint64(1)

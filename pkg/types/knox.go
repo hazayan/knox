@@ -619,3 +619,19 @@ type AccessCallbackInput struct {
 	Principals []RawPrincipal `json:"principals"`
 	AccessType AccessType     `json:"access_type"`
 }
+
+// ACLPolicy grants default ACL entries to keys whose identifiers match one of
+// its rules. Policies are evaluated on key creation and do not replace per-key
+// ACL administration.
+type ACLPolicy struct {
+	Name  string          `json:"name"`
+	Rules []ACLPolicyRule `json:"rules"`
+}
+
+// ACLPolicyRule grants ACL entries to key identifiers matching Pattern.
+// Patterns match exact key IDs unless they end in '*', in which case the text
+// before '*' is treated as a prefix.
+type ACLPolicyRule struct {
+	Pattern string `json:"pattern"`
+	Grants  ACL    `json:"grants"`
+}

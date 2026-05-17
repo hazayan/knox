@@ -66,6 +66,9 @@ bind_address: "127.0.0.1:9000"
 initialization:
   state_file: "/usr/local/etc/knox/init.json"
 
+access_control:
+  policy_file: "/usr/local/etc/knox/policies.json"
+
 storage:
   backend: "filesystem"
   filesystem_dir: "/var/lib/knox/keys"
@@ -167,6 +170,33 @@ knox key list
 knox key rotate app:test --data "new-secret-value"
 knox acl get app:test
 ```
+
+ACL policies provide Vault-inspired namespace defaults for newly-created keys.
+Policies are global-admin managed JSON documents. Rules match exact key IDs or
+prefixes ending in `*`, and matching grants are merged into the key ACL when the
+key is created:
+
+```json
+{
+  "name": "trust-services",
+  "rules": [
+    {
+      "pattern": "service:kanidm:*",
+      "grants": [
+        {"type": "UserGroup", "id": "knox-admins", "access": "Admin"}
+      ]
+    }
+  ]
+}
+```
+
+```bash
+knox policy put trust-services.json
+knox policy get trust-services
+knox policy list
+```
+
+Policies do not bypass per-key ACL checks for existing keys.
 
 See [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) for current command details.
 

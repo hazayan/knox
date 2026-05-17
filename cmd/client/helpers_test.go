@@ -40,6 +40,10 @@ type MockAPIClient struct {
 	AddAccessFunc               func(keyID string, access types.Access) error
 	DeleteAccessFunc            func(keyID string, access types.Access) error
 	DeleteKeyFunc               func(keyID string) error
+	ListPoliciesFunc            func() ([]string, error)
+	GetPolicyFunc               func(name string) (*types.ACLPolicy, error)
+	PutPolicyFunc               func(policy types.ACLPolicy) error
+	DeletePolicyFunc            func(name string) error
 	AddVersionFunc              func(keyID string, data []byte) (uint64, error)
 	UpdateVersionFunc           func(keyID string, versionID string, status types.VersionStatus) error
 	CacheGetKeyFunc             func(keyID string) (*types.Key, error)
@@ -377,6 +381,34 @@ func (m *MockAPIClient) PutAccess(keyID string, access ...types.Access) error {
 		return m.PutAccessFunc(keyID, access...)
 	}
 	return errors.New("PutAccess not implemented")
+}
+
+func (m *MockAPIClient) ListPolicies() ([]string, error) {
+	if m.ListPoliciesFunc != nil {
+		return m.ListPoliciesFunc()
+	}
+	return nil, errors.New("ListPolicies not implemented")
+}
+
+func (m *MockAPIClient) GetPolicy(name string) (*types.ACLPolicy, error) {
+	if m.GetPolicyFunc != nil {
+		return m.GetPolicyFunc(name)
+	}
+	return nil, errors.New("GetPolicy not implemented")
+}
+
+func (m *MockAPIClient) PutPolicy(policy types.ACLPolicy) error {
+	if m.PutPolicyFunc != nil {
+		return m.PutPolicyFunc(policy)
+	}
+	return errors.New("PutPolicy not implemented")
+}
+
+func (m *MockAPIClient) DeletePolicy(name string) error {
+	if m.DeletePolicyFunc != nil {
+		return m.DeletePolicyFunc(name)
+	}
+	return errors.New("DeletePolicy not implemented")
 }
 
 // AssertJSONOutput validates that the output is valid JSON.
