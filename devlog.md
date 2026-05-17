@@ -32,3 +32,6 @@
 [00032] [2026-05-17T18:05:34Z] [TEST] Migrated server integration tests from mock authentication to real FIDO2-signed test tokens and validated the hardware FIDO2 login drill with the attached authenticator.
 [00033] [2026-05-17T19:36:27Z] [IMPLEMENTATION] Added hardware FIDO2 login and registration CLI commands plus a local server token-minting bootstrap command for authenticated credential enrollment.
 [00034] [2026-05-17T19:36:27Z] [TEST] Validated the new hardware FIDO2 login path with focused client, server, libfido2, full Go, and live authenticator drill coverage.
+[00035] [2026-05-17T21:33:55Z] [IMPLEMENTATION] Added a Vault-like Knox initialization milestone with persistent init state, first global admin creation, one-time FIDO2 bootstrap token output, and global-admin gating for FIDO2 credential administration.
+[00036] [2026-05-17T21:33:55Z] [VALIDATION] Added focused tests for initialization state creation, duplicate-init refusal, admin group matching, and global-admin middleware authorization.
+[00037] [2026-05-17T21:33:55Z] [FIX] Restricted local Knox token minting to explicit break-glass use for principals already authorized by the persistent initialization state.

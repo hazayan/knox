@@ -74,6 +74,37 @@ func testFido2AuthToken(t *testing.T) string {
 	return token
 }
 
+func TestGlobalAdminMiddlewareRequiresInitializedAdmin(t *testing.T) {
+	state := &server.InitializationState{
+		Version:       server.InitializationStateVersion,
+		InitializedAt: time.Now().UTC(),
+		AdminPrincipals: []types.RawPrincipal{
+			{Type: "user", ID: "alice"},
+		},
+		AdminGroups: []string{"operators"},
+	}
+
+	called := false
+	handler := globalAdminMiddleware(state)(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	denied := httptest.NewRecorder()
+	deniedReq := httptest.NewRequest(http.MethodPost, "/v0/auth/fido2/credentials/begin", nil)
+	server.SetPrincipal(deniedReq, auth.NewUser("mallory", nil))
+	handler(denied, deniedReq)
+	require.Equal(t, http.StatusForbidden, denied.Code)
+	require.False(t, called)
+
+	allowed := httptest.NewRecorder()
+	allowedReq := httptest.NewRequest(http.MethodPost, "/v0/auth/fido2/credentials/begin", nil)
+	server.SetPrincipal(allowedReq, auth.NewUser("bob", []string{"operators"}))
+	handler(allowed, allowedReq)
+	require.Equal(t, http.StatusNoContent, allowed.Code)
+	require.True(t, called)
+}
+
 type failingPingBackend struct{}
 
 func (failingPingBackend) GetKey(context.Context, string) (*types.Key, error) {

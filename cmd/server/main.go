@@ -157,6 +157,7 @@ func main() {
 		Long:  `Knox is a service for storing and rotating secrets, keys, and passwords.`,
 		RunE:  runServer,
 	}
+	rootCmd.AddCommand(newInitCommand())
 	rootCmd.AddCommand(newKeyCommand())
 	rootCmd.AddCommand(newAuthCommand())
 
@@ -167,6 +168,65 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func newInitCommand() *cobra.Command {
+	var principalType string
+	var subject string
+	var groups []string
+
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Initialize Knox with the first global administrator",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
+				return errors.New("principal type and subject are required")
+			}
+			cfg, err := config.LoadServerConfig(cfgFile)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			principal, err := rawPrincipal(principalType, subject)
+			if err != nil {
+				return err
+			}
+			var token string
+			var expires time.Time
+			if cfg.Auth.Fido2.Enabled {
+				issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
+				if err != nil {
+					return err
+				}
+				token, expires, err = mintTokenForPrincipal(issuer, principalType, subject, groups)
+				if err != nil {
+					return err
+				}
+			}
+			state, err := server.InitializeState(cfg.Initialization.StateFile, server.InitializationOptions{
+				AdminPrincipal: principal,
+				AdminGroups:    groups,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "initialized Knox at %s\n", state.InitializedAt.Format(time.RFC3339))
+			fmt.Fprintf(cmd.ErrOrStderr(), "admin principal: %s:%s\n", principal.Type, principal.ID)
+			if len(state.AdminGroups) > 0 {
+				fmt.Fprintf(cmd.ErrOrStderr(), "admin groups: %s\n", strings.Join(state.AdminGroups, ","))
+			}
+			if cfg.Auth.Fido2.Enabled {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\n", token); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "bootstrap token expires at %s\n", expires.Format(time.RFC3339))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal and grant global admin")
+	return cmd
 }
 
 func newAuthCommand() *cobra.Command {
@@ -182,17 +242,32 @@ func newAuthMintTokenCommand() *cobra.Command {
 	var principalType string
 	var subject string
 	var groups []string
+	var breakGlass bool
 
 	cmd := &cobra.Command{
 		Use:   "mint-token",
-		Short: "Mint a local FIDO2 Knox API token from server configuration",
+		Short: "Mint an explicit break-glass FIDO2 Knox API token",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
 				return errors.New("principal type and subject are required")
 			}
+			if !breakGlass {
+				return errors.New("local token minting is a break-glass operation; pass --break-glass after confirming the target principal is an initialized Knox global admin")
+			}
 			cfg, err := config.LoadServerConfig(cfgFile)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
+			}
+			initState, err := server.LoadInitializationState(cfg.Initialization.StateFile)
+			if err != nil {
+				return err
+			}
+			principal, err := principalForToken(principalType, subject, groups)
+			if err != nil {
+				return err
+			}
+			if !initState.IsAdmin(principal) {
+				return errors.New("break-glass token minting is restricted to initialized Knox global administrators")
 			}
 			issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
 			if err != nil {
@@ -200,14 +275,7 @@ func newAuthMintTokenCommand() *cobra.Command {
 			}
 			var token string
 			var expires time.Time
-			switch principalType {
-			case "user":
-				token, expires, err = issuer.MintUserToken(subject, compactStrings(groups))
-			case "machine":
-				token, expires, err = issuer.MintMachineToken(subject)
-			default:
-				return errors.New("principal type must be user or machine")
-			}
+			token, expires, err = mintTokenForPrincipal(issuer, principalType, subject, groups)
 			if err != nil {
 				return err
 			}
@@ -221,7 +289,39 @@ func newAuthMintTokenCommand() *cobra.Command {
 	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
 	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
 	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
+	cmd.Flags().BoolVar(&breakGlass, "break-glass", false, "Allow local emergency token minting for an initialized global administrator")
 	return cmd
+}
+
+func mintTokenForPrincipal(issuer *auth.Fido2TokenIssuer, principalType, subject string, groups []string) (string, time.Time, error) {
+	switch principalType {
+	case "user":
+		return issuer.MintUserToken(subject, compactStrings(groups))
+	case "machine":
+		return issuer.MintMachineToken(subject)
+	default:
+		return "", time.Time{}, errors.New("principal type must be user or machine")
+	}
+}
+
+func rawPrincipal(principalType, subject string) (types.RawPrincipal, error) {
+	switch principalType {
+	case "user", "machine", "service":
+		return types.RawPrincipal{Type: principalType, ID: subject}, nil
+	default:
+		return types.RawPrincipal{}, errors.New("principal type must be user, machine, or service")
+	}
+}
+
+func principalForToken(principalType, subject string, groups []string) (types.Principal, error) {
+	switch principalType {
+	case "user":
+		return auth.NewUser(subject, compactStrings(groups)), nil
+	case "machine":
+		return auth.NewMachine(subject), nil
+	default:
+		return nil, errors.New("principal type must be user or machine")
+	}
 }
 
 func compactStrings(values []string) []string {
@@ -260,6 +360,15 @@ func runServer(_ *cobra.Command, _ []string) error {
 
 	logging.Infof("Knox server %s starting...", version)
 	logging.Infof("Configuration: %s", cfgFile)
+
+	initState, err := server.LoadInitializationState(cfg.Initialization.StateFile)
+	if err != nil {
+		if errors.Is(err, server.ErrNotInitialized) {
+			return fmt.Errorf("%w: run 'knox-server --config %s init --principal-type user --subject <admin>' before starting the server", err, cfgFile)
+		}
+		return err
+	}
+	logging.Infof("Initialization state loaded: %s", cfg.Initialization.StateFile)
 
 	// Initialize storage backend
 	storageBackend, err := storage.NewBackend(cfg.Storage.ToStorageConfig())
@@ -326,6 +435,9 @@ func runServer(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to create router: %w", err)
 	}
 	if err := registerFido2AuthRoutes(router, cfg, decorators); err != nil {
+		return err
+	}
+	if err := registerFido2AdminRoutes(router, cfg, decorators, initState); err != nil {
 		return err
 	}
 
@@ -505,7 +617,35 @@ func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig, decor
 		return fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
 	}
 	server.RegisterFido2AuthRoutes(router, service)
-	server.RegisterFido2AdminRoutes(router, service, decorators)
+	return nil
+}
+
+func registerFido2AdminRoutes(router *mux.Router, cfg *config.ServerConfig, decorators []func(http.HandlerFunc) http.HandlerFunc, initState *server.InitializationState) error {
+	if !cfg.Auth.Fido2.Enabled {
+		return nil
+	}
+	if cfg.Auth.Fido2.CredentialsFile == "" {
+		return errors.New("auth.fido2.credentials_file is required")
+	}
+	issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
+	if err != nil {
+		return err
+	}
+	store, err := server.NewWebAuthnPrincipalStoreFromFile(cfg.Auth.Fido2.CredentialsFile)
+	if err != nil {
+		return err
+	}
+	service, err := server.NewWebAuthnCeremonyService(&webauthn.Config{
+		RPID:          cfg.Auth.Fido2.RPID,
+		RPDisplayName: cfg.Auth.Fido2.RPName,
+		RPOrigins:     cfg.Auth.Fido2.Origins,
+	}, store, issuer)
+	if err != nil {
+		return fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
+	}
+	adminDecorators := append([]func(http.HandlerFunc) http.HandlerFunc{}, decorators...)
+	adminDecorators = append(adminDecorators, globalAdminMiddleware(initState))
+	server.RegisterFido2AdminRoutes(router, service, adminDecorators)
 	return nil
 }
 
@@ -876,6 +1016,31 @@ func authMiddleware(providers []auth.Provider) func(http.HandlerFunc) http.Handl
 
 			// Store principal in request using Knox's decorator system
 			server.SetPrincipal(r, principal)
+			next(w, r)
+		}
+	}
+}
+
+func globalAdminMiddleware(initState *server.InitializationState) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if initState == nil {
+				server.WriteErr(&server.HTTPError{Subcode: types.UnauthorizedCode, Message: "Knox is not initialized"})(w, r)
+				return
+			}
+			principal := server.GetPrincipal(r)
+			if !initState.IsAdmin(principal) {
+				principalID := ""
+				if principal != nil {
+					principalID = principal.GetID()
+				}
+				logging.AuditAuthAttempt(principalID, "admin", "init-state", "denied_not_global_admin", map[string]any{
+					"path":        r.URL.Path,
+					"remote_addr": r.RemoteAddr,
+				})
+				server.WriteErr(&server.HTTPError{Subcode: types.UnauthorizedCode, Message: "Principal is not a Knox global administrator"})(w, r)
+				return
+			}
 			next(w, r)
 		}
 	}

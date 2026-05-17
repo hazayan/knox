@@ -16,13 +16,19 @@ import (
 
 // ServerConfig holds configuration for the Knox server.
 type ServerConfig struct {
-	BindAddress   string              `mapstructure:"bind_address"`
-	TLS           TLSConfig           `mapstructure:"tls"`
-	MasterKey     MasterKeyConfig     `mapstructure:"master_key"`
-	Storage       StorageConfig       `mapstructure:"storage"`
-	Auth          AuthConfig          `mapstructure:"auth"`
-	Observability ObservabilityConfig `mapstructure:"observability"`
-	Limits        LimitsConfig        `mapstructure:"limits"`
+	BindAddress    string               `mapstructure:"bind_address"`
+	TLS            TLSConfig            `mapstructure:"tls"`
+	Initialization InitializationConfig `mapstructure:"initialization"`
+	MasterKey      MasterKeyConfig      `mapstructure:"master_key"`
+	Storage        StorageConfig        `mapstructure:"storage"`
+	Auth           AuthConfig           `mapstructure:"auth"`
+	Observability  ObservabilityConfig  `mapstructure:"observability"`
+	Limits         LimitsConfig         `mapstructure:"limits"`
+}
+
+// InitializationConfig holds Knox server initialization state configuration.
+type InitializationConfig struct {
+	StateFile string `mapstructure:"state_file"`
 }
 
 // TLSConfig holds TLS configuration.
@@ -186,6 +192,7 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 
 	// Set defaults
 	v.SetDefault("bind_address", "0.0.0.0:9000")
+	v.SetDefault("initialization.state_file", "/usr/local/etc/knox/init.json")
 	v.SetDefault("master_key.backend", "default")
 	v.SetDefault("storage.backend", "filesystem")
 	v.SetDefault("storage.filesystem_dir", "/var/lib/knox/keys")
