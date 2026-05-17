@@ -150,6 +150,43 @@ Access levels:
 - `Write`
 - `Admin`
 
+## ACL Policies
+
+ACL policies are named server-side documents that apply default ACL grants when
+matching keys are created. They are inspired by Vault path policies, but remain
+small and explicit: a rule matches either an exact key ID or a prefix pattern
+ending in `*`.
+
+Example policy:
+
+```json
+{
+  "name": "trust-services",
+  "rules": [
+    {
+      "pattern": "service:kanidm:*",
+      "grants": [
+        {"type": "UserGroup", "id": "knox-admins", "access": "Admin"},
+        {"type": "Machine", "id": "machine-a", "access": "Read"}
+      ]
+    }
+  ]
+}
+```
+
+Manage policies:
+
+```bash
+knox policy put trust-services.json
+knox policy list
+knox policy get trust-services
+knox policy delete trust-services
+```
+
+Policy management requires Knox global-admin authorization. Policy grants are
+merged into the ACL at key creation time; existing keys are not rewritten
+implicitly.
+
 ## Server Status
 
 Check operational endpoints from the active profile:

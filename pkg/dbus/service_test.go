@@ -86,6 +86,32 @@ func (m *MockAPIClient) PutAccess(keyID string, acl ...types.Access) error {
 	return args.Error(0)
 }
 
+func (m *MockAPIClient) ListPolicies() ([]string, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockAPIClient) GetPolicy(name string) (*types.ACLPolicy, error) {
+	args := m.Called(name)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*types.ACLPolicy), args.Error(1)
+}
+
+func (m *MockAPIClient) PutPolicy(policy types.ACLPolicy) error {
+	args := m.Called(policy)
+	return args.Error(0)
+}
+
+func (m *MockAPIClient) DeletePolicy(name string) error {
+	args := m.Called(name)
+	return args.Error(0)
+}
+
 func (m *MockAPIClient) GetAccess(keyID string) (types.ACL, error) {
 	args := m.Called(keyID)
 	return args.Get(0).(types.ACL), args.Error(1)

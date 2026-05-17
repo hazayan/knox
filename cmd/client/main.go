@@ -63,6 +63,7 @@ access control and comprehensive audit logging.`,
 	// Add command groups
 	rootCmd.AddCommand(newKeyCmd())
 	rootCmd.AddCommand(newACLCmd())
+	rootCmd.AddCommand(newPolicyCmd())
 	rootCmd.AddCommand(newAuthCmd())
 	rootCmd.AddCommand(newServerCmd())
 	rootCmd.AddCommand(newConfigCmd())

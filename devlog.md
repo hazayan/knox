@@ -35,3 +35,5 @@
 [00035] [2026-05-17T21:33:55Z] [IMPLEMENTATION] Added a Vault-like Knox initialization milestone with persistent init state, first global admin creation, one-time FIDO2 bootstrap token output, and global-admin gating for FIDO2 credential administration.
 [00036] [2026-05-17T21:33:55Z] [VALIDATION] Added focused tests for initialization state creation, duplicate-init refusal, admin group matching, and global-admin middleware authorization.
 [00037] [2026-05-17T21:33:55Z] [FIX] Restricted local Knox token minting to explicit break-glass use for principals already authorized by the persistent initialization state.
+[00038] [2026-05-17T21:53:57Z] [IMPLEMENTATION] Added Vault-inspired ACL policies with named JSON policy documents, exact or prefix key matching, global-admin policy management routes, and automatic grant merging during key creation.
+[00039] [2026-05-17T21:53:57Z] [VALIDATION] Added policy persistence, policy matching, and key-creation grant merge tests, then validated targeted server, client, config, and type packages.

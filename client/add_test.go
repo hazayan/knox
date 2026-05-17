@@ -104,6 +104,10 @@ type MockAPIClient struct {
 	DeleteKeyFunc               func(keyID string) error
 	GetACLFunc                  func(keyID string) (*types.ACL, error)
 	PutAccessFunc               func(keyID string, acl ...types.Access) error
+	ListPoliciesFunc            func() ([]string, error)
+	GetPolicyFunc               func(name string) (*types.ACLPolicy, error)
+	PutPolicyFunc               func(policy types.ACLPolicy) error
+	DeletePolicyFunc            func(name string) error
 	AddVersionFunc              func(keyID string, data []byte) (uint64, error)
 	UpdateVersionFunc           func(keyID, versionID string, status types.VersionStatus) error
 	CacheGetKeyFunc             func(keyID string) (*types.Key, error)
@@ -153,6 +157,34 @@ func (m *MockAPIClient) PutAccess(keyID string, acl ...types.Access) error {
 		return m.PutAccessFunc(keyID, acl...)
 	}
 	return errors.New("PutAccess not implemented")
+}
+
+func (m *MockAPIClient) ListPolicies() ([]string, error) {
+	if m.ListPoliciesFunc != nil {
+		return m.ListPoliciesFunc()
+	}
+	return nil, errors.New("ListPolicies not implemented")
+}
+
+func (m *MockAPIClient) GetPolicy(name string) (*types.ACLPolicy, error) {
+	if m.GetPolicyFunc != nil {
+		return m.GetPolicyFunc(name)
+	}
+	return nil, errors.New("GetPolicy not implemented")
+}
+
+func (m *MockAPIClient) PutPolicy(policy types.ACLPolicy) error {
+	if m.PutPolicyFunc != nil {
+		return m.PutPolicyFunc(policy)
+	}
+	return errors.New("PutPolicy not implemented")
+}
+
+func (m *MockAPIClient) DeletePolicy(name string) error {
+	if m.DeletePolicyFunc != nil {
+		return m.DeletePolicyFunc(name)
+	}
+	return errors.New("DeletePolicy not implemented")
 }
 
 func (m *MockAPIClient) AddVersion(keyID string, data []byte) (uint64, error) {

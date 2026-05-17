@@ -198,6 +198,10 @@ type APIClient interface {
 	DeleteKey(keyID string) error
 	GetACL(keyID string) (*types.ACL, error)
 	PutAccess(keyID string, acl ...types.Access) error
+	ListPolicies() ([]string, error)
+	GetPolicy(name string) (*types.ACLPolicy, error)
+	PutPolicy(policy types.ACLPolicy) error
+	DeletePolicy(name string) error
 	AddVersion(keyID string, data []byte) (uint64, error)
 	UpdateVersion(keyID, versionID string, status types.VersionStatus) error
 	CacheGetKey(keyID string) (*types.Key, error)
@@ -384,6 +388,22 @@ func (c *HTTPClient) PutAccess(keyID string, a ...types.Access) error {
 	return c.UncachedClient.PutAccess(keyID, a...)
 }
 
+func (c *HTTPClient) ListPolicies() ([]string, error) {
+	return c.UncachedClient.ListPolicies()
+}
+
+func (c *HTTPClient) GetPolicy(name string) (*types.ACLPolicy, error) {
+	return c.UncachedClient.GetPolicy(name)
+}
+
+func (c *HTTPClient) PutPolicy(policy types.ACLPolicy) error {
+	return c.UncachedClient.PutPolicy(policy)
+}
+
+func (c *HTTPClient) DeletePolicy(name string) error {
+	return c.UncachedClient.DeletePolicy(name)
+}
+
 // AddVersion adds a key version to a specific key.
 func (c *HTTPClient) AddVersion(keyID string, data []byte) (uint64, error) {
 	return c.UncachedClient.AddVersion(keyID, data)
@@ -534,6 +554,26 @@ func (c *UncachedHTTPClient) PutAccess(keyID string, a ...types.Access) error {
 	return err
 }
 
+func (c *UncachedHTTPClient) ListPolicies() ([]string, error) {
+	var names []string
+	err := c.getHTTPData("GET", "/v0/policies/", nil, &names)
+	return names, err
+}
+
+func (c *UncachedHTTPClient) GetPolicy(name string) (*types.ACLPolicy, error) {
+	policy := &types.ACLPolicy{}
+	err := c.getHTTPData("GET", "/v0/policies/"+url.PathEscape(name), nil, policy)
+	return policy, err
+}
+
+func (c *UncachedHTTPClient) PutPolicy(policy types.ACLPolicy) error {
+	return c.getHTTPJSON("PUT", "/v0/policies/"+url.PathEscape(policy.Name), policy, nil)
+}
+
+func (c *UncachedHTTPClient) DeletePolicy(name string) error {
+	return c.getHTTPData("DELETE", "/v0/policies/"+url.PathEscape(name), nil, nil)
+}
+
 // AddVersion adds a key version to a specific key.
 func (c *UncachedHTTPClient) AddVersion(keyID string, data []byte) (uint64, error) {
 	var i uint64
@@ -634,6 +674,70 @@ func (c *UncachedHTTPClient) getHTTPData(method, path string, body url.Values, d
 		return errNoAuth
 	}
 
+	return fmt.Errorf("%w: attempted auth types: %v", errUnsuccessfulAuth, attemptedAuthTypes)
+}
+
+func (c *UncachedHTTPClient) getHTTPJSON(method, path string, body any, data any) error {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	return c.getHTTPBody(method, path, "application/json", string(payload), data)
+}
+
+func (c *UncachedHTTPClient) getHTTPBody(method, path, contentType, encodedBody string, data any) error {
+	if len(c.AuthHandlers) == 0 {
+		return errNoAuth
+	}
+
+	authRequestAttempted := false
+	attemptedAuthTypes := []string{}
+	for _, authHandler := range c.AuthHandlers {
+		authToken, authType, clientOverride := authHandler()
+		if authToken == "" {
+			continue
+		}
+		authRequestAttempted = true
+		attemptedAuthTypes = append(attemptedAuthTypes, authType)
+
+		var cli HTTP
+		if clientOverride != nil {
+			cli = clientOverride
+		} else {
+			cli = c.getClient()
+		}
+
+		resp := &types.Response{Data: data}
+		for i := 1; i <= maxRetryAttempts; i++ {
+			r, err := http.NewRequest(method, c.baseURL()+path, bytes.NewBufferString(encodedBody))
+			if err != nil {
+				return err
+			}
+			r.Header.Set("Authorization", authToken)
+			r.Header.Set("User-Agent", fmt.Sprintf("Knox_Client/%s", c.Version))
+			if contentType != "" {
+				r.Header.Set("Content-Type", contentType)
+			}
+			err = getHTTPResp(cli, r, resp)
+			if err != nil {
+				return err
+			}
+			if resp.Status == "ok" {
+				return nil
+			}
+			if resp.Code == types.UnauthorizedCode || resp.Code == types.UnauthenticatedCode {
+				break
+			}
+			if (resp.Code != types.InternalServerErrorCode) || (i == maxRetryAttempts) {
+				return fmt.Errorf("%s", resp.Message)
+			}
+			time.Sleep(GetBackoffDuration(i))
+		}
+	}
+
+	if !authRequestAttempted {
+		return errNoAuth
+	}
 	return fmt.Errorf("%w: attempted auth types: %v", errUnsuccessfulAuth, attemptedAuthTypes)
 }
 

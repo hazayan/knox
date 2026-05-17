@@ -362,6 +362,11 @@ func newKey(id string, acl types.ACL, d []byte, u types.Principal) types.Key {
 
 	creatorAccess := types.Access{ID: u.GetID(), AccessType: types.Admin, Type: principalType}
 	key.ACL = acl.Add(creatorAccess)
+	if aclPolicyResolver != nil {
+		for _, a := range aclPolicyResolver(id) {
+			key.ACL = key.ACL.Add(a)
+		}
+	}
 	for _, a := range defaultAccess {
 		key.ACL = key.ACL.Add(a)
 	}
