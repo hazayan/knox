@@ -14,6 +14,11 @@ The server owns four responsibilities:
 3. Validate login assertions through a WebAuthn relying-party implementation.
 4. Mint and verify short-lived Knox bearer tokens.
 
+This identity credential is not the storage-unlock credential. It must not be
+used to derive the Knox master-key wrapping key. Root/admin bootstrap should use
+the initialization token to enroll the first administrator credential, then
+normal administration should use the FIDO2 login path.
+
 Normal Knox API routes do not run WebAuthn. They only validate the minted token
 through the regular auth-provider interface. This keeps secret operations simple
 and makes the ceremony replaceable without changing the core API.
@@ -82,8 +87,8 @@ auth:
       - "https://knox.example.net"
     token_issuer: "knox"
     token_ttl: "15m"
-    token_signing_key_file: "/usr/local/etc/knox/fido2-token.key"
-    credentials_file: "/usr/local/etc/knox/fido2-principals.json"
+    token_signing_key_file: "/usr/local/etc/knox/fido2-auth-token.key"
+    credentials_file: "/usr/local/etc/knox/fido2-auth-principals.json"
   providers:
     - type: "fido2"
 ```

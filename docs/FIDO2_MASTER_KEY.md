@@ -23,10 +23,15 @@ server still decrypts the master key into process memory during startup, so this
 protects at-rest material and restart/unlock paths. It does not protect secrets
 from a fully compromised running server process.
 
-Use a separate credential from other services on the same physical
-authenticator. Sharing a physical authenticator with `kunci-server` is
-acceptable, but Knox should use its own RP ID, credential ID, salt, metadata
-file, and backup credential.
+Use a separate credential from other services and from Knox FIDO2
+authentication on the same physical authenticator. Sharing a physical
+authenticator with `kunci-server`, or with a Knox administrator identity, is
+acceptable only when each purpose has its own RP ID, credential ID, salt,
+metadata file, and backup credential.
+
+This storage-unlock credential is not a Knox principal. Possession of it only
+allows the server process to unwrap the master key during startup; it must not
+grant API access or global-admin authority.
 
 ## Proposed Config
 
@@ -34,9 +39,9 @@ file, and backup credential.
 master_key:
   backend: "fido2"
   encrypted_key_file: "/var/db/knox/master.key.fido2"
-  metadata_file: "/usr/local/etc/knox/fido2-credential.json"
+  metadata_file: "/usr/local/etc/knox/fido2-master-key-credential.json"
   device: "auto"
-  pin_file: "/run/knox/fido2.pin"
+  pin_file: "/var/run/knox/.fido2-master-key.pin"
 ```
 
 The metadata file is not secret, but it should be root-readable only because it
@@ -64,34 +69,34 @@ All sensitive state changes are explicit:
 
 ```sh
 knox-server key fido2-enroll \
-  --metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --metadata-file /usr/local/etc/knox/fido2-master-key-credential.json \
   --rp-id identity-primary-knox \
   --rp-name "Identity Primary Knox" \
   --derive-info "knox master key fido2 v1" \
   --fido2-device auto \
-  --fido2-pin-file /run/knox/fido2.pin
+  --fido2-pin-file /var/run/knox/.fido2-master-key.pin
 
 knox-server key init \
   --backend fido2 \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --fido2-metadata-file /usr/local/etc/knox/fido2-master-key-credential.json \
   --fido2-device auto \
-  --fido2-pin-file /run/knox/fido2.pin
+  --fido2-pin-file /var/run/knox/.fido2-master-key.pin
 
 knox-server key migrate \
   --backend fido2 \
   --master-key-file /etc/knox/master.key \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --fido2-metadata-file /usr/local/etc/knox/fido2-master-key-credential.json \
   --fido2-device auto \
-  --fido2-pin-file /run/knox/fido2.pin
+  --fido2-pin-file /var/run/knox/.fido2-master-key.pin
 
 knox-server key unlock-test \
   --backend fido2 \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
+  --fido2-metadata-file /usr/local/etc/knox/fido2-master-key-credential.json \
   --fido2-device auto \
-  --fido2-pin-file /run/knox/fido2.pin
+  --fido2-pin-file /var/run/knox/.fido2-master-key.pin
 ```
 
 Normal server startup must not silently enroll, initialize, migrate, or rewrite
@@ -110,19 +115,19 @@ distinct backup FIDO2 credential when possible:
 knox-server key backup \
   --backend fido2 \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
-  --backup-fido2-metadata-file /usr/local/etc/knox/backup-fido2-credential.json \
+  --fido2-metadata-file /usr/local/etc/knox/fido2-master-key-credential.json \
+  --backup-fido2-metadata-file /usr/local/etc/knox/fido2-master-key-backup-credential.json \
   --fido2-device auto \
-  --fido2-pin-file /run/knox/fido2.pin \
+  --fido2-pin-file /var/run/knox/.fido2-master-key.pin \
   --output knox-master-key.knox-backup
 
 knox-server key restore \
   --input knox-master-key.knox-backup \
   --encrypted-key-file /var/db/knox/master.key.fido2 \
-  --fido2-metadata-file /usr/local/etc/knox/fido2-credential.json \
-  --backup-fido2-metadata-file /usr/local/etc/knox/backup-fido2-credential.json \
+  --fido2-metadata-file /usr/local/etc/knox/fido2-master-key-credential.json \
+  --backup-fido2-metadata-file /usr/local/etc/knox/fido2-master-key-backup-credential.json \
   --fido2-device auto \
-  --fido2-pin-file /run/knox/fido2.pin
+  --fido2-pin-file /var/run/knox/.fido2-master-key.pin
 ```
 
 Storage backup still needs the selected storage backend data, for example

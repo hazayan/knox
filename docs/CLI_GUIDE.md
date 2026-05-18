@@ -232,6 +232,14 @@ After registration, the normal login path is hardware-backed:
 knox auth fido2 login --principal-type user --subject admin
 ```
 
+This is the identity-authentication flow. It is separate from the FIDO2
+master-key flow used by `knox-server key fido2-enroll`, `key init`, and
+`key unlock-test` to unwrap storage at server startup. A production deployment
+should use distinct FIDO2 credentials and distinct files for:
+
+- storage unlock: `/usr/local/etc/knox/fido2-master-key-credential.json`
+- root/admin identity: `/usr/local/etc/knox/fido2-auth-principals.json`
+
 Global administrators can administer FIDO2 credential enrollment. Secret access
 continues to use per-key ACLs.
 
