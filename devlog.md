@@ -37,3 +37,4 @@
 [00037] [2026-05-17T21:33:55Z] [FIX] Restricted local Knox token minting to explicit break-glass use for principals already authorized by the persistent initialization state.
 [00038] [2026-05-17T21:53:57Z] [IMPLEMENTATION] Added Vault-inspired ACL policies with named JSON policy documents, exact or prefix key matching, global-admin policy management routes, and automatic grant merging during key creation.
 [00039] [2026-05-17T21:53:57Z] [VALIDATION] Added policy persistence, policy matching, and key-creation grant merge tests, then validated targeted server, client, config, and type packages.
+[00040] [2026-05-18T00:02:58Z] [FIX] Made the Knox server config flag persistent so initialization, authentication, and master-key subcommands can load non-default server config paths.
