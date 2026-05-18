@@ -372,6 +372,7 @@ func runServer(_ *cobra.Command, _ []string) error {
 		return err
 	}
 	logging.Infof("Initialization state loaded: %s", cfg.Initialization.StateFile)
+	server.SetGlobalAdminAccessCallback(initState)
 
 	policyStore, err := server.NewACLPolicyStoreFromFile(cfg.AccessControl.PolicyFile)
 	if err != nil {

@@ -314,6 +314,26 @@ func SetAccessCallback(callback func(types.AccessCallbackInput) (bool, error)) {
 	accessCallback = callback
 }
 
+// SetGlobalAdminAccessCallback grants initialized Knox global administrators
+// full access to every key. This is the recovery path expected from a
+// vault-like initialization model: per-key ACLs can restrict routine users and
+// services, but they must not lock out the initialized administrative root.
+func SetGlobalAdminAccessCallback(initState *InitializationState) {
+	SetAccessCallback(func(input types.AccessCallbackInput) (bool, error) {
+		if initState == nil {
+			return false, nil
+		}
+		for _, principal := range input.Principals {
+			for _, admin := range initState.AdminPrincipals {
+				if principal.Type == admin.Type && principal.ID == admin.ID {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+}
+
 // Extra validators to apply on principals submitted to Knox.
 var extraPrincipalValidators []types.PrincipalValidator
 

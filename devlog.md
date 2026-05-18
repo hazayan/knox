@@ -46,3 +46,5 @@
 [00046] [2026-05-18T02:29:25Z] [ISSUE] Tracked the follow-up Knox release and package publication needed before restart-free FIDO2 enrollment can be relied on by managed hosts.
 [00047] [2026-05-18T21:23:19Z] [IMPLEMENTATION] Added a Cobra key promote command so rotated secret versions can be promoted to primary by renewal automation.
 [00048] [2026-05-18T21:23:19Z] [VALIDATION] Added key promote CLI coverage and verified the Knox client command package tests.
+[00049] [2026-05-18T23:17:13Z] [FIX] Granted initialized Knox global administrators full key access through the server authorization callback so the vault-like root identity can recover or update per-key ACLs.
+[00050] [2026-05-18T23:17:13Z] [VALIDATION] Added route-level coverage for global-admin key authorization and verified the full Go test suite.
