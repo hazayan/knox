@@ -41,3 +41,6 @@
 [00041] [2026-05-18T00:37:20Z] [DOCUMENTATION] Documented the separate FIDO2 storage-unlock and identity-authentication flows with distinct credential filenames, pin paths, and operator responsibilities.
 [00042] [2026-05-18T00:44:00Z] [FIX] Updated Knox server master-key command defaults and config tests to use explicit FIDO2 storage-unlock filenames instead of generic authentication-oriented names.
 [00043] [2026-05-18T02:08:56Z] [ISSUE] Tracked that WebAuthn registration and login routes currently build separate principal stores, requiring a server restart before a newly registered FIDO2 credential can be used for login.
+[00044] [2026-05-18T02:28:22Z] [FIX] Reused one Knox WebAuthn ceremony service for FIDO2 administrator and authentication routes so newly registered credentials are visible to login without restarting the server.
+[00045] [2026-05-18T02:28:22Z] [VALIDATION] Added a route-level regression test for shared FIDO2 principal storage and verified the targeted server, auth service, and config packages.
+[00046] [2026-05-18T02:29:25Z] [ISSUE] Tracked the follow-up Knox release and package publication needed before restart-free FIDO2 enrollment can be relied on by managed hosts.
