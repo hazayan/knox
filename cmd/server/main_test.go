@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/hazayan/knox/pkg/config"
 	"github.com/hazayan/knox/pkg/crypto"
 	"github.com/hazayan/knox/pkg/observability/logging"
@@ -103,6 +104,55 @@ func TestGlobalAdminMiddlewareRequiresInitializedAdmin(t *testing.T) {
 	handler(allowed, allowedReq)
 	require.Equal(t, http.StatusNoContent, allowed.Code)
 	require.True(t, called)
+}
+
+func TestFido2AuthAndAdminRoutesSharePrincipalStore(t *testing.T) {
+	cfg := &config.ServerConfig{}
+	configureTestFido2Auth(t, cfg)
+	cfg.Auth.Fido2.RPID = "knox.example.net"
+	cfg.Auth.Fido2.Origins = []string{"https://knox.example.net"}
+
+	service, err := newFido2WebAuthnService(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, service)
+
+	router := mux.NewRouter()
+	initState := &server.InitializationState{
+		Version:       server.InitializationStateVersion,
+		InitializedAt: time.Now().UTC(),
+		AdminPrincipals: []types.RawPrincipal{
+			{Type: "user", ID: "admin"},
+		},
+	}
+	injectAdmin := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			server.SetPrincipal(r, auth.NewUser("admin", nil))
+			next(w, r)
+		}
+	}
+	registerFido2AdminRoutes(router, service, []func(http.HandlerFunc) http.HandlerFunc{injectAdmin}, initState)
+	registerFido2AuthRoutes(router, service)
+
+	importBody := bytes.NewBufferString(`{
+		"principal_type":"user",
+		"subject":"alice",
+		"credential":{"id":"Y3JlZGVudGlhbC0x","publicKey":"cHVibGljLWtleQ=="}
+	}`)
+	importReq := httptest.NewRequest(http.MethodPost, "/v0/auth/fido2/credentials/import", importBody)
+	importRec := httptest.NewRecorder()
+	router.ServeHTTP(importRec, importReq)
+	require.Equal(t, http.StatusOK, importRec.Code, importRec.Body.String())
+
+	beginBody := bytes.NewBufferString(`{"principal_type":"user","subject":"alice"}`)
+	beginReq := httptest.NewRequest(http.MethodPost, "/v0/auth/fido2/login/begin", beginBody)
+	beginRec := httptest.NewRecorder()
+	router.ServeHTTP(beginRec, beginReq)
+	require.Equal(t, http.StatusOK, beginRec.Code, beginRec.Body.String())
+
+	var beginResp server.Fido2BeginLoginResponse
+	require.NoError(t, json.NewDecoder(beginRec.Body).Decode(&beginResp))
+	assert.NotEmpty(t, beginResp.SessionID)
+	assert.Contains(t, string(beginResp.Options), "Y3JlZGVudGlhbC0x")
 }
 
 type failingPingBackend struct{}

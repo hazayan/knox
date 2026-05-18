@@ -131,10 +131,12 @@ func createTestServerWithMasterKey(cfg *config.ServerConfig, masterKey []byte) (
 		_ = backend.Close()
 		return nil, fmt.Errorf("failed to create test router: %w", err)
 	}
-	if err := registerFido2AuthRoutes(router, cfg, decorators); err != nil {
+	fido2Service, err := newFido2WebAuthnService(cfg)
+	if err != nil {
 		_ = backend.Close()
 		return nil, err
 	}
+	registerFido2AuthRoutes(router, fido2Service)
 	if cfg.Observability.Metrics.Enabled {
 		router.HandleFunc(cfg.Observability.Metrics.Endpoint, secureMetricsHandler(promhttp.Handler())).Methods("GET")
 	}
@@ -442,12 +444,12 @@ func runServer(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create router: %w", err)
 	}
-	if err := registerFido2AuthRoutes(router, cfg, decorators); err != nil {
+	fido2Service, err := newFido2WebAuthnService(cfg)
+	if err != nil {
 		return err
 	}
-	if err := registerFido2AdminRoutes(router, cfg, decorators, initState); err != nil {
-		return err
-	}
+	registerFido2AuthRoutes(router, fido2Service)
+	registerFido2AdminRoutes(router, fido2Service, decorators, initState)
 	registerPolicyRoutes(router, policyStore, decorators, initState)
 
 	// Add metrics endpoint if enabled
@@ -602,20 +604,20 @@ func newFido2TokenIssuerFromConfig(cfg config.Fido2AuthConfig) (*auth.Fido2Token
 	return auth.NewFido2TokenIssuer(cfg.TokenIssuer, []byte(strings.TrimSpace(string(key))), ttl)
 }
 
-func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig, decorators []func(http.HandlerFunc) http.HandlerFunc) error {
+func newFido2WebAuthnService(cfg *config.ServerConfig) (*server.WebAuthnCeremonyService, error) {
 	if !cfg.Auth.Fido2.Enabled {
-		return nil
+		return nil, nil
 	}
 	if cfg.Auth.Fido2.CredentialsFile == "" {
-		return errors.New("auth.fido2.credentials_file is required")
+		return nil, errors.New("auth.fido2.credentials_file is required")
 	}
 	issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	store, err := server.NewWebAuthnPrincipalStoreFromFile(cfg.Auth.Fido2.CredentialsFile)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	service, err := server.NewWebAuthnCeremonyService(&webauthn.Config{
 		RPID:          cfg.Auth.Fido2.RPID,
@@ -623,39 +625,25 @@ func registerFido2AuthRoutes(router *mux.Router, cfg *config.ServerConfig, decor
 		RPOrigins:     cfg.Auth.Fido2.Origins,
 	}, store, issuer)
 	if err != nil {
-		return fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
+		return nil, fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
 	}
-	server.RegisterFido2AuthRoutes(router, service)
-	return nil
+	return service, nil
 }
 
-func registerFido2AdminRoutes(router *mux.Router, cfg *config.ServerConfig, decorators []func(http.HandlerFunc) http.HandlerFunc, initState *server.InitializationState) error {
-	if !cfg.Auth.Fido2.Enabled {
-		return nil
+func registerFido2AuthRoutes(router *mux.Router, service *server.WebAuthnCeremonyService) {
+	if service == nil {
+		return
 	}
-	if cfg.Auth.Fido2.CredentialsFile == "" {
-		return errors.New("auth.fido2.credentials_file is required")
-	}
-	issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
-	if err != nil {
-		return err
-	}
-	store, err := server.NewWebAuthnPrincipalStoreFromFile(cfg.Auth.Fido2.CredentialsFile)
-	if err != nil {
-		return err
-	}
-	service, err := server.NewWebAuthnCeremonyService(&webauthn.Config{
-		RPID:          cfg.Auth.Fido2.RPID,
-		RPDisplayName: cfg.Auth.Fido2.RPName,
-		RPOrigins:     cfg.Auth.Fido2.Origins,
-	}, store, issuer)
-	if err != nil {
-		return fmt.Errorf("failed to configure FIDO2 WebAuthn service: %w", err)
+	server.RegisterFido2AuthRoutes(router, service)
+}
+
+func registerFido2AdminRoutes(router *mux.Router, service *server.WebAuthnCeremonyService, decorators []func(http.HandlerFunc) http.HandlerFunc, initState *server.InitializationState) {
+	if service == nil {
+		return
 	}
 	adminDecorators := append([]func(http.HandlerFunc) http.HandlerFunc{}, decorators...)
 	adminDecorators = append(adminDecorators, globalAdminMiddleware(initState))
 	server.RegisterFido2AdminRoutes(router, service, adminDecorators)
-	return nil
 }
 
 func registerPolicyRoutes(router *mux.Router, store *server.ACLPolicyStore, decorators []func(http.HandlerFunc) http.HandlerFunc, initState *server.InitializationState) {
