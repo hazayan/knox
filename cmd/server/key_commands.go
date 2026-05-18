@@ -54,7 +54,7 @@ func newKeyFido2EnrollCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&opts.metadataFile, "metadata-file", "/usr/local/etc/knox/fido2-credential.json", "FIDO2 credential metadata file")
+	cmd.Flags().StringVar(&opts.metadataFile, "metadata-file", "/usr/local/etc/knox/fido2-master-key-credential.json", "FIDO2 master-key credential metadata file")
 	cmd.Flags().StringVar(&opts.rpID, "rp-id", "", "FIDO2 relying party ID")
 	cmd.Flags().StringVar(&opts.rpName, "rp-name", "", "FIDO2 relying party display name")
 	cmd.Flags().StringVar(&opts.deriveInfo, "derive-info", crypto.DefaultFido2DeriveInfo, "HKDF info label")
@@ -236,7 +236,7 @@ func newKeyRestoreCommand() *cobra.Command {
 func addMasterKeyBundleFlags(cmd *cobra.Command, opts *keyCommandOptions) {
 	cmd.Flags().StringVar(&opts.backend, "backend", "fido2", "Master key wrapping backend")
 	cmd.Flags().StringVar(&opts.encryptedKeyFile, "encrypted-key-file", "/var/db/knox/master.key.fido2", "Encrypted Knox master-key bundle path")
-	cmd.Flags().StringVar(&opts.metadataFile, "fido2-metadata-file", "/usr/local/etc/knox/fido2-credential.json", "FIDO2 credential metadata file")
+	cmd.Flags().StringVar(&opts.metadataFile, "fido2-metadata-file", "/usr/local/etc/knox/fido2-master-key-credential.json", "FIDO2 master-key credential metadata file")
 	addFido2DeviceFlags(cmd, opts)
 }
 
