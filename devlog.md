@@ -38,3 +38,4 @@
 [00038] [2026-05-17T21:53:57Z] [IMPLEMENTATION] Added Vault-inspired ACL policies with named JSON policy documents, exact or prefix key matching, global-admin policy management routes, and automatic grant merging during key creation.
 [00039] [2026-05-17T21:53:57Z] [VALIDATION] Added policy persistence, policy matching, and key-creation grant merge tests, then validated targeted server, client, config, and type packages.
 [00040] [2026-05-18T00:02:58Z] [FIX] Made the Knox server config flag persistent so initialization, authentication, and master-key subcommands can load non-default server config paths.
+[00041] [2026-05-18T00:37:20Z] [DOCUMENTATION] Documented the separate FIDO2 storage-unlock and identity-authentication flows with distinct credential filenames, pin paths, and operator responsibilities.

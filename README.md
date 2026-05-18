@@ -69,6 +69,13 @@ initialization:
 access_control:
   policy_file: "/usr/local/etc/knox/policies.json"
 
+master_key:
+  backend: "fido2"
+  encrypted_key_file: "/var/db/knox/master.key.fido2"
+  metadata_file: "/usr/local/etc/knox/fido2-master-key-credential.json"
+  device: "auto"
+  pin_file: "/var/run/knox/.fido2-master-key.pin"
+
 storage:
   backend: "filesystem"
   filesystem_dir: "/var/lib/knox/keys"
@@ -86,8 +93,8 @@ auth:
       - "https://knox.example.net"
     token_issuer: "knox"
     token_ttl: "15m"
-    token_signing_key_file: "/usr/local/etc/knox/fido2-token.key"
-    credentials_file: "/usr/local/etc/knox/fido2-principals.json"
+    token_signing_key_file: "/usr/local/etc/knox/fido2-auth-token.key"
+    credentials_file: "/usr/local/etc/knox/fido2-auth-principals.json"
   providers:
     - type: "fido2"
 
@@ -108,16 +115,28 @@ limits:
   max_keys_per_list: 1000
 ```
 
-The server needs a 32-byte master key. Supported sources, in priority order:
+Knox has two separate FIDO2 flows in hardened deployments:
+
+1. Storage unlock: a FIDO2 hmac-secret credential unwraps the Knox master key
+   during server startup so the storage backend can be decrypted.
+2. Identity authentication: a different WebAuthn/FIDO2 credential proves a Knox
+   user or machine principal and mints a short-lived API token.
+
+These flows may use the same physical authenticator, but they must use distinct
+credentials, metadata files, token/key material, and operator ceremonies. The
+storage-unlock credential does not grant API access, and the root/admin identity
+credential does not unwrap storage.
+
+Without `master_key.backend`, the server needs a 32-byte plaintext master key.
+Supported sources, in priority order:
 
 1. `KNOX_MASTER_KEY`, as base64 or hex
 2. `KNOX_MASTER_KEY_FILE`, pointing to an absolute path
 3. `/etc/knox/master.key`
 
-The planned hardened deployment wraps this master key with a local FIDO2
-authenticator using the hmac-secret extension. See
-[FIDO2 Master Key Wrapping](docs/FIDO2_MASTER_KEY.md) for the design and backup
-requirements.
+See [FIDO2 Master Key Wrapping](docs/FIDO2_MASTER_KEY.md) and
+[FIDO2 Authentication](docs/FIDO2_AUTH.md) for the storage-unlock and identity
+flows.
 
 Key files must be owner-only, for example:
 
