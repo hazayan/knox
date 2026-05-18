@@ -867,6 +867,42 @@ func TestKeyVersionsCmd(t *testing.T) {
 	})
 }
 
+func TestKeyPromoteCmd(t *testing.T) {
+	t.Run("PromoteVersion", func(t *testing.T) {
+		tc := NewTestConfig(t)
+		defer tc.Cleanup()
+
+		logger = logging.NewCLILogger(false, io.Discard)
+
+		mockClient := &MockAPIClient{}
+		mockClient.SetupMockClient()
+		var capturedKeyID string
+		var capturedVersionID string
+		var capturedStatus types.VersionStatus
+		mockClient.UpdateVersionFunc = func(keyID string, versionID string, status types.VersionStatus) error {
+			capturedKeyID = keyID
+			capturedVersionID = versionID
+			capturedStatus = status
+			return nil
+		}
+
+		SetMockAPIClient(mockClient)
+		defer SetMockAPIClient(nil)
+
+		cmd := newKeyPromoteCmd()
+		cmd.SetArgs([]string{"test:key12", "42"})
+		cmd.SetOut(io.Discard)
+		cmd.SetErr(io.Discard)
+
+		err := cmd.Execute()
+		require.NoError(t, err)
+
+		assert.Equal(t, "test:key12", capturedKeyID)
+		assert.Equal(t, "42", capturedVersionID)
+		assert.Equal(t, types.Primary, capturedStatus)
+	})
+}
+
 // TestParseACL tests the ACL parsing function.
 func TestParseACL(t *testing.T) {
 	tests := []struct {
