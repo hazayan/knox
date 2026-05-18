@@ -5,10 +5,12 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/hazayan/knox/pkg/types"
 	"github.com/hazayan/knox/server/auth"
 	"github.com/hazayan/knox/server/keydb"
+	"github.com/stretchr/testify/require"
 )
 
 func makeDB() (KeyManager, *keydb.TempDB) {
@@ -694,4 +696,29 @@ func TestAuthorizeRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGlobalAdminAccessCallbackGrantsInitializedAdmin(t *testing.T) {
+	defer SetAccessCallback(nil)
+	state := &InitializationState{
+		Version:       InitializationStateVersion,
+		InitializedAt: time.Now().UTC(),
+		AdminPrincipals: []types.RawPrincipal{
+			{Type: "user", ID: "alice"},
+		},
+	}
+	SetGlobalAdminAccessCallback(state)
+
+	key := &types.Key{
+		ID:  "secret",
+		ACL: types.ACL{},
+	}
+
+	allowed, err := authorizeRequest(key, auth.NewUser("alice", nil), types.Admin)
+	require.NoError(t, err)
+	require.True(t, allowed)
+
+	denied, err := authorizeRequest(key, auth.NewUser("mallory", nil), types.Admin)
+	require.NoError(t, err)
+	require.False(t, denied)
 }
