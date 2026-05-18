@@ -44,3 +44,5 @@
 [00044] [2026-05-18T02:28:22Z] [FIX] Reused one Knox WebAuthn ceremony service for FIDO2 administrator and authentication routes so newly registered credentials are visible to login without restarting the server.
 [00045] [2026-05-18T02:28:22Z] [VALIDATION] Added a route-level regression test for shared FIDO2 principal storage and verified the targeted server, auth service, and config packages.
 [00046] [2026-05-18T02:29:25Z] [ISSUE] Tracked the follow-up Knox release and package publication needed before restart-free FIDO2 enrollment can be relied on by managed hosts.
+[00047] [2026-05-18T21:23:19Z] [IMPLEMENTATION] Added a Cobra key promote command so rotated secret versions can be promoted to primary by renewal automation.
+[00048] [2026-05-18T21:23:19Z] [VALIDATION] Added key promote CLI coverage and verified the Knox client command package tests.

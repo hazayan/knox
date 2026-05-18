@@ -30,6 +30,7 @@ func newKeyCmd() *cobra.Command {
 	cmd.AddCommand(newKeyListCmd())
 	cmd.AddCommand(newKeyDeleteCmd())
 	cmd.AddCommand(newKeyRotateCmd())
+	cmd.AddCommand(newKeyPromoteCmd())
 	cmd.AddCommand(newKeyVersionsCmd())
 
 	return cmd
@@ -448,6 +449,46 @@ Examples:
 		},
 	}
 
+	return cmd
+}
+
+func newKeyPromoteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "promote KEY_ID VERSION_ID",
+		Short: "Promote a key version to primary",
+		Long: `Promote an active key version to primary.
+
+The current primary version becomes active. The caller must have Write access
+to the key.`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			keyID := args[0]
+			versionID := args[1]
+
+			client, err := getAPIClient()
+			if err != nil {
+				return err
+			}
+
+			if err := client.UpdateVersion(keyID, versionID, types.Primary); err != nil {
+				return fmt.Errorf("failed to promote key version: %w", err)
+			}
+
+			if jsonOutput {
+				return json.NewEncoder(os.Stdout).Encode(map[string]any{
+					"key_id":     keyID,
+					"version_id": versionID,
+					"status":     "promoted",
+				})
+			}
+
+			logger.Success(fmt.Sprintf("Key version promoted: %s", keyID), map[string]any{
+				"key_id":     keyID,
+				"version_id": versionID,
+			})
+			return nil
+		},
+	}
 	return cmd
 }
 

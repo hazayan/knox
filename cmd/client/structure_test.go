@@ -26,7 +26,7 @@ func TestCommandStructure(t *testing.T) {
 			subcommandNames[subcmd.Name()] = true
 		}
 
-		expectedSubcommands := []string{"create", "get", "list", "delete", "rotate", "versions"}
+		expectedSubcommands := []string{"create", "get", "list", "delete", "rotate", "promote", "versions"}
 		for _, expected := range expectedSubcommands {
 			assert.True(t, subcommandNames[expected], "Key command should have %s subcommand", expected)
 		}
@@ -173,6 +173,7 @@ func TestCommandValidation(t *testing.T) {
 			{"get", newKeyGetCmd()},
 			{"delete", newKeyDeleteCmd()},
 			{"rotate", newKeyRotateCmd()},
+			{"promote", newKeyPromoteCmd()},
 			{"versions", newKeyVersionsCmd()},
 		}
 
