@@ -162,7 +162,7 @@ func main() {
 	rootCmd.AddCommand(newKeyCommand())
 	rootCmd.AddCommand(newAuthCommand())
 
-	rootCmd.Flags().StringVarP(&cfgFile, "config", "c", "/etc/knox/server.yaml", "Path to configuration file")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "/etc/knox/server.yaml", "Path to configuration file")
 	rootCmd.Flags().String("version", "", "Print version and exit")
 
 	if err := rootCmd.Execute(); err != nil {
