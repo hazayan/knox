@@ -135,6 +135,30 @@ Storage backup still needs the selected storage backend data, for example
 SQLite. A restore drill must prove both parts together: restored storage plus
 restored/unwrapped master key.
 
+## Restore Drill
+
+A production restore drill should use an isolated restore directory and a
+loopback-only Knox listener. Do not point the drill at live storage.
+
+Minimum acceptance checks:
+
+1. Copy the storage backend, server config, encrypted master-key bundle, and
+   FIDO2 metadata to the restore host.
+2. Run `knox-server key unlock-test` against the copied encrypted master-key
+   bundle and copied metadata.
+3. Create a FIDO2-encrypted master-key backup artifact with
+   `knox-server key backup`.
+4. Restore that artifact to a fresh encrypted master-key bundle with
+   `knox-server key restore`.
+5. Run `knox-server key unlock-test` against the restored bundle.
+6. Start an isolated Knox server with the restored bundle and copied storage.
+7. List keys, read a known key, create or rotate a drill-only key, restart the
+   isolated server, and read the rotated value again.
+
+This drill was validated with a backup trust host on 2026-05-19 using
+filesystem storage, FIDO2-backed master-key wrapping, a restored encrypted
+master-key bundle, an isolated loopback listener, and a drill-only key rotation.
+
 ## Kha Boundary
 
 Kha should configure Knox and wire services/build jobs to read secrets from
