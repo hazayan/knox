@@ -48,3 +48,4 @@
 [00048] [2026-05-18T21:23:19Z] [VALIDATION] Added key promote CLI coverage and verified the Knox client command package tests.
 [00049] [2026-05-18T23:17:13Z] [FIX] Granted initialized Knox global administrators full key access through the server authorization callback so the vault-like root identity can recover or update per-key ACLs.
 [00050] [2026-05-18T23:17:13Z] [VALIDATION] Added route-level coverage for global-admin key authorization and verified the full Go test suite.
+[00051] [2026-05-19T00:05:15Z] [VALIDATION] Deployed Knox v1.4.11 on ExamplePrimary and verified the initialized global administrator can grant ACL access to the DNS automation token used by Kha.
