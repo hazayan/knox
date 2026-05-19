@@ -48,6 +48,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 files=
+plaintext_files=
 for file in .beads/issues.jsonl .beads/interactions.jsonl; do
 	[ -f "$file" ] || continue
 
@@ -56,12 +57,18 @@ for file in .beads/issues.jsonl .beads/interactions.jsonl; do
 		exit 1
 	fi
 
+	if [ -s "$file" ] && [ "$(head -c 10 "$file" | od -An -tx1 | tr -d ' \n')" = "00474954435259505400" ]; then
+		files="$files $file"
+		continue
+	fi
+
 	if [ -s "$file" ] && [ "$(head -c 1 "$file")" != "{" ]; then
 		printf '%s\n' "commit-encrypted-beads: $file is not plaintext in the working tree" >&2
 		exit 1
 	fi
 
 	files="$files $file"
+	plaintext_files="$plaintext_files $file"
 done
 
 if [ -z "$files" ]; then
@@ -82,7 +89,9 @@ trap 'rm -f "$tmp_index" "$msg_file"' EXIT INT TERM
 GIT_INDEX_FILE=$tmp_index git read-tree "$target_commit"
 
 # shellcheck disable=SC2086
-GIT_INDEX_FILE=$tmp_index git add -f -- $files
+if [ -n "$plaintext_files" ]; then
+	GIT_INDEX_FILE=$tmp_index git add -f -- $plaintext_files
+fi
 
 for file in $files; do
 	header_hex=$(GIT_INDEX_FILE=$tmp_index git cat-file -p ":$file" 2>/dev/null | od -An -tx1 -N 10 | tr -d ' \n' || true)
