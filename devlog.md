@@ -51,3 +51,4 @@
 [00051] [2026-05-19T00:05:15Z] [VALIDATION] Deployed Knox v1.4.11 on ExamplePrimary and verified the initialized global administrator can grant ACL access to the DNS automation token used by Kha.
 [00052] [2026-05-19T03:32:14Z] [TROUBLESHOOTING] Rechecked the Knox restore drill blocker across local, ExamplePrimary, and ExampleSecondary environments and confirmed no FIDO2 authenticator is currently visible to fido2-token on the candidate restore hosts.
 [00053] [2026-05-19T14:02:03Z] [SECURITY] Added a repeatable JJ and git-crypt repair helper so Beads metadata is committed through Git clean filters, imported into JJ without rewriting the working tree, and verified against the committed encrypted blob.
+[00054] [2026-05-19T16:14:33Z] [VALIDATION] Completed the Knox restore drill with copied filesystem storage, FIDO2 master-key unlock, FIDO2 backup and restore, isolated server restart, key listing, drill-only key rotation, and post-restart readback.

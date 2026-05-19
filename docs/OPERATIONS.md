@@ -91,6 +91,12 @@ The Go integration tests exercise the same shape of restore for the filesystem
 backend: storage directory copy, master-key file copy, fresh server startup,
 list/get, and post-restore version add.
 
+For FIDO2-backed master keys, the restore drill must also exercise the hardware
+unlock path before and after restoring the encrypted master-key backup artifact.
+The operational drill on 2026-05-19 validated copied filesystem storage,
+FIDO2 unlock-test, FIDO2 backup and restore, isolated server startup, key list,
+drill-only key read, rotation, restart, and post-restart readback.
+
 ## Health Checks
 
 The server exposes unauthenticated operational endpoints:
