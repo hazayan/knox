@@ -54,3 +54,5 @@
 [00054] [2026-05-19T16:14:33Z] [VALIDATION] Completed the Knox restore drill with copied filesystem storage, FIDO2 master-key unlock, FIDO2 backup and restore, isolated server restart, key listing, drill-only key rotation, and post-restart readback.
 [00055] [2026-05-19T18:07:19Z] [IMPLEMENTATION] Added explicit local automation machine-token minting for scoped Knox automation principals without reusing operator break-glass tokens.
 [00056] [2026-05-19T18:07:19Z] [VALIDATION] Added server command coverage for automation machine token minting and verified the Knox server, auth, and client Go test packages.
+[00057] [2026-05-19T22:05:00Z] [VALIDATION] Closed the Knox FIDO2 store publication follow-up after confirming the shared WebAuthn principal-store fix is present, Knox v1.4.12 is installed on both trust-service hosts, and the server, auth, and client Go tests pass.
+[00058] [2026-05-19T22:05:00Z] [FIX] Hardened the encrypted Beads commit helper so already-locked Beads interaction files can be preserved while plaintext issue state is still written through git-crypt.
