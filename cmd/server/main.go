@@ -246,31 +246,37 @@ func newAuthMintTokenCommand() *cobra.Command {
 	var subject string
 	var groups []string
 	var breakGlass bool
+	var automation bool
 
 	cmd := &cobra.Command{
 		Use:   "mint-token",
-		Short: "Mint an explicit break-glass FIDO2 Knox API token",
+		Short: "Mint an explicit local FIDO2 Knox API token",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
 				return errors.New("principal type and subject are required")
 			}
-			if !breakGlass {
-				return errors.New("local token minting is a break-glass operation; pass --break-glass after confirming the target principal is an initialized Knox global admin")
+			if breakGlass == automation {
+				return errors.New("choose exactly one local token minting mode: --break-glass or --automation")
+			}
+			if automation && (principalType != "machine" || len(compactStrings(groups)) > 0) {
+				return errors.New("automation token minting is restricted to machine principals without groups")
 			}
 			cfg, err := config.LoadServerConfig(cfgFile)
 			if err != nil {
 				return fmt.Errorf("failed to load config: %w", err)
 			}
-			initState, err := server.LoadInitializationState(cfg.Initialization.StateFile)
-			if err != nil {
-				return err
-			}
 			principal, err := principalForToken(principalType, subject, groups)
 			if err != nil {
 				return err
 			}
-			if !initState.IsAdmin(principal) {
-				return errors.New("break-glass token minting is restricted to initialized Knox global administrators")
+			if breakGlass {
+				initState, err := server.LoadInitializationState(cfg.Initialization.StateFile)
+				if err != nil {
+					return err
+				}
+				if !initState.IsAdmin(principal) {
+					return errors.New("break-glass token minting is restricted to initialized Knox global administrators")
+				}
 			}
 			issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
 			if err != nil {
@@ -293,6 +299,7 @@ func newAuthMintTokenCommand() *cobra.Command {
 	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
 	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
 	cmd.Flags().BoolVar(&breakGlass, "break-glass", false, "Allow local emergency token minting for an initialized global administrator")
+	cmd.Flags().BoolVar(&automation, "automation", false, "Allow local machine token minting for scoped automation principals")
 	return cmd
 }
 

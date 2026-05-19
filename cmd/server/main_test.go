@@ -75,6 +75,29 @@ func testFido2AuthToken(t *testing.T) string {
 	return token
 }
 
+func writeTestFido2ServerConfig(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	keyFile := filepath.Join(dir, "fido2-token.key")
+	require.NoError(t, os.WriteFile(keyFile, []byte(testFido2SigningKey+"\n"), 0o600))
+	configFile := filepath.Join(dir, "server.yaml")
+	configData := []byte(`
+initialization:
+  state_file: "` + filepath.Join(dir, "init.json") + `"
+auth:
+  fido2:
+    enabled: true
+    token_issuer: "knox-test"
+    token_ttl: "15m"
+    token_signing_key_file: "` + keyFile + `"
+  providers:
+    - type: "fido2"
+`)
+	require.NoError(t, os.WriteFile(configFile, configData, 0o600))
+	return configFile
+}
+
 func TestGlobalAdminMiddlewareRequiresInitializedAdmin(t *testing.T) {
 	state := &server.InitializationState{
 		Version:       server.InitializationStateVersion,
@@ -104,6 +127,54 @@ func TestGlobalAdminMiddlewareRequiresInitializedAdmin(t *testing.T) {
 	handler(allowed, allowedReq)
 	require.Equal(t, http.StatusNoContent, allowed.Code)
 	require.True(t, called)
+}
+
+func TestAuthMintTokenAutomationMintsMachineTokenWithoutInitState(t *testing.T) {
+	oldCfgFile := cfgFile
+	cfgFile = writeTestFido2ServerConfig(t)
+	t.Cleanup(func() { cfgFile = oldCfgFile })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := newAuthMintTokenCommand()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--automation",
+		"--principal-type", "machine",
+		"--subject", "kha-controller",
+	})
+	require.NoError(t, cmd.Execute())
+
+	token := strings.TrimSpace(stdout.String())
+	require.NotEmpty(t, token)
+	require.Contains(t, stderr.String(), "token expires at")
+
+	issuer, err := auth.NewFido2TokenIssuer("knox-test", []byte(testFido2SigningKey), 15*time.Minute)
+	require.NoError(t, err)
+	provider := auth.NewFido2TokenProvider(issuer)
+	principal, err := provider.Authenticate(token, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.NoError(t, err)
+	require.Equal(t, "machine", principal.Type())
+	require.Equal(t, "kha-controller", principal.GetID())
+}
+
+func TestAuthMintTokenAutomationRejectsUserToken(t *testing.T) {
+	oldCfgFile := cfgFile
+	cfgFile = writeTestFido2ServerConfig(t)
+	t.Cleanup(func() { cfgFile = oldCfgFile })
+
+	cmd := newAuthMintTokenCommand()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{
+		"--automation",
+		"--principal-type", "user",
+		"--subject", "operator",
+	})
+	err := cmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "restricted to machine principals")
 }
 
 func TestFido2AuthAndAdminRoutesSharePrincipalStore(t *testing.T) {
