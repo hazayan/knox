@@ -56,3 +56,5 @@
 [00056] [2026-05-19T18:07:19Z] [VALIDATION] Added server command coverage for automation machine token minting and verified the Knox server, auth, and client Go test packages.
 [00057] [2026-05-19T22:05:00Z] [VALIDATION] Closed the Knox FIDO2 store publication follow-up after confirming the shared WebAuthn principal-store fix is present, Knox v1.4.12 is installed on both trust-service hosts, and the server, auth, and client Go tests pass.
 [00058] [2026-05-19T22:05:00Z] [FIX] Hardened the encrypted Beads commit helper so already-locked Beads interaction files can be preserved while plaintext issue state is still written through git-crypt.
+[00059] [2026-05-20T00:02:13Z] [IMPLEMENTATION] Added explicit Knox administrator status and recovery-token commands so initialized global-admin recovery is operator-visible without persisting a reusable root token.
+[00060] [2026-05-20T00:02:13Z] [VALIDATION] Added command coverage for Knox administrator status, administrator recovery-token minting, and non-admin recovery rejection, then verified the full Go test suite.

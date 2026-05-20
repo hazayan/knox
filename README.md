@@ -162,11 +162,20 @@ created twice. FIDO2 credential administration is restricted to principals named
 in this state, or users in one of its admin groups. Per-secret ACLs remain
 separate from this global administrator role.
 
+Inspect initialized administrators without exposing secret material:
+
+```bash
+knox-server --config /etc/knox/server.yaml admin status
+```
+
+The bootstrap token printed by `init` is intentionally one-time operator
+material. It should be used to enroll the first administrator authenticator and
+then discarded. Knox does not persist a reusable root token.
+
 Local privileged token minting has two explicit modes:
 
 ```bash
-knox-server --config /etc/knox/server.yaml auth mint-token \
-  --break-glass \
+knox-server --config /etc/knox/server.yaml admin recover-token \
   --principal-type user \
   --subject admin
 
@@ -176,11 +185,11 @@ knox-server --config /etc/knox/server.yaml auth mint-token \
   --subject kha-controller
 ```
 
-`--break-glass` is for initialized global administrators only. It is a recovery
-path, not a steady-state automation credential. `--automation` mints a
-short-lived machine token for a scoped automation principal; access still comes
-from per-key ACLs or ACL policies and should be limited to the namespaces that
-automation owns.
+`admin recover-token` is for initialized global administrators only. It is a
+recovery path, not a steady-state automation credential. `auth mint-token
+--automation` mints a short-lived machine token for a scoped automation
+principal; access still comes from per-key ACLs or ACL policies and should be
+limited to the namespaces that automation owns.
 
 Start the server:
 
