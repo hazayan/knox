@@ -243,16 +243,26 @@ should use distinct FIDO2 credentials and distinct files for:
 Global administrators can administer FIDO2 credential enrollment. Secret access
 continues to use per-key ACLs.
 
-After initialization, local token minting is reserved for emergency recovery and
-is restricted to initialized global administrators:
+The bootstrap token is intentionally not persisted. After initialization, inspect
+the durable administrator state with:
 
 ```bash
-knox-server --config /etc/knox/server.yaml auth mint-token \
-  --break-glass \
+knox-server --config /etc/knox/server.yaml admin status
+```
+
+Emergency recovery token minting is restricted to initialized global
+administrators:
+
+```bash
+knox-server --config /etc/knox/server.yaml admin recover-token \
   --principal-type user \
   --subject admin \
   --group knox-admins
 ```
+
+Pipe the token into `knox auth login` for the current shell or terminal. This is
+a local break-glass path and should not be used as a steady-state automation
+credential.
 
 Environment example:
 

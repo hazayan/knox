@@ -161,6 +161,7 @@ func main() {
 		RunE:  runServer,
 	}
 	rootCmd.AddCommand(newInitCommand())
+	rootCmd.AddCommand(newAdminCommand())
 	rootCmd.AddCommand(newKeyCommand())
 	rootCmd.AddCommand(newAuthCommand())
 
@@ -171,6 +172,77 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func newAdminCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "admin",
+		Short: "Inspect and recover Knox global administrator access",
+		Long:  "Inspect Knox initialization state and mint explicit recovery tokens for initialized global administrators.",
+	}
+	cmd.AddCommand(newAdminStatusCommand())
+	cmd.AddCommand(newAdminRecoverTokenCommand())
+	return cmd
+}
+
+func newAdminStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Show Knox global administrator initialization state",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := config.LoadServerConfig(cfgFile)
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
+			state, err := server.LoadInitializationState(cfg.Initialization.StateFile)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "initialized: yes\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "initialized_at: %s\n", state.InitializedAt.Format(time.RFC3339))
+			fmt.Fprintf(cmd.OutOrStdout(), "state_file: %s\n", cfg.Initialization.StateFile)
+			for _, principal := range state.AdminPrincipals {
+				fmt.Fprintf(cmd.OutOrStdout(), "admin_principal: %s:%s\n", principal.Type, principal.ID)
+			}
+			for _, group := range state.AdminGroups {
+				fmt.Fprintf(cmd.OutOrStdout(), "admin_group: %s\n", group)
+			}
+			return nil
+		},
+	}
+}
+
+func newAdminRecoverTokenCommand() *cobra.Command {
+	var principalType string
+	var subject string
+	var groups []string
+
+	cmd := &cobra.Command{
+		Use:   "recover-token",
+		Short: "Mint a short-lived token for an initialized global administrator",
+		Long:  "Mint a local break-glass token for an initialized Knox global administrator. This is an operator recovery command and should not be used as steady-state automation.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			token, expires, err := mintExplicitToken(mintTokenOptions{
+				PrincipalType: principalType,
+				Subject:       subject,
+				Groups:        groups,
+				BreakGlass:    true,
+			})
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\n", token); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "recovery token expires at %s\n", expires.Format(time.RFC3339))
+			fmt.Fprintf(cmd.ErrOrStderr(), "store it for this shell with: knox auth login <token>\n")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&principalType, "principal-type", "user", "Knox principal type")
+	cmd.Flags().StringVar(&subject, "subject", "", "Knox principal subject")
+	cmd.Flags().StringSliceVar(&groups, "group", nil, "Group to attach to a user principal")
+	return cmd
 }
 
 func newInitCommand() *cobra.Command {
@@ -232,6 +304,14 @@ func newInitCommand() *cobra.Command {
 	return cmd
 }
 
+type mintTokenOptions struct {
+	PrincipalType string
+	Subject       string
+	Groups        []string
+	BreakGlass    bool
+	Automation    bool
+}
+
 func newAuthCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
@@ -252,39 +332,13 @@ func newAuthMintTokenCommand() *cobra.Command {
 		Use:   "mint-token",
 		Short: "Mint an explicit local FIDO2 Knox API token",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if strings.TrimSpace(principalType) == "" || strings.TrimSpace(subject) == "" {
-				return errors.New("principal type and subject are required")
-			}
-			if breakGlass == automation {
-				return errors.New("choose exactly one local token minting mode: --break-glass or --automation")
-			}
-			if automation && (principalType != "machine" || len(compactStrings(groups)) > 0) {
-				return errors.New("automation token minting is restricted to machine principals without groups")
-			}
-			cfg, err := config.LoadServerConfig(cfgFile)
-			if err != nil {
-				return fmt.Errorf("failed to load config: %w", err)
-			}
-			principal, err := principalForToken(principalType, subject, groups)
-			if err != nil {
-				return err
-			}
-			if breakGlass {
-				initState, err := server.LoadInitializationState(cfg.Initialization.StateFile)
-				if err != nil {
-					return err
-				}
-				if !initState.IsAdmin(principal) {
-					return errors.New("break-glass token minting is restricted to initialized Knox global administrators")
-				}
-			}
-			issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
-			if err != nil {
-				return err
-			}
-			var token string
-			var expires time.Time
-			token, expires, err = mintTokenForPrincipal(issuer, principalType, subject, groups)
+			token, expires, err := mintExplicitToken(mintTokenOptions{
+				PrincipalType: principalType,
+				Subject:       subject,
+				Groups:        groups,
+				BreakGlass:    breakGlass,
+				Automation:    automation,
+			})
 			if err != nil {
 				return err
 			}
@@ -301,6 +355,41 @@ func newAuthMintTokenCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&breakGlass, "break-glass", false, "Allow local emergency token minting for an initialized global administrator")
 	cmd.Flags().BoolVar(&automation, "automation", false, "Allow local machine token minting for scoped automation principals")
 	return cmd
+}
+
+func mintExplicitToken(opts mintTokenOptions) (string, time.Time, error) {
+	if strings.TrimSpace(opts.PrincipalType) == "" || strings.TrimSpace(opts.Subject) == "" {
+		return "", time.Time{}, errors.New("principal type and subject are required")
+	}
+	if opts.BreakGlass == opts.Automation {
+		return "", time.Time{}, errors.New("choose exactly one local token minting mode: --break-glass or --automation")
+	}
+	groups := compactStrings(opts.Groups)
+	if opts.Automation && (opts.PrincipalType != "machine" || len(groups) > 0) {
+		return "", time.Time{}, errors.New("automation token minting is restricted to machine principals without groups")
+	}
+	cfg, err := config.LoadServerConfig(cfgFile)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to load config: %w", err)
+	}
+	principal, err := principalForToken(opts.PrincipalType, opts.Subject, groups)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	if opts.BreakGlass {
+		initState, err := server.LoadInitializationState(cfg.Initialization.StateFile)
+		if err != nil {
+			return "", time.Time{}, err
+		}
+		if !initState.IsAdmin(principal) {
+			return "", time.Time{}, errors.New("recovery token minting is restricted to initialized Knox global administrators")
+		}
+	}
+	issuer, err := newFido2TokenIssuerFromConfig(cfg.Auth.Fido2)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return mintTokenForPrincipal(issuer, opts.PrincipalType, opts.Subject, groups)
 }
 
 func mintTokenForPrincipal(issuer *auth.Fido2TokenIssuer, principalType, subject string, groups []string) (string, time.Time, error) {

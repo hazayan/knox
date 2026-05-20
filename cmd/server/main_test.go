@@ -177,6 +177,95 @@ func TestAuthMintTokenAutomationRejectsUserToken(t *testing.T) {
 	require.Contains(t, err.Error(), "restricted to machine principals")
 }
 
+func TestAdminStatusReportsInitializedAdministrators(t *testing.T) {
+	oldCfgFile := cfgFile
+	cfgFile = writeTestFido2ServerConfig(t)
+	t.Cleanup(func() { cfgFile = oldCfgFile })
+
+	cfg, err := config.LoadServerConfig(cfgFile)
+	require.NoError(t, err)
+	_, err = server.InitializeState(cfg.Initialization.StateFile, server.InitializationOptions{
+		AdminPrincipal: types.RawPrincipal{Type: "user", ID: "admin"},
+		AdminGroups:    []string{"knox-admins"},
+		Time:           time.Date(2026, 5, 19, 22, 0, 0, 0, time.UTC),
+	})
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	cmd := newAdminStatusCommand()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(io.Discard)
+	require.NoError(t, cmd.Execute())
+
+	out := stdout.String()
+	require.Contains(t, out, "initialized: yes")
+	require.Contains(t, out, "admin_principal: user:admin")
+	require.Contains(t, out, "admin_group: knox-admins")
+	require.NotContains(t, out, testFido2SigningKey)
+}
+
+func TestAdminRecoverTokenMintsTokenForInitializedAdmin(t *testing.T) {
+	oldCfgFile := cfgFile
+	cfgFile = writeTestFido2ServerConfig(t)
+	t.Cleanup(func() { cfgFile = oldCfgFile })
+
+	cfg, err := config.LoadServerConfig(cfgFile)
+	require.NoError(t, err)
+	_, err = server.InitializeState(cfg.Initialization.StateFile, server.InitializationOptions{
+		AdminPrincipal: types.RawPrincipal{Type: "user", ID: "admin"},
+		AdminGroups:    []string{"knox-admins"},
+	})
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := newAdminRecoverTokenCommand()
+	cmd.SetOut(&stdout)
+	cmd.SetErr(&stderr)
+	cmd.SetArgs([]string{
+		"--principal-type", "user",
+		"--subject", "admin",
+	})
+	require.NoError(t, cmd.Execute())
+
+	token := strings.TrimSpace(stdout.String())
+	require.NotEmpty(t, token)
+	require.Contains(t, stderr.String(), "recovery token expires at")
+	require.Contains(t, stderr.String(), "knox auth login <token>")
+
+	issuer, err := auth.NewFido2TokenIssuer("knox-test", []byte(testFido2SigningKey), 15*time.Minute)
+	require.NoError(t, err)
+	provider := auth.NewFido2TokenProvider(issuer)
+	principal, err := provider.Authenticate(token, httptest.NewRequest(http.MethodGet, "/", nil))
+	require.NoError(t, err)
+	require.Equal(t, "user", principal.Type())
+	require.Equal(t, "admin", principal.GetID())
+}
+
+func TestAdminRecoverTokenRejectsNonAdmin(t *testing.T) {
+	oldCfgFile := cfgFile
+	cfgFile = writeTestFido2ServerConfig(t)
+	t.Cleanup(func() { cfgFile = oldCfgFile })
+
+	cfg, err := config.LoadServerConfig(cfgFile)
+	require.NoError(t, err)
+	_, err = server.InitializeState(cfg.Initialization.StateFile, server.InitializationOptions{
+		AdminPrincipal: types.RawPrincipal{Type: "user", ID: "admin"},
+	})
+	require.NoError(t, err)
+
+	cmd := newAdminRecoverTokenCommand()
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{
+		"--principal-type", "user",
+		"--subject", "mallory",
+	})
+	err = cmd.Execute()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "restricted to initialized Knox global administrators")
+}
+
 func TestFido2AuthAndAdminRoutesSharePrincipalStore(t *testing.T) {
 	cfg := &config.ServerConfig{}
 	configureTestFido2Auth(t, cfg)
