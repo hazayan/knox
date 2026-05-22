@@ -39,7 +39,7 @@ knox-dbus
 Unix server or workstation
   /usr/local/bin/knox-server
   /etc/knox/server.yaml
-  /etc/knox/master.key
+  /var/db/knox/master.key.fido2 or /etc/knox/master.key
   /var/lib/knox/keys
 
 Unix workstation or laptop
@@ -90,14 +90,15 @@ a data encryption key, and that key is encrypted with the master key.
 
 Master key sources:
 
-1. `KNOX_MASTER_KEY`
-2. `KNOX_MASTER_KEY_FILE`
-3. `/etc/knox/master.key`
+1. FIDO2-wrapped encrypted master-key bundle when `master_key.backend` is
+   `fido2`
+2. `KNOX_MASTER_KEY`
+3. `KNOX_MASTER_KEY_FILE`
+4. `/etc/knox/master.key`
 
-Planned hardened deployments should add a FIDO2-backed master-key source. In
-that mode the persisted master key is an encrypted local bundle, and the
-wrapping key is derived from the authenticator's hmac-secret output. This should
-mirror the kunci-server keystore pattern while using a Knox-specific RP ID,
+In FIDO2 mode the persisted master key is an encrypted local bundle, and the
+wrapping key is derived from the authenticator's hmac-secret output. This
+mirrors the kunci-server keystore pattern while using a Knox-specific RP ID,
 credential, salt, and metadata file.
 
 The default operational path should document and test:
@@ -117,11 +118,12 @@ sync with code and tests.
 
 The default profile should prefer a small set of boring authentication options:
 
-- token-based auth for humans and scripts
+- short-lived FIDO2/WebAuthn tokens for humans
+- explicit machine tokens for scoped automation
 - mTLS for machines where host identity matters
 
-SPIFFE and GitHub auth may remain available, but they are not core to the
-default use case and should not drive the default setup.
+SPIFFE and mTLS providers can be configured for machine identity. Third-party
+OAuth-style login is intentionally not part of the current default model.
 
 ## Authorization
 

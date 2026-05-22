@@ -12,6 +12,9 @@ Knox is under active stabilization. The codebase has meaningful pieces in place:
 - AES-256-GCM envelope encryption for stored secrets
 - HTTP API with ACL-aware key operations
 - CLI commands for key, ACL, and config workflows
+- Vault-like one-time initialization with explicit global administrators
+- FIDO2/WebAuthn authentication for short-lived user and machine API tokens
+- FIDO2 hmac-secret wrapping for the Knox master key at rest
 - Filesystem, SQLite, memory, and etcd storage packages
 - D-Bus Secret Service bridge implementation
 - Tests across crypto, storage, server, client, and D-Bus packages
@@ -28,7 +31,8 @@ The practical deployment model is:
 Unix server or workstation
   knox-server
   filesystem or SQLite storage
-  master key from /etc/knox/master.key or KNOX_MASTER_KEY_FILE
+  initialized global administrator state
+  master key from an encrypted FIDO2 bundle, or from a legacy file/env source
   TLS and simple auth appropriate for the deployment
 
 Unix workstation or laptop
@@ -127,8 +131,13 @@ credentials, metadata files, token/key material, and operator ceremonies. The
 storage-unlock credential does not grant API access, and the root/admin identity
 credential does not unwrap storage.
 
-Without `master_key.backend`, the server needs a 32-byte plaintext master key.
-Supported sources, in priority order:
+`master_key.backend: "fido2"` is the hardened path. `knox-server key
+fido2-enroll`, `key init`, `key migrate`, `key backup`, `key restore`, and
+`key unlock-test` manage that bundle explicitly; normal server startup only
+loads the configured bundle.
+
+For compatibility, `master_key.backend: "default"` or `"file"` loads a 32-byte
+plaintext master key. Supported legacy sources, in priority order:
 
 1. `KNOX_MASTER_KEY`, as base64 or hex
 2. `KNOX_MASTER_KEY_FILE`, pointing to an absolute path
@@ -243,6 +252,10 @@ knox policy put trust-services.json
 knox policy get trust-services
 knox policy list
 ```
+
+## License
+
+Knox is distributed under the Apache License 2.0. See [LICENSE](LICENSE).
 
 Policies do not bypass per-key ACL checks for existing keys.
 

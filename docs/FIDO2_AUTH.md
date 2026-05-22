@@ -115,5 +115,8 @@ permissions.
 ## Validation Plan
 
 Normal tests cover server routing, token minting, token validation, credential
-registration/import persistence, and CLI storage without hardware. The opt-in
-hardware drill is gated behind the `fido2hardware libfido2` build tags.
+registration/import persistence, and CLI storage without hardware. The combined
+hardware login command is implemented as `knox auth fido2 login`, and the
+authenticated hardware registration path is `knox auth fido2 register hardware`.
+Opt-in hardware validation remains gated behind the `fido2hardware libfido2`
+build tags.
