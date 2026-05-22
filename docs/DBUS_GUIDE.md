@@ -191,12 +191,12 @@ Each secret item becomes a Knox key:
 
 **D-Bus Item:**
 - Collection: `default`
-- Label: `GitHub Personal Access Token`
-- Attributes: `{application: "github", username: "myuser"}`
-- Secret: `ghp_xxxxxxxxxxxx`
+- Label: `Example API Token`
+- Attributes: `{application: "example-app", username: "operator"}`
+- Secret: `<api-token-value>`
 
 **Knox Key:**
-- ID: `dbus:default:github_personal_access_token`
+- ID: `dbus:default:example_api_token`
 - Data: structured payload containing metadata plus the secret value
 - Metadata: label and attributes packed with the D-Bus secret payload
 
@@ -239,7 +239,7 @@ knox:
 |----------|------------------|------------|----------|
 | `dbus:default:firefox_password` | `Default` | `firefox_password` | ✅ Yes |
 | `dbus:session:temp_token` | `Session` | `temp_token` | ✅ Yes |
-| `service:auth:github_token` | `service_auth` | `github_token` | ✅ Yes |
+| `service:auth:api_token` | `service_auth` | `api_token` | ✅ Yes |
 | `app:database:db_password` | `database_creds` | `db_password` | ✅ Yes |
 | `other:prefix:should_not_appear` | *(none)* | *(none)* | ❌ No |
 
@@ -539,7 +539,7 @@ tail -f /var/log/knox/audit.log | grep dbus:
 Found a bug? Want to add a feature?
 
 1. Check the [Known Limitations](#known-limitations)
-2. Open an issue on GitHub
+2. Open an issue in the project tracker
 3. Submit a pull request!
 
 ## See Also

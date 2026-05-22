@@ -11,7 +11,9 @@ Recommended default:
 - bind to loopback or an address appropriate for the deployment
 - use the filesystem backend first, or SQLite if a single database file is
   preferable
-- keep the master key outside the repository and outside regular shell history
+- use FIDO2-wrapped master-key storage for hardened hosts, or keep legacy
+  plaintext master keys outside the repository and outside regular shell
+  history
 - back up both the storage directory and the master key material
 
 Example filesystem paths:
@@ -57,7 +59,7 @@ Exact user-service commands vary by service manager.
 Backups are only useful if they include the encrypted storage and the master key
 material needed to decrypt it.
 
-For the planned FIDO2-backed master-key mode, backup must include:
+For FIDO2-backed master-key mode, backup must include:
 
 - the Knox storage backend data,
 - the encrypted master-key bundle,

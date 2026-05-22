@@ -123,10 +123,10 @@ unless they are qualified by a clear purpose.
 
 ## Examples
 
-Cloudflare API token for ACME DNS-01:
+DNS provider API token for ACME DNS-01:
 
 ```text
-provider:cloudflare:prod:api-token:acme-dns01
+provider:dns:prod:api-token:acme-dns01
 ```
 
 Kanidm bootstrap credentials on the primary identity host:
@@ -167,7 +167,7 @@ Kha manifests should reference Knox secrets by name only:
 ```toml
 [secret]
 provider = "knox"
-name = "provider:cloudflare:prod:api-token:acme-dns01"
+name = "provider:dns:prod:api-token:acme-dns01"
 ```
 
 Kha must treat secret values as sensitive:

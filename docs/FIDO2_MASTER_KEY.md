@@ -1,8 +1,8 @@
 # FIDO2 Master Key Wrapping
 
 Knox already encrypts stored secret versions with an AES-256-GCM envelope
-scheme. The next hardening step is to protect the Knox master key at rest with
-a local FIDO2 authenticator instead of keeping the plaintext master key in
+scheme. Hardened deployments can protect the Knox master key at rest with a
+local FIDO2 authenticator instead of keeping the plaintext master key in
 `/etc/knox/master.key`.
 
 ## Model
@@ -33,7 +33,7 @@ This storage-unlock credential is not a Knox principal. Possession of it only
 allows the server process to unwrap the master key during startup; it must not
 grant API access or global-admin authority.
 
-## Proposed Config
+## Server Config
 
 ```yaml
 master_key:
@@ -51,10 +51,10 @@ the wrapped Knox master key and must be backed up with the storage.
 ## Implementation Status
 
 The current implementation includes the encrypted master-key bundle format,
-server config selection, admin commands, and a libfido2-backed hardware
-provider. Normal builds keep the fake provider available for tests through
-`KNOX_FIDO2_FAKE_SECRET_B64`; production builds that need hardware FIDO2
-hardware support must be built with:
+server config selection, server-side management commands, backup/restore, and a
+libfido2-backed hardware provider. Normal builds keep the fake provider
+available for tests through `KNOX_FIDO2_FAKE_SECRET_B64`; production builds
+that need hardware FIDO2 support must be built with:
 
 ```sh
 go build -tags libfido2 ./cmd/server
