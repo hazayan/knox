@@ -61,3 +61,4 @@
 [00061] [2026-05-22T20:55:00Z] [SECURITY] Scrubbed public-risk operational references from development notes, examples, tests, and Beads issue metadata before history cleanup.
 [00062] [2026-05-22T21:05:00Z] [DOCUMENTATION] Refreshed README and docs against current initialization, ACL, FIDO2 authentication, FIDO2 master-key, backup, and secret-naming behavior while removing sensitive deployment examples.
 [00063] [2026-05-23T03:04:00Z] [FIX] Registered FIDO2 machine-token authentication alongside user-token authentication and added token-claim inspection so automation principal mismatches can be diagnosed without exposing token material.
+[00064] [2026-05-23T14:26:24Z] [IMPLEMENTATION] Added cluster-scoped Knox peer unlock so a locally unlocked peer can answer single-use HMAC-authenticated rolling restart unlock requests while preserving FIDO2 as the cold-start path.

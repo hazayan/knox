@@ -99,6 +99,55 @@ The operational drill on 2026-05-19 validated copied filesystem storage,
 FIDO2 unlock-test, FIDO2 backup and restore, isolated server startup, key list,
 drill-only key read, rotation, restart, and post-restart readback.
 
+## Cluster Peer Unlock
+
+Knox can use FIDO2 for cold start while allowing rolling maintenance restarts
+from another already-unlocked Knox peer. This is a cluster-scoped operation, not
+a generic remote unlock path.
+
+Cold-start rule:
+
+- if every Knox peer is down, at least one peer must be unlocked locally with
+  the FIDO2 master-key path
+- once one peer is unlocked and serving, another configured peer may restart and
+  request a single-use peer unlock response from it
+
+Server configuration shape:
+
+```yaml
+master_key:
+  backend: fido2
+  encrypted_key_file: /var/db/knox/master.key.fido2
+  metadata_file: /usr/local/etc/knox/fido2-master-key-credential.json
+  pin_file: /var/run/knox/.fido2-master-key.pin
+
+peer_unlock:
+  enabled: true
+  node_id: node-a
+  shared_key_file: /usr/local/etc/knox/peer-unlock.key
+  ttl: 2m
+  peers:
+    - id: node-b
+      url: https://node-b.example.net:9000
+```
+
+The shared key file must be a regular non-symlink file, mode `0600`, and contain
+at least 32 bytes. It may contain raw bytes or a base64-encoded value. Treat it
+as sensitive machine-local cluster material.
+
+Peer unlock behavior:
+
+- local FIDO2 unlock is attempted first
+- if local unlock fails and `peer_unlock.enabled` is true, Knox asks configured
+  peers for `/v0/cluster/peer-unlock`
+- the request is HMAC-authenticated with the shared key and bound to the
+  requester ID, timestamp, and nonce
+- the response wraps the master key with AES-GCM, expires quickly, and the
+  responder rejects replayed request nonces
+
+Operationally, restart peers one at a time. Keep at least one unlocked Knox peer
+online until the restarted peer is healthy.
+
 ## Health Checks
 
 The server exposes unauthenticated operational endpoints:

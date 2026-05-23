@@ -21,6 +21,7 @@ type ServerConfig struct {
 	Initialization InitializationConfig `mapstructure:"initialization"`
 	AccessControl  AccessControlConfig  `mapstructure:"access_control"`
 	MasterKey      MasterKeyConfig      `mapstructure:"master_key"`
+	PeerUnlock     PeerUnlockConfig     `mapstructure:"peer_unlock"`
 	Storage        StorageConfig        `mapstructure:"storage"`
 	Auth           AuthConfig           `mapstructure:"auth"`
 	Observability  ObservabilityConfig  `mapstructure:"observability"`
@@ -51,6 +52,22 @@ type MasterKeyConfig struct {
 	MetadataFile     string `mapstructure:"metadata_file"`
 	Device           string `mapstructure:"device"`
 	PinFile          string `mapstructure:"pin_file"`
+}
+
+// PeerUnlockConfig allows rolling maintenance unlocks from an already-unlocked
+// Knox peer. It is intentionally separate from the master_key backend so FIDO2
+// remains the cold-start path.
+type PeerUnlockConfig struct {
+	Enabled       bool             `mapstructure:"enabled"`
+	NodeID        string           `mapstructure:"node_id"`
+	SharedKeyFile string           `mapstructure:"shared_key_file"`
+	TTL           string           `mapstructure:"ttl"`
+	Peers         []PeerUnlockPeer `mapstructure:"peers"`
+}
+
+type PeerUnlockPeer struct {
+	ID  string `mapstructure:"id"`
+	URL string `mapstructure:"url"`
 }
 
 // StorageConfig holds storage backend configuration.
@@ -201,6 +218,7 @@ func LoadServerConfig(path string) (*ServerConfig, error) {
 	v.SetDefault("initialization.state_file", "/usr/local/etc/knox/init.json")
 	v.SetDefault("access_control.policy_file", "/usr/local/etc/knox/policies.json")
 	v.SetDefault("master_key.backend", "default")
+	v.SetDefault("peer_unlock.ttl", "2m")
 	v.SetDefault("storage.backend", "filesystem")
 	v.SetDefault("storage.filesystem_dir", "/var/lib/knox/keys")
 	v.SetDefault("storage.sqlite_path", "/var/lib/knox/knox.db")
