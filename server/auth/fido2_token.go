@@ -142,16 +142,23 @@ func (i *Fido2TokenIssuer) sign(payload string) string {
 
 // Fido2TokenProvider validates FIDO2-minted Knox API tokens.
 type Fido2TokenProvider struct {
-	issuer *Fido2TokenIssuer
+	issuer    *Fido2TokenIssuer
+	name      string
+	tokenType byte
 }
 
 // NewFido2TokenProvider creates a provider backed by a token issuer.
 func NewFido2TokenProvider(issuer *Fido2TokenIssuer) *Fido2TokenProvider {
-	return &Fido2TokenProvider{issuer: issuer}
+	return &Fido2TokenProvider{issuer: issuer, name: "fido2", tokenType: 'u'}
+}
+
+// NewFido2MachineTokenProvider creates a machine-token provider backed by the same issuer.
+func NewFido2MachineTokenProvider(issuer *Fido2TokenIssuer) *Fido2TokenProvider {
+	return &Fido2TokenProvider{issuer: issuer, name: "fido2_machine", tokenType: 'm'}
 }
 
 func (p *Fido2TokenProvider) Name() string {
-	return "fido2"
+	return p.name
 }
 
 func (p *Fido2TokenProvider) Version() byte {
@@ -159,7 +166,7 @@ func (p *Fido2TokenProvider) Version() byte {
 }
 
 func (p *Fido2TokenProvider) Type() byte {
-	return 'u'
+	return p.tokenType
 }
 
 func (p *Fido2TokenProvider) Authenticate(token string, _ *http.Request) (types.Principal, error) {

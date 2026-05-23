@@ -658,6 +658,12 @@ func setupAuthProviders(cfg *config.ServerConfig) []auth.Provider {
 				continue
 			}
 			providers = append(providers, provider)
+			machineProvider, err := newFido2MachineTokenProvider(cfg.Auth.Fido2)
+			if err != nil {
+				logging.Errorf("Failed to configure FIDO2 machine auth provider: %v", err)
+				continue
+			}
+			providers = append(providers, machineProvider)
 			logging.Debugf("Added FIDO2 auth provider to list")
 			logging.Info("✓ Configured FIDO2 auth provider")
 
@@ -681,6 +687,14 @@ func newFido2TokenProvider(cfg config.Fido2AuthConfig) (auth.Provider, error) {
 		return nil, err
 	}
 	return auth.NewFido2TokenProvider(issuer), nil
+}
+
+func newFido2MachineTokenProvider(cfg config.Fido2AuthConfig) (auth.Provider, error) {
+	issuer, err := newFido2TokenIssuerFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return auth.NewFido2MachineTokenProvider(issuer), nil
 }
 
 func newFido2TokenIssuerFromConfig(cfg config.Fido2AuthConfig) (*auth.Fido2TokenIssuer, error) {

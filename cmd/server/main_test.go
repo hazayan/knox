@@ -514,8 +514,9 @@ func TestSetupAuthProvidersFido2(t *testing.T) {
 	}
 
 	providers := setupAuthProviders(cfg)
-	require.Len(t, providers, 1)
+	require.Len(t, providers, 2)
 	assert.Equal(t, "fido2", providers[0].Name())
+	assert.Equal(t, "fido2_machine", providers[1].Name())
 }
 
 // TestRunServer tests the runServer function.

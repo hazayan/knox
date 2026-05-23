@@ -29,6 +29,7 @@ func newAuthCmd() *cobra.Command {
 	cmd.AddCommand(newAuthLoginCmd())
 	cmd.AddCommand(newAuthLogoutCmd())
 	cmd.AddCommand(newAuthStatusCmd())
+	cmd.AddCommand(newAuthInspectTokenCmd())
 	cmd.AddCommand(newAuthFido2Cmd())
 
 	return cmd
@@ -146,6 +147,77 @@ func newAuthStatusCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newAuthInspectTokenCmd() *cobra.Command {
+	var tokenFile string
+
+	cmd := &cobra.Command{
+		Use:   "inspect-token [TOKEN]",
+		Short: "Inspect local Knox token claims without printing token material",
+		Long:  "Decode Knox token claims without verifying the token signature and without printing token material.",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			token := ""
+			source := "argument"
+			if len(args) == 1 {
+				token = args[0]
+			} else if strings.TrimSpace(tokenFile) != "" {
+				data, err := readAuthTokenFile(tokenFile)
+				if err != nil {
+					return err
+				}
+				token = data
+				source = tokenFile
+			} else if envToken := strings.TrimSpace(os.Getenv("KNOX_MACHINE_AUTH")); envToken != "" {
+				token = envToken
+				source = "KNOX_MACHINE_AUTH"
+			} else if envToken := strings.TrimSpace(os.Getenv("KNOX_USER_AUTH")); envToken != "" {
+				token = envToken
+				source = "KNOX_USER_AUTH"
+			} else {
+				path, err := authTokenPath()
+				if err != nil {
+					return err
+				}
+				data, err := readAuthTokenFile(path)
+				if err != nil {
+					return err
+				}
+				token = data
+				source = path
+			}
+
+			claims, err := inspectTokenClaims(token)
+			if err != nil {
+				return err
+			}
+
+			if jsonOutput {
+				return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
+					"source":         source,
+					"version":        claims.Version,
+					"issuer":         claims.Issuer,
+					"subject":        claims.Subject,
+					"principal_type": claims.PrincipalType,
+					"groups":         claims.Groups,
+					"issued_at":      time.Unix(claims.IssuedAt, 0).UTC(),
+					"expires_at":     time.Unix(claims.ExpiresAt, 0).UTC(),
+				})
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "source: %s\n", source)
+			fmt.Fprintf(cmd.OutOrStdout(), "principal: %s:%s\n", claims.PrincipalType, claims.Subject)
+			fmt.Fprintf(cmd.OutOrStdout(), "issuer: %s\n", claims.Issuer)
+			fmt.Fprintf(cmd.OutOrStdout(), "issued_at: %s\n", time.Unix(claims.IssuedAt, 0).UTC().Format(time.RFC3339))
+			fmt.Fprintf(cmd.OutOrStdout(), "expires_at: %s\n", time.Unix(claims.ExpiresAt, 0).UTC().Format(time.RFC3339))
+			if len(claims.Groups) > 0 {
+				fmt.Fprintf(cmd.OutOrStdout(), "groups: %s\n", strings.Join(claims.Groups, ","))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&tokenFile, "token-file", "", "Read token from an explicit file")
+	return cmd
 }
 
 func newAuthFido2Cmd() *cobra.Command {
@@ -518,6 +590,39 @@ type fido2FinishRequest struct {
 type fido2FinishResponse struct {
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type tokenClaims struct {
+	Version       int      `json:"version"`
+	Issuer        string   `json:"issuer"`
+	Subject       string   `json:"subject"`
+	PrincipalType string   `json:"principal_type"`
+	Groups        []string `json:"groups,omitempty"`
+	IssuedAt      int64    `json:"issued_at"`
+	ExpiresAt     int64    `json:"expires_at"`
+}
+
+func inspectTokenClaims(token string) (tokenClaims, error) {
+	token = strings.TrimSpace(token)
+	if len(token) > 2 && token[0] == '0' && (token[1] == 'u' || token[1] == 'm') {
+		token = token[2:]
+	}
+	parts := strings.Split(token, ".")
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+		return tokenClaims{}, errors.New("token is not a Knox FIDO2 token")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return tokenClaims{}, fmt.Errorf("failed to decode token claims: %w", err)
+	}
+	var claims tokenClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return tokenClaims{}, fmt.Errorf("failed to parse token claims: %w", err)
+	}
+	if claims.Subject == "" || claims.PrincipalType == "" || claims.Issuer == "" {
+		return tokenClaims{}, errors.New("token claims are incomplete")
+	}
+	return claims, nil
 }
 
 func unauthenticatedProfileClient() (*config.ClientProfile, *http.Client, error) {

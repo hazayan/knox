@@ -277,12 +277,17 @@ Token file example:
 knox auth login token-value
 printf '%s\n' "token-value" | knox auth login
 knox auth status
+knox auth inspect-token
+knox auth inspect-token --token-file ~/.config/knox/machine-token
 knox auth logout
 ```
 
 The token file is read from the XDG config directory and must not be readable by
 group or other users. `knox auth login` creates the file with owner-only
-permissions. Trailing whitespace is ignored.
+permissions. Trailing whitespace is ignored. `knox auth inspect-token` decodes
+claims from the selected token without printing token material; it is useful for
+checking whether the client is presenting the expected user or machine
+principal. It does not validate the token signature.
 
 mTLS profile fields:
 
