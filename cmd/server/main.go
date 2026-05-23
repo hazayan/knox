@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -495,13 +496,7 @@ func runServer(_ *cobra.Command, _ []string) error {
 	logging.Info("Storage backend health check passed")
 
 	// Load master encryption key
-	masterKey, err := crypto.LoadMasterKeyWithConfig(crypto.MasterKeyConfig{
-		Backend:          cfg.MasterKey.Backend,
-		EncryptedKeyFile: cfg.MasterKey.EncryptedKeyFile,
-		MetadataFile:     cfg.MasterKey.MetadataFile,
-		Device:           cfg.MasterKey.Device,
-		PinFile:          cfg.MasterKey.PinFile,
-	})
+	masterKey, err := loadMasterKey(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to load master key with backend %q: %w", cfg.MasterKey.Backend, err)
 	}
@@ -513,11 +508,6 @@ func runServer(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to create cryptor: %w", err)
 	}
 	logging.Info("AES-256-GCM cryptor initialized")
-
-	// Clear master key from memory
-	for i := range masterKey {
-		masterKey[i] = 0
-	}
 
 	// Create key database using storage backend adapter
 	db := storage.NewDBAdapter(storageBackend, cryptor)
@@ -540,6 +530,20 @@ func runServer(_ *cobra.Command, _ []string) error {
 	router, err := server.GetRouter(cryptor, db, decorators, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create router: %w", err)
+	}
+	peerUnlockService, err := newPeerUnlockService(cfg, masterKey)
+	if err != nil {
+		return err
+	}
+	if peerUnlockService != nil {
+		defer peerUnlockService.Close()
+		server.RegisterPeerUnlockRoutes(router, peerUnlockService)
+		logging.Info("Peer unlock route enabled")
+	}
+	// Clear the local slice after all components that need their own copy have
+	// been initialized.
+	for i := range masterKey {
+		masterKey[i] = 0
 	}
 	fido2Service, err := newFido2WebAuthnService(cfg)
 	if err != nil {
@@ -769,6 +773,99 @@ func registerPolicyRoutes(router *mux.Router, store *server.ACLPolicyStore, deco
 	router.HandleFunc("/v0/policies/{name}", decorator(getPolicyHandler(store))).Methods(http.MethodGet)
 	router.HandleFunc("/v0/policies/{name}", decorator(putPolicyHandler(store))).Methods(http.MethodPut)
 	router.HandleFunc("/v0/policies/{name}", decorator(deletePolicyHandler(store))).Methods(http.MethodDelete)
+}
+
+func loadMasterKey(cfg *config.ServerConfig) ([]byte, error) {
+	masterKey, err := crypto.LoadMasterKeyWithConfig(crypto.MasterKeyConfig{
+		Backend:          cfg.MasterKey.Backend,
+		EncryptedKeyFile: cfg.MasterKey.EncryptedKeyFile,
+		MetadataFile:     cfg.MasterKey.MetadataFile,
+		Device:           cfg.MasterKey.Device,
+		PinFile:          cfg.MasterKey.PinFile,
+	})
+	if err == nil {
+		return masterKey, nil
+	}
+	if !cfg.PeerUnlock.Enabled {
+		return nil, err
+	}
+	logging.Warnf("Local master key unlock failed; trying configured peers: %v", err)
+	peerService, peerErr := newPeerUnlockService(cfg, make([]byte, crypto.MasterKeyLen))
+	if peerErr != nil {
+		return nil, fmt.Errorf("%w; peer unlock is not usable: %v", err, peerErr)
+	}
+	defer peerService.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	masterKey, peerErr = peerService.UnlockFromPeers(ctx)
+	if peerErr != nil {
+		return nil, fmt.Errorf("%w; peer unlock failed: %v", err, peerErr)
+	}
+	logging.Info("Master encryption key loaded from cluster peer")
+	return masterKey, nil
+}
+
+func newPeerUnlockService(cfg *config.ServerConfig, masterKey []byte) (*server.PeerUnlockService, error) {
+	if !cfg.PeerUnlock.Enabled {
+		return nil, nil
+	}
+	sharedKey, err := readPeerUnlockSharedKey(cfg.PeerUnlock.SharedKeyFile)
+	if err != nil {
+		return nil, err
+	}
+	ttl, err := time.ParseDuration(strings.TrimSpace(cfg.PeerUnlock.TTL))
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer_unlock.ttl: %w", err)
+	}
+	peers := make([]server.PeerUnlockPeer, 0, len(cfg.PeerUnlock.Peers))
+	for _, peer := range cfg.PeerUnlock.Peers {
+		peers = append(peers, server.PeerUnlockPeer{ID: peer.ID, URL: peer.URL})
+	}
+	return server.NewPeerUnlockService(server.PeerUnlockConfig{
+		Enabled:   cfg.PeerUnlock.Enabled,
+		NodeID:    cfg.PeerUnlock.NodeID,
+		SharedKey: sharedKey,
+		TTL:       ttl,
+		Peers:     peers,
+	}, masterKey)
+}
+
+func readPeerUnlockSharedKey(path string) ([]byte, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, errors.New("peer_unlock.shared_key_file is required")
+	}
+	cleaned, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("invalid peer unlock shared key path: %w", err)
+	}
+	info, err := os.Lstat(cleaned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat peer unlock shared key file: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("peer unlock shared key file must not be a symlink")
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("peer unlock shared key file must be a regular file")
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		return nil, fmt.Errorf("peer unlock shared key file has insecure permissions %o (should be 0600)", info.Mode().Perm())
+	}
+	data, err := os.ReadFile(cleaned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read peer unlock shared key file: %w", err)
+	}
+	trimmed := strings.TrimSpace(string(data))
+	for _, decoder := range []*base64.Encoding{base64.StdEncoding, base64.RawStdEncoding, base64.RawURLEncoding} {
+		if decoded, err := decoder.DecodeString(trimmed); err == nil && len(decoded) >= 32 {
+			return decoded, nil
+		}
+	}
+	if len(data) < 32 {
+		return nil, errors.New("peer unlock shared key must contain at least 32 bytes")
+	}
+	return data, nil
 }
 
 func listPoliciesHandler(store *server.ACLPolicyStore) http.HandlerFunc {

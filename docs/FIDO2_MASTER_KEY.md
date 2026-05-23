@@ -48,6 +48,16 @@ The metadata file is not secret, but it should be root-readable only because it
 describes the credential used to unlock the storage. The encrypted key file is
 the wrapped Knox master key and must be backed up with the storage.
 
+## Peer Unlock
+
+FIDO2 remains the cold-start unlock mechanism. For rolling maintenance, Knox can
+fall back to a live cluster peer after local FIDO2 unlock fails. This requires
+`peer_unlock` configuration and a shared cluster unlock key on each peer. The
+live peer must already be unlocked; if all peers are down, FIDO2 is still
+required.
+
+Peer unlock is documented in [Operations](OPERATIONS.md#cluster-peer-unlock).
+
 ## Implementation Status
 
 The current implementation includes the encrypted master-key bundle format,

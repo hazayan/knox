@@ -177,6 +177,25 @@ func TestAuthMintTokenAutomationRejectsUserToken(t *testing.T) {
 	require.Contains(t, err.Error(), "restricted to machine principals")
 }
 
+func TestReadPeerUnlockSharedKeyRejectsLoosePermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "peer.key")
+	require.NoError(t, os.WriteFile(path, []byte("0123456789abcdef0123456789abcdef"), 0o644))
+
+	_, err := readPeerUnlockSharedKey(path)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "insecure permissions")
+}
+
+func TestReadPeerUnlockSharedKeyAcceptsBase64(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "peer.key")
+	raw := []byte("0123456789abcdef0123456789abcdef")
+	require.NoError(t, os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(raw)), 0o600))
+
+	loaded, err := readPeerUnlockSharedKey(path)
+	require.NoError(t, err)
+	require.Equal(t, raw, loaded)
+}
+
 func TestAdminStatusReportsInitializedAdministrators(t *testing.T) {
 	oldCfgFile := cfgFile
 	cfgFile = writeTestFido2ServerConfig(t)

@@ -30,6 +30,14 @@ master_key:
   metadata_file: "/usr/local/etc/knox/fido2-master-key-credential.json"
   device: "auto"
   pin_file: "/var/run/knox/.fido2-master-key.pin"
+peer_unlock:
+  enabled: true
+  node_id: "node-a"
+  shared_key_file: "/usr/local/etc/knox/peer-unlock.key"
+  ttl: "90s"
+  peers:
+    - id: "node-b"
+      url: "https://node-b.example.net:9000"
 auth:
   fido2:
     enabled: true
@@ -77,6 +85,13 @@ limits:
 		assert.Equal(t, "/usr/local/etc/knox/fido2-master-key-credential.json", cfg.MasterKey.MetadataFile)
 		assert.Equal(t, "auto", cfg.MasterKey.Device)
 		assert.Equal(t, "/var/run/knox/.fido2-master-key.pin", cfg.MasterKey.PinFile)
+		assert.True(t, cfg.PeerUnlock.Enabled)
+		assert.Equal(t, "node-a", cfg.PeerUnlock.NodeID)
+		assert.Equal(t, "/usr/local/etc/knox/peer-unlock.key", cfg.PeerUnlock.SharedKeyFile)
+		assert.Equal(t, "90s", cfg.PeerUnlock.TTL)
+		assert.Len(t, cfg.PeerUnlock.Peers, 1)
+		assert.Equal(t, "node-b", cfg.PeerUnlock.Peers[0].ID)
+		assert.Equal(t, "https://node-b.example.net:9000", cfg.PeerUnlock.Peers[0].URL)
 		assert.True(t, cfg.Auth.Fido2.Enabled)
 		assert.Equal(t, "knox.example.net", cfg.Auth.Fido2.RPID)
 		assert.Equal(t, "Knox", cfg.Auth.Fido2.RPName)
@@ -144,6 +159,8 @@ storage:
 	// Verify defaults are set
 	assert.Equal(t, "0.0.0.0:9000", cfg.BindAddress)
 	assert.Equal(t, "default", cfg.MasterKey.Backend)
+	assert.False(t, cfg.PeerUnlock.Enabled)
+	assert.Equal(t, "2m", cfg.PeerUnlock.TTL)
 	assert.Equal(t, "memory", cfg.Storage.Backend)
 	assert.Equal(t, "/var/lib/knox/knox.db", cfg.Storage.SQLitePath)
 	assert.Equal(t, "knox", cfg.Auth.Fido2.TokenIssuer)
