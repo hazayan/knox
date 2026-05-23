@@ -51,12 +51,26 @@ func TestFido2TokenProviderAuthenticatesMachineToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	principal, err := NewFido2TokenProvider(issuer).Authenticate(token, nil)
+	principal, err := NewFido2MachineTokenProvider(issuer).Authenticate(token, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if principal.GetID() != "builder-node" || principal.Type() != "machine" {
 		t.Fatalf("unexpected principal: %s %s", principal.Type(), principal.GetID())
+	}
+}
+
+func TestFido2TokenProvidersAdvertiseUserAndMachinePrefixes(t *testing.T) {
+	issuer := testFido2Issuer(t)
+
+	userProvider := NewFido2TokenProvider(issuer)
+	if userProvider.Name() != "fido2" || userProvider.Version() != '0' || userProvider.Type() != 'u' {
+		t.Fatalf("unexpected user provider identity: %s %c%c", userProvider.Name(), userProvider.Version(), userProvider.Type())
+	}
+
+	machineProvider := NewFido2MachineTokenProvider(issuer)
+	if machineProvider.Name() != "fido2_machine" || machineProvider.Version() != '0' || machineProvider.Type() != 'm' {
+		t.Fatalf("unexpected machine provider identity: %s %c%c", machineProvider.Name(), machineProvider.Version(), machineProvider.Type())
 	}
 }
 

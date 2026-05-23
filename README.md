@@ -198,7 +198,21 @@ knox-server --config /etc/knox/server.yaml auth mint-token \
 recovery path, not a steady-state automation credential. `auth mint-token
 --automation` mints a short-lived machine token for a scoped automation
 principal; access still comes from per-key ACLs or ACL policies and should be
-limited to the namespaces that automation owns.
+limited to the namespaces that automation owns. FIDO2 user tokens are sent with
+the Knox `0u` provider prefix, while FIDO2 machine tokens are sent with `0m`.
+A server with the `fido2` auth provider enabled accepts both prefixes through
+the same signing key and principal store.
+
+Inspect a local token's claims without printing token material:
+
+```bash
+knox auth inspect-token
+knox auth inspect-token --token-file ~/.config/knox/machine-token
+```
+
+The inspection command is a local diagnostic. It decodes token claims so an
+operator can verify the principal and expiry selected by the client; it does not
+validate the token signature.
 
 Start the server:
 

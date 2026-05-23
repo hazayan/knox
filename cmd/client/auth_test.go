@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -89,6 +93,58 @@ func TestAuthStatusJSON(t *testing.T) {
 	assert.Equal(t, true, status["present"])
 }
 
+func TestAuthInspectTokenShowsClaimsWithoutTokenMaterial(t *testing.T) {
+	token := testClientToken(t, map[string]any{
+		"version":        1,
+		"issuer":         "knox-test",
+		"subject":        "kha-controller",
+		"principal_type": "machine",
+		"issued_at":      int64(1000),
+		"expires_at":     int64(2000),
+	})
+
+	cmd := newAuthInspectTokenCmd()
+	cmd.SetArgs([]string{"0m" + token})
+	var out strings.Builder
+	cmd.SetOut(&out)
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	assert.Contains(t, out.String(), "principal: machine:kha-controller")
+	assert.Contains(t, out.String(), "issuer: knox-test")
+	assert.NotContains(t, out.String(), token)
+}
+
+func TestAuthInspectTokenJSON(t *testing.T) {
+	token := testClientToken(t, map[string]any{
+		"version":        1,
+		"issuer":         "knox-test",
+		"subject":        "operator",
+		"principal_type": "user",
+		"groups":         []string{"knox-admins"},
+		"issued_at":      int64(1000),
+		"expires_at":     int64(2000),
+	})
+
+	jsonOutput = true
+	defer func() { jsonOutput = false }()
+
+	cmd := newAuthInspectTokenCmd()
+	cmd.SetArgs([]string{token})
+	var out strings.Builder
+	cmd.SetOut(&out)
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	var result map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out.String()), &result))
+	assert.Equal(t, "user", result["principal_type"])
+	assert.Equal(t, "operator", result["subject"])
+	assert.Equal(t, time.Unix(2000, 0).UTC().Format(time.RFC3339), result["expires_at"])
+}
+
 func TestAuthLogoutRemovesToken(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", configHome)
@@ -157,4 +213,16 @@ func TestReadAssertion(t *testing.T) {
 	_, err = readAssertion("-", strings.NewReader(`{`))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "valid JSON")
+}
+
+func testClientToken(t *testing.T, claims map[string]any) string {
+	t.Helper()
+
+	payload, err := json.Marshal(claims)
+	require.NoError(t, err)
+	payloadB64 := base64.RawURLEncoding.EncodeToString(payload)
+	mac := hmac.New(sha256.New, []byte("0123456789abcdef0123456789abcdef"))
+	_, err = mac.Write([]byte(payloadB64))
+	require.NoError(t, err)
+	return payloadB64 + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

@@ -93,6 +93,12 @@ auth:
     - type: "fido2"
 ```
 
+The configured FIDO2 provider accepts both Knox token classes produced from the
+same signing key and principal store: user tokens use the `0u` provider prefix,
+and automation machine tokens use the `0m` provider prefix. Machine tokens are
+minted locally with `knox-server auth mint-token --automation` and are still
+limited by normal Knox ACLs and ACL policies.
+
 Credential imports use a JSON array of principals:
 
 ```json
