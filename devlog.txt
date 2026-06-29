@@ -58,3 +58,5 @@
 [00058] [2026-05-23T03:04:00Z] [FIX] Registered FIDO2 machine-token authentication alongside user-token authentication and added token-claim inspection so automation principal mismatches can be diagnosed without exposing token material.
 [00059] [2026-05-23T14:26:24Z] [IMPLEMENTATION] Added cluster-scoped Knox peer unlock so a locally unlocked peer can answer single-use HMAC-authenticated rolling restart unlock requests while preserving FIDO2 as the cold-start path.
 [00060] [2026-06-29T22:28:04Z] [CLEANUP] Removed obsolete .git-crypt metadata and encrypted Beads helper scripts from the repository.
+[00061] [2026-06-29T22:45:56Z] [IMPLEMENTATION] Removed stale Beads-era agent ignore metadata and obsolete git-crypt attributes from repository metadata.
+[00062] [2026-06-29T22:49:26Z] [CI] Wired Forgejo tag source releases to consume Forge organization signing secrets and publish archives with SHA-256 checksums.

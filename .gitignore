@@ -17,6 +17,3 @@ DEVELOPMENT.log
 .dolt/
 *.db
 .beads-credential-key
-AGENTS.md
-CLAUDE.md
-.claude/
