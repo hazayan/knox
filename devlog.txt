@@ -57,3 +57,4 @@
 [00057] [2026-05-20T00:02:13Z] [VALIDATION] Added command coverage for Knox administrator status, administrator recovery-token minting, and non-admin recovery rejection, then verified the full Go test suite.
 [00058] [2026-05-23T03:04:00Z] [FIX] Registered FIDO2 machine-token authentication alongside user-token authentication and added token-claim inspection so automation principal mismatches can be diagnosed without exposing token material.
 [00059] [2026-05-23T14:26:24Z] [IMPLEMENTATION] Added cluster-scoped Knox peer unlock so a locally unlocked peer can answer single-use HMAC-authenticated rolling restart unlock requests while preserving FIDO2 as the cold-start path.
+[00060] [2026-06-29T22:28:04Z] [CLEANUP] Removed obsolete .git-crypt metadata and encrypted Beads helper scripts from the repository.
