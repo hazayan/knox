@@ -1,0 +1,12 @@
+title = "knox gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deterministic test key material and placeholder metrics auth examples."
+paths = [
+  '''^client/daemon_test\.go$''',
+  '''^cmd/server/main_test\.go$''',
+  '''^docs/PRODUCTION_GUIDE\.md$''',
+]
