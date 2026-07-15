@@ -6,6 +6,11 @@ on:
       - "v*"
       - "[0-9]*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to regenerate
+        required: true
+        type: string
 
 jobs:
   release:
@@ -22,11 +27,12 @@ jobs:
         shell: sh
         env:
           SOURCE_RELEASE_SIGNING_KEY_B64: ${{ secrets.FOJI_BSD_PKG_REPO_SIGNING_KEY_B64 }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           set -eu
           umask 077
 
-          tag="${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}"
+          tag="${RELEASE_TAG:-${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}}"
           repo="${GITHUB_REPOSITORY#*/}"
           forgejo_host="${FORGEJO_HOST:-https://forge.svc.hazayan.net}"
           forgejo_repo="${GITHUB_REPOSITORY}"
